@@ -3,8 +3,8 @@ import { Database } from '../types/database.types';
 
 // URL y clave anónima (anon key) de tu proyecto de Supabase.
 // Asegúrate de definir estas variables en tu archivo .env.local
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder_key';
 
 /**
  * Cliente de Supabase inicializado.
