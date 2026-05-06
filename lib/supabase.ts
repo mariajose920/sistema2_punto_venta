@@ -1,14 +1,28 @@
 import { createClient } from '@supabase/supabase-js';
 import { Database } from '../types/database.types';
 
-// URL y clave anónima (anon key) de tu proyecto de Supabase.
-// Asegúrate de definir estas variables en tu archivo .env.local
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder_key';
+/**
+ * CONFIGURACIÓN DE SUPABASE
+ * Este archivo centraliza la conexión con el backend de Supabase.
+ */
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+// Validación estricta de variables de entorno
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.warn(
+    '⚠️ ADVERTENCIA: Faltan variables de entorno de Supabase. ' +
+    'Asegúrese de configurar NEXT_PUBLIC_SUPABASE_URL y NEXT_PUBLIC_SUPABASE_ANON_KEY en su archivo .env'
+  );
+}
 
 /**
- * Cliente de Supabase inicializado.
- * Se utiliza el tipo `Database` generado para obtener autocompletado y seguridad de tipos 
- * en todas las consultas a la base de datos.
+ * Cliente de Supabase tipado.
+ * Proporciona autocompletado para tablas, columnas y tipos de datos
+ * definidos en types/database.types.ts
  */
-export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient<Database>(
+  supabaseUrl || 'https://placeholder.supabase.co',
+  supabaseAnonKey || 'placeholder_key'
+);

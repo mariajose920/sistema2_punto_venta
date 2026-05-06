@@ -1,96 +1,115 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { User } from '@supabase/supabase-js';
 
-// Definimos los roles posibles en el sistema, basados en los requisitos
-export type Role = 'admin' | 'cajera' | null;
+// Tipos estrictos para los roles del sistema
+export type Role = 'admin' | 'cajera' | 'proveedor' | null;
 
-interface AuthState {
+export interface AuthState {
   user: User | null;
   role: Role;
   loading: boolean;
+  error: string | null;
+  isMounted: boolean;
 }
 
 /**
- * Hook personalizado para manejar la autenticación y los roles del usuario.
- * Obtiene la sesión actual desde Supabase auth y consulta la tabla 'Usuario'
- * para determinar el rol del usuario conectado.
+ * Hook useAuth: Centraliza la lógica de autenticación y autorización.
+ * Implementa un patrón de observación para mantener el estado sincronizado
+ * con Supabase Auth y la tabla de perfiles 'Usuario'.
  */
 export function useAuth(): AuthState {
-  const [user, setUser] = useState<User | null>(null);
-  const [role, setRole] = useState<Role>(null);
-  // El estado 'loading' evita que se realicen redirecciones prematuras mientras se consulta
-  const [loading, setLoading] = useState<boolean>(true);
+  const [state, setState] = useState<AuthState>({
+    user: null,
+    role: null,
+    loading: true,
+    error: null,
+    isMounted: false,
+  });
+
+  /**
+   * Obtiene el rol de un usuario desde la tabla 'Usuario' de la base de datos.
+   */
+  const fetchUserRole = useCallback(async (userId: string): Promise<Role> => {
+    try {
+      const { data, error } = await supabase
+        .from('Usuario')
+        .select('rol')
+        .eq('id', userId)
+        .single();
+
+      if (error || !data) return null;
+      // Tipado explícito para evitar 'never' en la inferencia de Supabase
+      const userRole = (data as { rol: string }).rol as Role;
+      return userRole;
+    } catch (err) {
+      console.error('[useAuth] Error inesperado consultando rol:', err);
+      return null;
+
+    }
+  }, []);
 
   useEffect(() => {
-    // Función asíncrona para obtener la sesión actual y el rol del usuario de la base de datos
-    const fetchSessionAndRole = async () => {
+    let active = true;
+
+    // 1. Inicialización de sesión al cargar el componente
+    const initializeAuth = async () => {
       try {
-        setLoading(true);
-        // 1. Obtenemos la sesión actual de Supabase Auth
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-        
+
         if (sessionError) throw sessionError;
 
         if (session?.user) {
-          setUser(session.user);
-          
-          // 2. Consultamos la tabla 'Usuario' para obtener el rol.
-          // Comparamos el ID de auth.users con la columna 'id' de la tabla 'Usuario'
-          const { data: usuarioData, error: roleError } = await supabase
-            .from('Usuario')
-            .select('rol')
-            .eq('id', session.user.id)
-            .single();
-
-          if (roleError) {
-            console.error('Error al obtener el rol del usuario desde la tabla Usuario:', roleError);
-            setRole(null);
-          } else if (usuarioData) {
-            // Asignamos el rol obtenido (debe ser 'admin' o 'cajera')
-            setRole(usuarioData.rol as Role);
+          const role = await fetchUserRole(session.user.id);
+          if (active) {
+            setState({ user: session.user, role, loading: false, error: null, isMounted: true });
           }
         } else {
-          setUser(null);
-          setRole(null);
+          if (active) {
+            setState({ user: null, role: null, loading: false, error: null, isMounted: true });
+          }
         }
-      } catch (error) {
-        console.error('Error inesperado en la autenticación:', error);
-      } finally {
-        setLoading(false);
+      } catch (err: any) {
+        if (active) {
+          setState(prev => ({
+            ...prev,
+            loading: false,
+            error: err.message || 'Error inicializando auth',
+            isMounted: true
+          }));
+        }
       }
     };
 
-    fetchSessionAndRole();
+    initializeAuth();
 
-    // 3. Nos suscribimos a los cambios de estado de autenticación (ej. cuando el usuario hace login o logout)
+    // 2. Suscripción a cambios en tiempo real (Login, Logout, Token Refresh)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        if (!active) return;
+
         if (session?.user) {
-          setUser(session.user);
-          // Al cambiar la sesión (ej. tras un login), volvemos a consultar el rol
-          const { data: usuarioData } = await supabase
-            .from('Usuario')
-            .select('rol')
-            .eq('id', session.user.id)
-            .single();
-            
-          setRole(usuarioData?.rol as Role);
+          const currentRole = await fetchUserRole(session.user.id);
+          setState({
+            user: session.user,
+            role: currentRole,
+            loading: false,
+            error: null,
+            isMounted: true
+          });
         } else {
-          setUser(null);
-          setRole(null);
+          setState({ user: null, role: null, loading: false, error: null, isMounted: true });
         }
-        setLoading(false);
       }
     );
 
-    // Limpiamos la suscripción de Supabase al desmontar el componente para evitar fugas de memoria
     return () => {
+      active = false;
       subscription.unsubscribe();
     };
-  }, []);
+  }, [fetchUserRole]);
 
-  return { user, role, loading };
+  return state;
 }
