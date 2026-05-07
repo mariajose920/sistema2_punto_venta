@@ -120,11 +120,32 @@ export default function ProductosPage() {
 
     try {
       setLoading(true);
+      
+      // Validación de Código de Barras Único (si se ingresó uno)
+      if (formData.codigo_barra && formData.codigo_barra.trim() !== '') {
+        const { data: existente, error: checkError } = await (supabase as any)
+          .from('Producto')
+          .select('id, nombre')
+          .eq('codigo_barra', formData.codigo_barra.trim())
+          .neq('id', editingId || '00000000-0000-0000-0000-000000000000') // Excluir el actual si editamos
+          .maybeSingle();
+
+        if (existente) {
+          throw new Error(`El código de barras ya pertenece al producto: "${existente.nombre}"`);
+        }
+      }
+
+      // Limpiar código de barras si está vacío para evitar colisiones de strings vacíos
+      const finalData = {
+        ...formData,
+        codigo_barra: formData.codigo_barra?.trim() || null
+      };
+
       if (editingId) {
-        const { error } = await (supabase as any).from('Producto').update(formData).eq('id', editingId);
+        const { error } = await (supabase as any).from('Producto').update(finalData).eq('id', editingId);
         if (error) throw error;
       } else {
-        const { error } = await (supabase as any).from('Producto').insert([formData]);
+        const { error } = await (supabase as any).from('Producto').insert([finalData]);
         if (error) throw error;
       }
       
@@ -132,7 +153,7 @@ export default function ProductosPage() {
       resetForm();
       fetchData();
     } catch (err: any) {
-      alert('Error al guardar: ' + err.message);
+      alert('Error: ' + err.message);
     } finally {
       setLoading(false);
     }
@@ -219,7 +240,7 @@ export default function ProductosPage() {
                 <tr><td colSpan={6} className="p-12 text-center animate-pulse font-bold text-gray-400">Consultando Base de Datos...</td></tr>
               ) : filtrados.map(p => (
                 <tr key={p.id} className={`hover:bg-gray-50 dark:hover:bg-gray-700/20 transition-colors ${p.stock_actual <= p.stock_minimo ? 'bg-red-50/30 dark:bg-red-900/10' : ''}`}>
-                  <td className="px-6 py-4 font-mono text-xs text-gray-400">{p.codigo_barra}</td>
+                  <td className="px-6 py-4 font-mono text-xs text-gray-400">{p.codigo_barra || 'S/N'}</td>
                   <td className="px-6 py-4">
                     <p className="font-bold text-gray-900 dark:text-white">{p.nombre}</p>
                     <p className="text-[10px] font-bold text-blue-600 uppercase tracking-wider">{p.categoria}</p>
@@ -271,36 +292,46 @@ export default function ProductosPage() {
             <form onSubmit={handleSave} className="p-8 space-y-4 max-h-[70vh] overflow-y-auto">
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2 sm:col-span-1">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-1">Código de Barras</label>
-                  <input required value={formData.codigo_barra} onChange={e => setFormData({...formData, codigo_barra: e.target.value})} className="w-full p-3 bg-gray-50 dark:bg-gray-900 rounded-xl focus:ring-2 focus:ring-blue-600 border-none font-bold" />
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-1">Código de Barras (Opcional)</label>
+                  <input 
+                    placeholder="Escanear o digitar..."
+                    value={formData.codigo_barra || ''} 
+                    onChange={e => setFormData({...formData, codigo_barra: e.target.value})} 
+                    className="w-full p-3 bg-gray-50 dark:bg-gray-900 rounded-xl focus:ring-2 focus:ring-blue-600 border-none font-bold" 
+                  />
                 </div>
                 
                 <div className="col-span-2 sm:col-span-1">
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-1">Categoría</label>
                   {!showNewCategoryInput ? (
-                    <div className="relative group">
-                      <select 
-                        required 
-                        value={formData.categoria} 
-                        onChange={e => {
-                          if (e.target.value === 'NEW') setShowNewCategoryInput(true);
-                          else setFormData({...formData, categoria: e.target.value});
-                        }} 
-                        className="w-full p-3 bg-gray-50 dark:bg-gray-900 rounded-xl focus:ring-2 focus:ring-blue-600 border-none font-bold appearance-none pr-10"
+                    <div className="space-y-2">
+                      <div className="relative group">
+                        <select 
+                          required 
+                          value={formData.categoria} 
+                          onChange={e => setFormData({...formData, categoria: e.target.value})} 
+                          className="w-full p-3 bg-gray-50 dark:bg-gray-900 rounded-xl focus:ring-2 focus:ring-blue-600 border-none font-bold appearance-none pr-10"
+                        >
+                          <option value="">Seleccionar...</option>
+                          {categorias.map(cat => (
+                            <option key={cat.id} value={cat.nombre}>{cat.nombre}</option>
+                          ))}
+                        </select>
+                        <span className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">▼</span>
+                      </div>
+                      <button 
+                        type="button"
+                        onClick={() => setShowNewCategoryInput(true)}
+                        className="text-[10px] font-black text-blue-600 hover:text-blue-700 uppercase tracking-widest flex items-center gap-1 transition-colors"
                       >
-                        <option value="">Seleccionar...</option>
-                        {categorias.map(cat => (
-                          <option key={cat.id} value={cat.nombre}>{cat.nombre}</option>
-                        ))}
-                        <option value="NEW" className="text-blue-600 font-bold">+ Agregar nueva categoría</option>
-                      </select>
-                      <span className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">▼</span>
+                        <span>➕</span> Agregar nueva categoría
+                      </button>
                     </div>
                   ) : (
-                    <div className="flex items-center gap-2 w-full">
+                    <div className="flex items-center gap-2 w-full animate-in slide-in-from-top-2 duration-200">
                       <input 
                         autoFocus
-                        placeholder="Nueva..."
+                        placeholder="Nueva categoría..."
                         value={newCategoryName}
                         onChange={e => setNewCategoryName(e.target.value)}
                         className="flex-1 min-w-0 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-800 font-bold text-sm outline-none focus:ring-2 focus:ring-blue-600"
@@ -309,15 +340,13 @@ export default function ProductosPage() {
                         type="button" 
                         onClick={handleSaveCategory} 
                         className="flex-shrink-0 w-10 h-10 flex items-center justify-center bg-blue-600 text-white rounded-xl shadow-lg shadow-blue-200 dark:shadow-none hover:scale-105 active:scale-95 transition-all"
-                        title="Guardar Categoría"
                       >
                         ✓
                       </button>
                       <button 
                         type="button" 
                         onClick={() => setShowNewCategoryInput(false)} 
-                        className="flex-shrink-0 w-10 h-10 flex items-center justify-center bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-xl hover:bg-gray-300 dark:hover:bg-gray-600 transition-all"
-                        title="Cancelar"
+                        className="flex-shrink-0 w-10 h-10 flex items-center justify-center bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-xl"
                       >
                         ✕
                       </button>
