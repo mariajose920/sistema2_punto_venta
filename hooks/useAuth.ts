@@ -40,14 +40,20 @@ export function useAuth(): AuthState {
         .eq('id', userId)
         .single();
 
-      if (error || !data) return null;
-      // Tipado explícito para evitar 'never' en la inferencia de Supabase
+      if (error || !data) {
+        console.warn('[useAuth] No se pudo obtener el rol. Verifique políticas RLS o configuración de Supabase URL.');
+        return null;
+      }
+      
       const userRole = (data as { rol: string }).rol as Role;
       return userRole;
-    } catch (err) {
-      console.error('[useAuth] Error inesperado consultando rol:', err);
+    } catch (err: any) {
+      if (err.message?.includes('Unexpected token')) {
+        console.error('[useAuth CRITICAL] Error de configuración de URL en Supabase. Se recibió HTML en lugar de JSON.');
+      } else {
+        console.error('[useAuth] Error inesperado:', err);
+      }
       return null;
-
     }
   }, []);
 

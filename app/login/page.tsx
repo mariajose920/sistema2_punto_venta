@@ -62,7 +62,14 @@ export default function LoginPage() {
         router.push(destination);
       }
     } catch (err: any) {
-      setError(err.message || 'Error crítico en el proceso de autenticación.');
+      let errorMessage = err.message || 'Error inesperado en el servidor.';
+      
+      // Detectar el error clásico de recibir HTML en lugar de JSON
+      if (errorMessage.includes('Unexpected token') && errorMessage.includes('<')) {
+        errorMessage = 'ERROR DE CONFIGURACIÓN: El sistema recibió una página web en lugar de una respuesta de datos. Verifica que NEXT_PUBLIC_SUPABASE_URL en Vercel sea la URL de tu proyecto de Supabase (https://xxxx.supabase.co) y no la URL de tu sitio web.';
+      }
+
+      setError(errorMessage);
       console.error('[LoginProcessError]', err);
     } finally {
       setLoading(false);

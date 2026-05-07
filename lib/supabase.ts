@@ -6,14 +6,26 @@ import { Database } from '../types/database.types';
  * Este archivo centraliza la conexión con el backend de Supabase.
  */
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
 
-// Validación de presencia de variables (Error fatal si no existen)
+// Validación de presencia y formato de variables
 if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error(
-    'FALTAN VARIABLES DE ENTORNO: Revisa que NEXT_PUBLIC_SUPABASE_URL y NEXT_PUBLIC_SUPABASE_ANON_KEY estén configuradas en tu archivo .env o en el panel de Vercel.'
-  );
+  throw new Error('CONFIGURACIÓN INCOMPLETA: Faltan NEXT_PUBLIC_SUPABASE_URL o NEXT_PUBLIC_SUPABASE_ANON_KEY en Vercel.');
 }
 
-export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey);
+// Validación de seguridad: Evitar que se use la URL de Vercel como URL de Supabase
+if (supabaseUrl.includes('vercel.app') || !supabaseUrl.startsWith('https://')) {
+  throw new Error(`URL DE SUPABASE INVÁLIDA: La URL "${supabaseUrl}" no parece ser un endpoint de Supabase legítimo. Debe empezar con https:// y ser del tipo xxxxx.supabase.co`);
+}
+
+// Limpiar URL de posibles barras finales que rompen el fetch
+const cleanUrl = supabaseUrl.endsWith('/') ? supabaseUrl.slice(0, -1) : supabaseUrl;
+
+export const supabase = createClient<Database>(cleanUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true
+  }
+});
