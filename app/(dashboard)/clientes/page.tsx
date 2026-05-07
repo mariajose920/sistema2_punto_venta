@@ -51,7 +51,7 @@ export default function ClientesPage() {
   const fetchClientes = useCallback(async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase.from('Cliente').select('*').order('nombre');
+      const { data, error } = await (supabase as any).from('Cliente').select('*').order('nombre');
       if (error) throw error;
       setClientes(data || []);
       setFiltered(data || []);
@@ -75,10 +75,10 @@ export default function ClientesPage() {
     e.preventDefault();
     try {
       if (selectedCliente?.id) {
-        const { error } = await supabase.from('Cliente').update(formData).eq('id', selectedCliente.id);
+        const { error } = await (supabase as any).from('Cliente').update(formData).eq('id', selectedCliente.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from('Cliente').insert([formData]);
+        const { error } = await (supabase as any).from('Cliente').insert([formData]);
         if (error) throw error;
       }
       setIsModalOpen(false);
@@ -97,19 +97,19 @@ export default function ClientesPage() {
         { data: ventas },
         { data: pagos }
       ] = await Promise.all([
-        supabase.from('Venta').select('id_venta, total_venta, fecha_venta').eq('id_cliente', cliente.id).eq('forma_pago', 'fiado'),
-        supabase.from('Pago').select('id, monto, created_at, metodo_pago').eq('cliente_id', cliente.id)
+        (supabase as any).from('Venta').select('id_venta, total_venta, fecha_venta').eq('id_cliente', cliente.id).eq('forma_pago', 'fiado'),
+        (supabase as any).from('Pago').select('id, monto, created_at, metodo_pago').eq('cliente_id', cliente.id)
       ]);
 
       const movs: Movimiento[] = [
-        ...(ventas || []).map(v => ({
+        ...(ventas || []).map((v: any) => ({
           id: v.id_venta,
           tipo: 'venta' as const,
           monto: v.total_venta,
           fecha: v.fecha_venta,
           referencia: `Venta #${v.id_venta.slice(0, 8)}`
         })),
-        ...(pagos || []).map(p => ({
+        ...(pagos || []).map((p: any) => ({
           id: p.id,
           tipo: 'pago' as const,
           monto: p.monto,
@@ -132,7 +132,7 @@ export default function ClientesPage() {
       setLoading(true);
       
       // 1. Registrar el Pago
-      const { error: pError } = await supabase.from('Pago').insert([{
+      const { error: pError } = await (supabase as any).from('Pago').insert([{
         cliente_id: selectedCliente.id,
         monto: montoAbono,
         metodo_pago: metodoPago
@@ -156,7 +156,7 @@ export default function ClientesPage() {
       if (cError) throw cError;
 
       // 4. Saldar créditos pendientes (Lógica interna: reduce saldo_pendiente de los créditos más viejos)
-      const { data: creditos } = await supabase
+      const { data: creditos } = await (supabase as any)
         .from('Credito')
         .select('*')
         .eq('cliente_id', selectedCliente.id)

@@ -46,7 +46,7 @@ export default function ProductosPage() {
   const fetchProductos = useCallback(async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('Producto')
         .select('*')
         .order('nombre', { ascending: true });
@@ -89,11 +89,11 @@ export default function ProductosPage() {
       setLoading(true);
       if (editingId) {
         // ACTUALIZAR
-        const { error } = await supabase.from('Producto').update(formData).eq('id', editingId);
+        const { error } = await (supabase as any).from('Producto').update(formData).eq('id', editingId);
         if (error) throw error;
       } else {
         // CREAR
-        const { error } = await supabase.from('Producto').insert([formData]);
+        const { error } = await (supabase as any).from('Producto').insert([formData]);
         if (error) throw error;
       }
       
@@ -114,7 +114,7 @@ export default function ProductosPage() {
     }
 
     if (window.confirm('¿Eliminar este producto permanentemente?')) {
-      const { error } = await supabase.from('Producto').delete().eq('id', id);
+      const { error } = await (supabase as any).from('Producto').delete().eq('id', id);
       if (error) alert('Error: ' + error.message);
       else fetchProductos();
     }

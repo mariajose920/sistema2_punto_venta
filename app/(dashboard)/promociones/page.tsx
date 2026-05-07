@@ -33,7 +33,7 @@ export default function PromocionesPage() {
   const fetchPromos = useCallback(async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase.from('Promocion').select('*').order('created_at', { ascending: false });
+      const { data, error } = await (supabase as any).from('Promocion').select('*').order('created_at', { ascending: false });
       if (error) throw error;
       setPromociones(data || []);
     } catch (err) {
@@ -51,9 +51,9 @@ export default function PromocionesPage() {
 
     try {
       if (selectedPromo?.id) {
-        await supabase.from('Promocion').update(formData).eq('id', selectedPromo.id);
+        await (supabase as any).from('Promocion').update(formData).eq('id', selectedPromo.id);
       } else {
-        await supabase.from('Promocion').insert([formData]);
+        await (supabase as any).from('Promocion').insert([formData]);
       }
       setIsModalOpen(false);
       fetchPromos();
@@ -64,7 +64,7 @@ export default function PromocionesPage() {
 
   const toggleStatus = async (promo: Promocion) => {
     if (role !== 'admin') return;
-    await supabase.from('Promocion').update({ activa: !promo.activa }).eq('id', promo.id);
+    await (supabase as any).from('Promocion').update({ activa: !promo.activa }).eq('id', promo.id);
     fetchPromos();
   };
 
