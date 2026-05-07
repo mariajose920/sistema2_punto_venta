@@ -278,32 +278,49 @@ export default function ProductosPage() {
                 <div className="col-span-2 sm:col-span-1">
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-1">Categoría</label>
                   {!showNewCategoryInput ? (
-                    <select 
-                      required 
-                      value={formData.categoria} 
-                      onChange={e => {
-                        if (e.target.value === 'NEW') setShowNewCategoryInput(true);
-                        else setFormData({...formData, categoria: e.target.value});
-                      }} 
-                      className="w-full p-3 bg-gray-50 dark:bg-gray-900 rounded-xl focus:ring-2 focus:ring-blue-600 border-none font-bold appearance-none"
-                    >
-                      <option value="">Seleccionar...</option>
-                      {categorias.map(cat => (
-                        <option key={cat.id} value={cat.nombre}>{cat.nombre}</option>
-                      ))}
-                      <option value="NEW" className="text-blue-600 font-bold">+ Agregar nueva categoría</option>
-                    </select>
+                    <div className="relative group">
+                      <select 
+                        required 
+                        value={formData.categoria} 
+                        onChange={e => {
+                          if (e.target.value === 'NEW') setShowNewCategoryInput(true);
+                          else setFormData({...formData, categoria: e.target.value});
+                        }} 
+                        className="w-full p-3 bg-gray-50 dark:bg-gray-900 rounded-xl focus:ring-2 focus:ring-blue-600 border-none font-bold appearance-none pr-10"
+                      >
+                        <option value="">Seleccionar...</option>
+                        {categorias.map(cat => (
+                          <option key={cat.id} value={cat.nombre}>{cat.nombre}</option>
+                        ))}
+                        <option value="NEW" className="text-blue-600 font-bold">+ Agregar nueva categoría</option>
+                      </select>
+                      <span className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">▼</span>
+                    </div>
                   ) : (
-                    <div className="flex gap-2">
+                    <div className="flex items-center gap-2 w-full">
                       <input 
                         autoFocus
-                        placeholder="Nombre categoría..."
+                        placeholder="Nueva..."
                         value={newCategoryName}
                         onChange={e => setNewCategoryName(e.target.value)}
-                        className="flex-1 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-800 font-bold"
+                        className="flex-1 min-w-0 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-800 font-bold text-sm outline-none focus:ring-2 focus:ring-blue-600"
                       />
-                      <button type="button" onClick={handleSaveCategory} className="px-4 bg-blue-600 text-white rounded-xl">✓</button>
-                      <button type="button" onClick={() => setShowNewCategoryInput(false)} className="px-4 bg-gray-200 text-gray-600 rounded-xl">✕</button>
+                      <button 
+                        type="button" 
+                        onClick={handleSaveCategory} 
+                        className="flex-shrink-0 w-10 h-10 flex items-center justify-center bg-blue-600 text-white rounded-xl shadow-lg shadow-blue-200 dark:shadow-none hover:scale-105 active:scale-95 transition-all"
+                        title="Guardar Categoría"
+                      >
+                        ✓
+                      </button>
+                      <button 
+                        type="button" 
+                        onClick={() => setShowNewCategoryInput(false)} 
+                        className="flex-shrink-0 w-10 h-10 flex items-center justify-center bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-xl hover:bg-gray-300 dark:hover:bg-gray-600 transition-all"
+                        title="Cancelar"
+                      >
+                        ✕
+                      </button>
                     </div>
                   )}
                 </div>
