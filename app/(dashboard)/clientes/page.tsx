@@ -48,6 +48,39 @@ export default function ClientesPage() {
     telefono: '',
   });
 
+  // Utilidades de RUT
+  const cleanRUT = (rut: string) => rut.replace(/[^0-9kK]/g, '').toUpperCase();
+
+  const validateRUT = (rut: string) => {
+    const clean = cleanRUT(rut);
+    if (clean.length < 2) return false;
+    const body = clean.slice(0, -1);
+    const dv = clean.slice(-1);
+    let sum = 0;
+    let mul = 2;
+    for (let i = body.length - 1; i >= 0; i--) {
+      sum += parseInt(body.charAt(i)) * mul;
+      mul = mul === 7 ? 2 : mul + 1;
+    }
+    const res = 11 - (sum % 11);
+    const calculatedDV = res === 11 ? '0' : res === 10 ? 'K' : res.toString();
+    return calculatedDV === dv;
+  };
+
+  const formatRUT = (rut: string) => {
+    const clean = cleanRUT(rut);
+    if (clean.length < 2) return clean;
+    const body = clean.slice(0, -1);
+    const dv = clean.slice(-1);
+    let formatted = '';
+    for (let i = body.length - 1, j = 1; i >= 0; i--, j++) {
+      formatted = body.charAt(i) + formatted;
+      if (j % 3 === 0 && i !== 0) formatted = '.' + formatted;
+    }
+    return `${formatted}-${dv}`;
+  };
+
+  // 1. Cargar clientes
   const fetchClientes = useCallback(async () => {
     try {
       setLoading(true);
@@ -67,24 +100,49 @@ export default function ClientesPage() {
   useEffect(() => {
     const term = search.toLowerCase();
     setFiltered(clientes.filter(c => 
-      c.nombre.toLowerCase().includes(term)
+      c.nombre.toLowerCase().includes(term) || (c as any).rut?.includes(term)
     ));
   }, [search, clientes]);
 
   const handleSaveCliente = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      if (!formData.nombre) throw new Error('El nombre es obligatorio');
+      if (!(formData as any).rut) throw new Error('El RUT es obligatorio');
+      
+      const rutNormalizado = formatRUT((formData as any).rut);
+      if (!validateRUT(rutNormalizado)) throw new Error('El RUT ingresado no es válido');
+
+      setLoading(true);
+
+      // Validar duplicado de RUT
+      const { data: existente } = await (supabase as any)
+        .from('Cliente')
+        .select('id, nombre')
+        .eq('rut', rutNormalizado)
+        .neq('id', selectedCliente?.id || '00000000-0000-0000-0000-000000000000')
+        .maybeSingle();
+
+      if (existente) {
+        throw new Error(`Ya existe un cliente registrado con el RUT: ${rutNormalizado} (${existente.nombre})`);
+      }
+
+      const finalData = { ...formData, rut: rutNormalizado };
+
       if (selectedCliente?.id) {
-        const { error } = await (supabase as any).from('Cliente').update(formData).eq('id', selectedCliente.id);
+        const { error } = await (supabase as any).from('Cliente').update(finalData).eq('id', selectedCliente.id);
         if (error) throw error;
       } else {
-        const { error } = await (supabase as any).from('Cliente').insert([formData]);
+        const { error } = await (supabase as any).from('Cliente').insert([finalData]);
         if (error) throw error;
       }
+      
       setIsModalOpen(false);
       fetchClientes();
     } catch (err: any) {
-      alert('Error: ' + err.message);
+      alert(err.message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -203,7 +261,7 @@ export default function ClientesPage() {
             <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
             <input 
               type="text" 
-              placeholder="Buscar cliente..." 
+              placeholder="Buscar por nombre o RUT..." 
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full pl-12 pr-4 py-4 bg-gray-50 dark:bg-gray-900 border-none rounded-2xl font-bold text-sm focus:ring-4 focus:ring-blue-600/10 transition-all"
@@ -211,7 +269,7 @@ export default function ClientesPage() {
           </div>
           {role === 'admin' && (
             <button 
-              onClick={() => { setSelectedCliente(null); setFormData({ nombre: '', telefono: '' }); setIsModalOpen(true); }}
+              onClick={() => { setSelectedCliente(null); setFormData({ nombre: '', telefono: '', rut: '' } as any); setIsModalOpen(true); }}
               className="bg-blue-600 text-white px-8 py-4 rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl shadow-blue-100 dark:shadow-none hover:bg-blue-700 transition-all"
             >
               Nuevo Cliente
@@ -229,6 +287,7 @@ export default function ClientesPage() {
             <div className="flex justify-between items-start mb-6">
               <div>
                 <h3 className="text-xl font-black text-gray-900 dark:text-white truncate max-w-[150px]">{c.nombre}</h3>
+                <p className="text-[10px] font-bold text-blue-600 uppercase tracking-widest italic">{(c as any).rut || 'Sin RUT'}</p>
                 <p className="text-[10px] font-bold text-gray-400 uppercase">{c.telefono || 'Sin contacto'}</p>
               </div>
               <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-white shadow-lg ${c.saldo_deudado > 0 ? 'bg-red-500' : 'bg-emerald-500'}`}>
@@ -386,6 +445,18 @@ export default function ClientesPage() {
             </h2>
             <form onSubmit={handleSaveCliente} className="space-y-4">
               <div>
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">RUT (Sin puntos ni guion)</label>
+                <input 
+                  required 
+                  autoFocus
+                  placeholder="12345678-9"
+                  value={(formData as any).rut || ''} 
+                  onBlur={e => setFormData({...formData, rut: formatRUT(e.target.value)} as any)}
+                  onChange={e => setFormData({...formData, rut: e.target.value} as any)} 
+                  className="w-full p-4 bg-blue-50 dark:bg-blue-900/20 rounded-2xl border-none font-black text-xl text-blue-600" 
+                />
+              </div>
+              <div>
                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Nombre Completo / Razón Social</label>
                 <input required value={formData.nombre} onChange={e => setFormData({...formData, nombre: e.target.value})} className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold" placeholder="Ej: Juan Pérez" />
               </div>
@@ -396,8 +467,8 @@ export default function ClientesPage() {
               
               <div className="flex gap-4 pt-8">
                 <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 font-bold text-gray-400">Cancelar</button>
-                <button type="submit" className="flex-[2] py-5 bg-blue-600 text-white font-black rounded-2xl shadow-xl shadow-blue-100 dark:shadow-none hover:bg-blue-700 transition-all">
-                  {selectedCliente ? 'ACTUALIZAR FICHA' : 'CREAR CLIENTE'}
+                <button type="submit" disabled={loading} className="flex-[2] py-5 bg-blue-600 text-white font-black rounded-2xl shadow-xl shadow-blue-100 dark:shadow-none hover:bg-blue-700 transition-all">
+                  {loading ? 'GUARDANDO...' : selectedCliente ? 'ACTUALIZAR FICHA' : 'CREAR CLIENTE'}
                 </button>
               </div>
             </form>
