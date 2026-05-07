@@ -17,51 +17,54 @@ export default function LoginPage() {
     setError(null);
 
     try {
-      // 1. Iniciamos sesión con correo y contraseña en Supabase Auth
+      // 1. Normalización de credenciales
+      const cleanEmail = email.trim().toLowerCase();
+      const cleanPassword = password.trim();
+
+      console.log('[Auth] Intento de login:', cleanEmail);
+
+      // 2. Autenticación en Supabase Auth
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
+        email: cleanEmail,
+        password: cleanPassword,
       });
 
       if (authError) {
-        // Manejamos el error de credenciales incorrectas u otros problemas de autenticación
-        // Se arroja el error para ser capturado en el bloque catch
-        throw new Error('Credenciales inválidas. Por favor verifica tu correo y contraseña.');
+        console.error('[AuthError]', authError.status, authError.message);
+        
+        if (authError.status === 400 || authError.message.toLowerCase().includes('invalid login credentials')) {
+          throw new Error('ACCESO DENEGADO: El correo o la contraseña no coinciden. Verifica los datos en el panel de Supabase Auth.');
+        }
+        if (authError.message.includes('Email not confirmed')) {
+          throw new Error('CORREO NO CONFIRMADO: Debes validar tu email o marcarlo como verificado en el dashboard de Supabase.');
+        }
+        throw new Error(`FALLA DE CONEXIÓN: ${authError.message}`);
       }
 
-      if (authData.user) {
-        // 2. Una vez autenticado, consultamos el rol del usuario en nuestra tabla 'Usuario'
-        const { data: usuarioData, error: roleError } = await supabase
+      if (authData?.user) {
+        // 3. Resolución de Perfil y Rol (Tabla Usuario)
+        const { data: usuarioData, error: roleError } = await (supabase as any)
           .from('Usuario')
           .select('rol')
           .eq('id', authData.user.id)
           .single();
 
         if (roleError || !usuarioData) {
-          // Manejamos el caso donde el usuario existe en Auth pero no tiene su rol configurado en la tabla
-          throw new Error('No se pudo verificar el rol del usuario. Contacta al administrador.');
+          console.error('[RoleError]', roleError);
+          throw new Error('PERFIL INCOMPLETO: Autenticación exitosa, pero el usuario no existe en la tabla pública "Usuario".');
         }
 
-        // 3. Lógica de redirección basada en el rol obtenido de la base de datos
+        // 4. Redirección basada en Rol
         const userRole = usuarioData.rol;
-        if (userRole === 'admin') {
-          // Redirigimos al panel de administrador si es admin
-          router.push('/admin');
-        } else if (userRole === 'cajera') {
-          // Redirigimos al panel de la cajera si tiene ese rol
-          router.push('/cajera');
-        } else {
-          // Error en caso de roles no contemplados
-          throw new Error('Rol de usuario no reconocido en el sistema.');
-        }
+        const destination = userRole === 'admin' ? '/admin' : '/cajera';
+        
+        console.log('[LoginSuccess] Redirigiendo a:', destination);
+        router.push(destination);
       }
-    } catch (err: unknown) {
-      // Capturamos cualquier error (ya sea de Supabase Auth o de nuestra propia validación)
-      // y lo establecemos en el estado para mostrarlo en la interfaz gráfica
-      setError(err instanceof Error ? err.message : 'Ocurrió un error inesperado al intentar iniciar sesión.');
-      console.error('Error en handleLogin:', err);
+    } catch (err: any) {
+      setError(err.message || 'Error crítico en el proceso de autenticación.');
+      console.error('[LoginProcessError]', err);
     } finally {
-      // Finalizamos el estado de carga, independientemente del éxito o error
       setLoading(false);
     }
   };

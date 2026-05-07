@@ -18,10 +18,10 @@ interface UserMetrics {
 }
 
 interface Venta {
-  id: string;
-  total: number;
-  created_at: string;
-  tipo_pago: string;
+  id_venta: string;
+  total_venta: number;
+  fecha_venta: string;
+  forma_pago: string;
 }
 
 export default function UsuariosPage() {
@@ -56,17 +56,18 @@ export default function UsuariosPage() {
     setLoading(true);
     
     try {
-      const { data: ventas, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('Venta')
-        .select('*')
-        .eq('usuario_id', user.id)
-        .gte('created_at', fechaDesde)
-        .lte('created_at', `${fechaHasta}T23:59:59`)
-        .order('created_at', { ascending: false });
+        .select('id_venta, total_venta, fecha_venta, forma_pago')
+        .eq('id_usuario_cajera', user.id)
+        .gte('fecha_venta', fechaDesde)
+        .lte('fecha_venta', `${fechaHasta}T23:59:59`)
+        .order('fecha_venta', { ascending: false });
 
       if (error) throw error;
 
-      const total = (ventas || []).reduce((acc, v) => acc + v.total, 0);
+      const ventas = data as Venta[];
+      const total = (ventas || []).reduce((acc, v) => acc + (v.total_venta || 0), 0);
       const cantidad = (ventas || []).length;
       
       setMetrics({
@@ -88,7 +89,7 @@ export default function UsuariosPage() {
       return;
     }
 
-    const { error } = await supabase
+    const { error } = await (supabase as any)
       .from('Usuario')
       .update({ rol: newRole })
       .eq('id', userId);
@@ -98,7 +99,7 @@ export default function UsuariosPage() {
       alert(`Rol actualizado a ${newRole}`);
       fetchUsuarios();
       if (selectedUser?.id === userId) {
-        setSelectedUser({ ...selectedUser, rol: newRole });
+        setSelectedUser({ ...selectedUser, rol: newRole } as Usuario);
       }
     }
   };
@@ -110,7 +111,7 @@ export default function UsuariosPage() {
     }
 
     if (window.confirm('¿Estás seguro de eliminar el acceso de este usuario? Esta acción solo lo elimina de la base de datos operativa, no de Supabase Auth.')) {
-      const { error } = await supabase.from('Usuario').delete().eq('id', userId);
+      const { error } = await (supabase as any).from('Usuario').delete().eq('id', userId);
       if (error) alert('Error: ' + error.message);
       else {
         alert('Usuario eliminado del sistema operativo.');
@@ -226,18 +227,18 @@ export default function UsuariosPage() {
                       </thead>
                       <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
                         {historial.map(v => (
-                          <tr key={v.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-700/20 transition-colors">
+                          <tr key={v.id_venta} className="hover:bg-gray-50/50 dark:hover:bg-gray-700/20 transition-colors">
                             <td className="px-8 py-5">
-                              <p className="font-bold text-gray-900 dark:text-white">{new Date(v.created_at).toLocaleDateString()}</p>
-                              <p className="text-[10px] text-gray-400 font-bold uppercase">{new Date(v.created_at).toLocaleTimeString()}</p>
+                              <p className="font-bold text-gray-900 dark:text-white">{new Date(v.fecha_venta).toLocaleDateString()}</p>
+                              <p className="text-[10px] text-gray-400 font-bold uppercase">{new Date(v.fecha_venta).toLocaleTimeString()}</p>
                             </td>
                             <td className="px-8 py-5">
                               <span className="px-3 py-1 bg-gray-100 dark:bg-gray-900 rounded-full text-[9px] font-black uppercase tracking-tighter text-gray-500">
-                                {v.tipo_pago}
+                                {v.forma_pago}
                               </span>
                             </td>
                             <td className="px-8 py-5 text-right font-black text-gray-900 dark:text-white">
-                              ${v.total.toLocaleString()}
+                              ${v.total_venta.toLocaleString()}
                             </td>
                           </tr>
                         ))}
@@ -260,6 +261,7 @@ export default function UsuariosPage() {
     </div>
   );
 }
+
 
 function StatCard({ title, value, icon }: any) {
   return (

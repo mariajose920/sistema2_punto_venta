@@ -6,12 +6,12 @@ import { useAuth } from '@/hooks/useAuth';
 import Link from 'next/link';
 
 interface Compra {
-  id: string;
-  total: number;
-  created_at: string;
+  id_compra: string;
+  total_compra: number;
+  fecha_compra: string;
   Proveedor: {
-    nombre: string;
-  };
+    nombre_empresa: string;
+  } | null;
 }
 
 export default function ComprasPage() {
@@ -22,10 +22,10 @@ export default function ComprasPage() {
   const fetchCompras = useCallback(async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('Compra')
-        .select('id, total, created_at, Proveedor(nombre)')
-        .order('created_at', { ascending: false });
+        .select('id_compra, total_compra, fecha_compra, Proveedor(nombre_empresa)')
+        .order('fecha_compra', { ascending: false });
 
       if (error) throw error;
       setCompras(data || []);
@@ -82,19 +82,19 @@ export default function ComprasPage() {
               ) : compras.length === 0 ? (
                 <tr><td colSpan={4} className="p-12 text-center text-gray-400 italic">No hay compras registradas.</td></tr>
               ) : compras.map(compra => (
-                <tr key={compra.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-700/20 transition-colors">
+                <tr key={compra.id_compra} className="hover:bg-gray-50/50 dark:hover:bg-gray-700/20 transition-colors">
                   <td className="px-8 py-6 font-bold text-gray-900 dark:text-white">
-                    {new Date(compra.created_at).toLocaleDateString()}
-                    <p className="text-[10px] text-gray-400 font-black">{new Date(compra.created_at).toLocaleTimeString()}</p>
+                    {new Date(compra.fecha_compra).toLocaleDateString()}
+                    <p className="text-[10px] text-gray-400 font-black">{new Date(compra.fecha_compra).toLocaleTimeString()}</p>
                   </td>
                   <td className="px-8 py-6">
                     <span className="font-black text-emerald-600 uppercase text-xs tracking-tighter">
-                      {compra.Proveedor?.nombre || 'Proveedor Desconocido'}
+                      {compra.Proveedor?.nombre_empresa || 'Proveedor Desconocido'}
                     </span>
                   </td>
                   <td className="px-8 py-6 text-right">
                     <span className="font-black text-gray-900 dark:text-white text-lg">
-                      ${compra.total.toLocaleString()}
+                      ${compra.total_compra.toLocaleString()}
                     </span>
                   </td>
                   <td className="px-8 py-6 text-center">
@@ -109,3 +109,4 @@ export default function ComprasPage() {
     </div>
   );
 }
+

@@ -34,7 +34,7 @@ interface CartItem extends Product {
 }
 
 export default function NuevaVentaPage() {
-  const { user } = useAuth();
+  const { user, role } = useAuth();
   const router = useRouter();
   
   // Estados de datos
@@ -65,9 +65,9 @@ export default function NuevaVentaPage() {
     const fetchData = async () => {
       const today = new Date().toISOString().split('T')[0];
       const [pRes, cRes, promoRes] = await Promise.all([
-        supabase.from('Producto').select('id, codigo_barra, nombre, precio_venta_publico, stock_actual').gt('stock_actual', 0),
-        supabase.from('Cliente').select('id, nombre, saldo_deudado'),
-        supabase.from('Promocion')
+        (supabase as any).from('Producto').select('id, codigo_barra, nombre, precio_venta_publico, stock_actual').gt('stock_actual', 0),
+        (supabase as any).from('Cliente').select('id, nombre, saldo_deudado'),
+        (supabase as any).from('Promocion')
           .select('id, nombre, tipo, valor')
           .eq('activa', true)
           .lte('fecha_inicio', today)
@@ -171,25 +171,33 @@ export default function NuevaVentaPage() {
       return;
     }
 
+    if (!user) {
+      alert('Error: Sesión no válida.');
+      return;
+    }
+
     try {
       setLoading(true);
-      const { data: venta, error: vError } = await supabase
+      
+      // 1. Crear la cabecera de la Venta
+      const { data: venta, error: vError } = await (supabase as any)
         .from('Venta')
         .insert([{
-          id_usuario_cajera: user?.id,
+          id_usuario_cajera: user.id,
           id_cliente: selectedClientId || null,
           total_venta: totalFinal,
           forma_pago: paymentMethod,
-          iva: totalFinal * 0.19, // IVA ejemplo 19%
+          iva: totalFinal * 0.19,
           estado: 'cerrada'
         }])
         .select()
         .single();
 
-      if (vError) throw vError;
+      if (vError || !venta) throw vError || new Error('Error al crear la cabecera de venta');
 
+      // 2. Insertar detalles y actualizar stock
       for (const item of cart) {
-        await supabase.from('DetalleVenta').insert([{
+        const { error: dError } = await (supabase as any).from('DetalleVenta').insert([{
           id_venta: venta.id_venta,
           id_producto: item.isVariable ? null : item.id,
           cantidad: item.cantidad,
@@ -198,27 +206,41 @@ export default function NuevaVentaPage() {
           subtotal: item.subtotal
         }]);
 
+        if (dError) throw dError;
+
         if (!item.isVariable) {
-          const { data: prod } = await supabase.from('Producto').select('stock_actual').eq('id', item.id).single();
-          await supabase.from('Producto').update({ stock_actual: (prod?.stock_actual || 0) - item.cantidad }).eq('id', item.id);
+          const { data: prod, error: pFetchError } = await (supabase as any).from('Producto').select('stock_actual').eq('id', item.id).single();
+          if (pFetchError) throw pFetchError;
+          
+          const stockUpdate: any = { stock_actual: (prod?.stock_actual || 0) - item.cantidad };
+          const { error: pUpdateError } = await (supabase as any).from('Producto').update(stockUpdate).eq('id', item.id);
+          if (pUpdateError) throw pUpdateError;
         }
       }
 
-      if (paymentMethod === 'fiado') {
-        await supabase.from('Credito').insert([{
+      // 3. Manejar Crédito si es Fiado
+      if (paymentMethod === 'fiado' && selectedClientId) {
+        const { error: cError } = await (supabase as any).from('Credito').insert([{
           cliente_id: selectedClientId,
           venta_id: venta.id_venta,
           monto_inicial: totalFinal,
           saldo_pendiente: totalFinal,
           estado: 'vigente'
         }]);
-        const { data: cli } = await supabase.from('Cliente').select('saldo_deudado').eq('id', selectedClientId).single();
-        await supabase.from('Cliente').update({ saldo_deudado: (cli?.saldo_deudado || 0) + totalFinal }).eq('id', selectedClientId);
+
+        if (cError) throw cError;
+
+        const { data: cli, error: cliFetchError } = await (supabase as any).from('Cliente').select('saldo_deudado').eq('id', selectedClientId).single();
+        if (cliFetchError) throw cliFetchError;
+
+        const clienteUpdate: any = { saldo_deudado: (cli?.saldo_deudado || 0) + totalFinal };
+        const { error: cliUpdateError } = await (supabase as any).from('Cliente').update(clienteUpdate).eq('id', selectedClientId);
+        if (cliUpdateError) throw cliUpdateError;
       }
 
       alert('Venta completada');
       setCart([]);
-      router.push(user?.role === 'admin' ? '/admin' : '/cajera');
+      router.push(role === 'admin' ? '/admin' : '/cajera');
     } catch (err: any) {
       alert('Error: ' + err.message);
     } finally {

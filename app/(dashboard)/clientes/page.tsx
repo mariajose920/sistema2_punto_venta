@@ -149,7 +149,7 @@ export default function ClientesPage() {
       }
 
       // 3. Actualizar Cliente
-      const { error: cError } = await supabase.from('Cliente').update({
+      const { error: cError } = await (supabase.from('Cliente') as any).update({
         saldo_deudado: nuevaDeuda,
         saldo_favor: nuevoSaldoFavor
       }).eq('id', selectedCliente.id);
@@ -169,7 +169,7 @@ export default function ClientesPage() {
           if (restante <= 0) break;
           const aPagar = Math.min(cred.saldo_pendiente, restante);
           const nuevoSaldoCred = cred.saldo_pendiente - aPagar;
-          await supabase.from('Credito').update({
+          await (supabase.from('Credito') as any).update({
             saldo_pendiente: nuevoSaldoCred,
             estado: nuevoSaldoCred <= 0 ? 'pagado' : 'vigente'
           }).eq('id', cred.id);

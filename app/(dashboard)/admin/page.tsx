@@ -50,6 +50,12 @@ export default function AdminDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Tipos locales para asegurar la inferencia en las consultas
+  interface VentaRow { total_venta: number; forma_pago: string; }
+  interface CompraRow { total_compra: number; }
+  interface CreditoRow { saldo_pendiente: number; }
+  interface ProductoRow { stock_actual: number; stock_minimo: number; precio_compra: number; }
+
   useEffect(() => {
     // Protección de ruta y prevención de ejecución antes de hidratación
     if (!isMounted) return;
@@ -63,12 +69,11 @@ export default function AdminDashboardPage() {
         setLoading(true);
         setError(null);
 
-        // Consultas en paralelo para optimizar el tiempo de carga
         const [
-          { data: ventas, error: e1 },
-          { data: compras, error: e2 },
-          { data: creditos, error: e3 },
-          { data: productos, error: e4 }
+          { data: vData, error: e1 },
+          { data: cData, error: e2 },
+          { data: crData, error: e3 },
+          { data: pData, error: e4 }
         ] = await Promise.all([
           supabase.from('Venta').select('total_venta, forma_pago'),
           supabase.from('Compra').select('total_compra'),
@@ -76,23 +81,25 @@ export default function AdminDashboardPage() {
           supabase.from('Producto').select('stock_actual, stock_minimo, precio_compra')
         ]);
 
-        // Manejo centralizado de errores de Supabase
-        if (e1 || e2 || e3 || e4) {
-          throw new Error('No se pudo sincronizar con la base de datos. Verifique su conexión.');
-        }
+        if (e1 || e2 || e3 || e4) throw new Error('Error al sincronizar con la base de datos.');
 
-        // Cálculos financieros (Uso de null-coalescing para evitar errores de undefined)
-        const ingresos = ventas?.reduce((acc, v) => acc + (Number(v.total_venta) || 0), 0) || 0;
-        const gastos = compras?.reduce((acc, c) => acc + (Number(c.total_compra) || 0), 0) || 0;
-        const cuentasPorCobrar = creditos?.reduce((acc, cr) => acc + (Number(cr.saldo_pendiente) || 0), 0) || 0;
+        const ventas = (vData || []) as unknown as VentaRow[];
+        const compras = (cData || []) as unknown as CompraRow[];
+        const creditos = (crData || []) as unknown as CreditoRow[];
+        const productos = (pData || []) as unknown as ProductoRow[];
+
+        // Cálculos financieros con tipos seguros
+        const ingresos = ventas.reduce((acc, v) => acc + (Number(v.total_venta) || 0), 0);
+        const gastos = compras.reduce((acc, c) => acc + (Number(c.total_compra) || 0), 0);
+        const cuentasPorCobrar = creditos.reduce((acc, cr) => acc + (Number(cr.saldo_pendiente) || 0), 0);
         
-        const totalVentasContado = ventas?.filter(v => v.forma_pago !== 'fiado').reduce((acc, v) => acc + (Number(v.total_venta) || 0), 0) || 0;
-        const totalVentasCredito = ventas?.filter(v => v.forma_pago === 'fiado').reduce((acc, v) => acc + (Number(v.total_venta) || 0), 0) || 0;
+        const totalVentasContado = ventas.filter(v => v.forma_pago !== 'fiado').reduce((acc, v) => acc + (Number(v.total_venta) || 0), 0);
+        const totalVentasCredito = ventas.filter(v => v.forma_pago === 'fiado').reduce((acc, v) => acc + (Number(v.total_venta) || 0), 0);
 
         let valorInventario = 0;
         let stockBajo = 0;
         
-        productos?.forEach(p => {
+        productos.forEach(p => {
           const stock = Number(p.stock_actual) || 0;
           const costo = Number(p.precio_compra) || 0;
           const minimo = Number(p.stock_minimo) || 0;

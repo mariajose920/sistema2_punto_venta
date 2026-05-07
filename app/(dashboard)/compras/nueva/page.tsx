@@ -8,13 +8,13 @@ import { useRouter } from 'next/navigation';
 interface Product {
   id: string;
   nombre: string;
-  codigo: string;
+  codigo_barra: string;
   precio_compra: number;
 }
 
 interface Provider {
-  id: string;
-  nombre: string;
+  id_proveedor: string;
+  nombre_empresa: string;
 }
 
 interface CompraItem extends Product {
@@ -24,7 +24,7 @@ interface CompraItem extends Product {
 }
 
 export default function NuevaCompraPage() {
-  const { role } = useAuth();
+  const { role, isMounted } = useAuth();
   const router = useRouter();
   
   const [productos, setProductos] = useState<Product[]>([]);
@@ -37,20 +37,21 @@ export default function NuevaCompraPage() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    if (!isMounted) return;
     if (role !== 'admin') {
       router.push('/login');
       return;
     }
     const fetchData = async () => {
       const [pRes, provRes] = await Promise.all([
-        supabase.from('Producto').select('id, nombre, codigo, precio_compra'),
-        supabase.from('Proveedor').select('id, nombre')
+        (supabase as any).from('Producto').select('id, nombre, codigo_barra, precio_compra'),
+        (supabase as any).from('Proveedor').select('id_proveedor, nombre_empresa')
       ]);
       setProductos(pRes.data || []);
       setProveedores(provRes.data || []);
     };
     fetchData();
-  }, [role, router]);
+  }, [role, router, isMounted]);
 
   const addToCart = (product: Product) => {
     const existing = cart.find(item => item.id === product.id);
@@ -85,28 +86,35 @@ export default function NuevaCompraPage() {
     try {
       setLoading(true);
       // 1. Insertar Compra
-      const { data: compra, error: cError } = await supabase
+      const { data: compra, error: cError } = await (supabase as any)
         .from('Compra')
-        .insert([{ proveedor_id: selectedProviderId, total: total }])
+        .insert([{ 
+          id_proveedor: selectedProviderId, 
+          total_compra: total,
+          fecha_compra: new Date().toISOString(),
+          forma_pago_compra: 'efectivo'
+        }])
         .select().single();
 
-      if (cError) throw cError;
+      if (cError || !compra) throw cError || new Error('Error al crear cabecera de compra');
 
       // 2. Insertar Detalles y Actualizar Productos
       for (const item of cart) {
-        await supabase.from('CompraDetalle').insert([{
-          compra_id: compra.id,
-          producto_id: item.id,
+        const { error: dError } = await (supabase as any).from('DetalleCompra').insert([{
+          id_compra: compra.id_compra,
+          id_producto: item.id,
           cantidad: item.cantidad,
-          precio_unitario: item.costo_unitario,
+          precio_unitario_compra: item.costo_unitario,
           subtotal: item.subtotal
         }]);
 
+        if (dError) throw dError;
+
         // Actualizar Stock y Precio de Compra en catálogo
-        const { data: currentProd } = await supabase.from('Producto').select('stock').eq('id', item.id).single();
-        await supabase.from('Producto').update({
-          stock: (currentProd?.stock || 0) + item.cantidad,
-          precio_compra: item.costo_unitario // Actualizamos con el último costo
+        const { data: currentProd } = await (supabase as any).from('Producto').select('stock_actual').eq('id', item.id).single();
+        await (supabase as any).from('Producto').update({
+          stock_actual: (currentProd?.stock_actual || 0) + item.cantidad,
+          precio_compra: item.costo_unitario 
         }).eq('id', item.id);
       }
 
@@ -118,6 +126,8 @@ export default function NuevaCompraPage() {
       setLoading(false);
     }
   };
+
+  if (!isMounted) return null;
 
   return (
     <div className="flex flex-col lg:flex-row gap-8 animate-in fade-in duration-500">
@@ -132,7 +142,7 @@ export default function NuevaCompraPage() {
             className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold text-gray-900 dark:text-white appearance-none focus:ring-2 focus:ring-emerald-600"
           >
             <option value="">-- Seleccionar Proveedor --</option>
-            {proveedores.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
+            {proveedores.map(p => <option key={p.id_proveedor} value={p.id_proveedor}>{p.nombre_empresa}</option>)}
           </select>
         </div>
 
@@ -148,7 +158,7 @@ export default function NuevaCompraPage() {
           />
           {showSearch && (
             <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl shadow-2xl z-50 max-h-60 overflow-auto">
-              {productos.filter(p => p.nombre.toLowerCase().includes(search.toLowerCase()) || p.codigo.includes(search)).map(p => (
+              {productos.filter(p => p.nombre.toLowerCase().includes(search.toLowerCase()) || p.codigo_barra?.includes(search)).map(p => (
                 <button key={p.id} onClick={() => addToCart(p)} className="w-full p-4 text-left hover:bg-emerald-50 dark:hover:bg-emerald-900/20 border-b last:border-0 border-gray-50 dark:border-gray-700">
                   <p className="font-bold text-gray-900 dark:text-white">{p.nombre}</p>
                   <p className="text-[10px] font-black text-gray-400">Último Costo: ${p.precio_compra?.toLocaleString()}</p>
@@ -215,3 +225,4 @@ export default function NuevaCompraPage() {
     </div>
   );
 }
+
