@@ -8,6 +8,7 @@ interface Cliente {
   id: string;
   nombre: string;
   telefono: string;
+  rut: string; // Campo ahora explícito
   saldo_deudado: number;
   saldo_favor: number;
   created_at: string;
@@ -28,6 +29,7 @@ export default function ClientesPage() {
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [filtered, setFiltered] = useState<Cliente[]>([]);
   const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null); // Nuevo: para mostrar errores al usuario
   const [search, setSearch] = useState('');
   
   // Estados de Modales
@@ -46,10 +48,11 @@ export default function ClientesPage() {
   const [formData, setFormData] = useState<Partial<Cliente>>({
     nombre: '',
     telefono: '',
+    rut: ''
   });
 
   // Utilidades de RUT
-  const cleanRUT = (rut: string) => rut.replace(/[^0-9kK]/g, '').toUpperCase();
+  const cleanRUT = (rut: string) => (rut || '').replace(/[^0-9kK]/g, '').toUpperCase();
 
   const validateRUT = (rut: string) => {
     const clean = cleanRUT(rut);
@@ -84,12 +87,19 @@ export default function ClientesPage() {
   const fetchClientes = useCallback(async () => {
     try {
       setLoading(true);
-      const { data, error } = await (supabase as any).from('Cliente').select('*').order('nombre');
+      setErrorMsg(null);
+      const { data, error } = await (supabase as any)
+        .from('Cliente')
+        .select('*')
+        .order('nombre', { ascending: true });
+      
       if (error) throw error;
+      
       setClientes(data || []);
       setFiltered(data || []);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error cargando clientes:', err);
+      setErrorMsg(err.message || 'Error al conectar con la base de datos');
     } finally {
       setLoading(false);
     }
@@ -100,7 +110,8 @@ export default function ClientesPage() {
   useEffect(() => {
     const term = search.toLowerCase();
     setFiltered(clientes.filter(c => 
-      c.nombre.toLowerCase().includes(term) || (c as any).rut?.includes(term)
+      c.nombre.toLowerCase().includes(term) || 
+      (c.rut && c.rut.toLowerCase().includes(term))
     ));
   }, [search, clientes]);
 
@@ -282,6 +293,16 @@ export default function ClientesPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {loading && clientes.length === 0 ? (
           <div className="col-span-full py-20 text-center animate-pulse text-gray-400 font-bold">Consultando saldos...</div>
+        ) : errorMsg ? (
+          <div className="col-span-full py-20 text-center text-red-500 bg-red-50 dark:bg-red-900/10 rounded-[2rem] border border-red-100 dark:border-red-900/30">
+            <p className="font-black uppercase tracking-widest mb-2">Acceso Restringido o Error</p>
+            <p className="text-sm font-bold opacity-70 mb-4">{errorMsg}</p>
+            <button onClick={() => fetchClientes()} className="bg-red-600 text-white px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest">Reintentar</button>
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="col-span-full py-20 text-center text-gray-400 font-bold italic border-2 border-dashed border-gray-100 dark:border-gray-800 rounded-[2rem]">
+            No se encontraron clientes registrados.
+          </div>
         ) : filtered.map(c => (
           <div key={c.id} className="bg-white dark:bg-gray-800 p-8 rounded-[2rem] border border-gray-100 dark:border-gray-700 shadow-sm hover:shadow-md transition-all group">
             <div className="flex justify-between items-start mb-6">
