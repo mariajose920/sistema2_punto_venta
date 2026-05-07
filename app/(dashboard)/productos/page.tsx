@@ -21,12 +21,15 @@ export default function ProductosPage() {
   // Estados de datos
   const [productos, setProductos] = useState<Producto[]>([]);
   const [filtrados, setFiltrados] = useState<Producto[]>([]);
+  const [categorias, setCategorias] = useState<{id: string, nombre: string}[]>([]);
   
   // Estados de UI
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [showNewCategoryInput, setShowNewCategoryInput] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
   
   // Estado para el formulario (Agregar/Editar)
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -42,40 +45,70 @@ export default function ProductosPage() {
 
   const barcodeRef = useRef<HTMLInputElement>(null);
 
-  // 1. Cargar productos desde Supabase
-  const fetchProductos = useCallback(async () => {
+  // Utilidades de Formateo
+  const formatNumber = (val: number | undefined) => {
+    if (val === undefined || val === null) return '';
+    return val.toLocaleString('es-CL');
+  };
+
+  const parseNumber = (val: string) => {
+    // Elimina todo lo que no sea número y quita ceros iniciales al convertir
+    const clean = val.replace(/\D/g, '');
+    const num = parseInt(clean, 10);
+    return isNaN(num) ? 0 : num;
+  };
+
+  // 1. Cargar datos desde Supabase
+  const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      const { data, error } = await (supabase as any)
+      // Cargar Productos
+      const { data: prodData, error: prodError } = await (supabase as any)
         .from('Producto')
         .select('*')
         .order('nombre', { ascending: true });
-
-      if (error) throw error;
-      setProductos(data || []);
-      setFiltrados(data || []);
+      if (prodError) throw prodError;
+      
+      // Cargar Categorías
+      const { data: catData, error: catError } = await (supabase as any)
+        .from('Categoria')
+        .select('*')
+        .order('nombre', { ascending: true });
+      
+      setProductos(prodData || []);
+      setFiltrados(prodData || []);
+      setCategorias(catData || []);
     } catch (err: any) {
-      console.error('Error cargando productos:', err);
-      setError('Error al conectar con el inventario de Supabase.');
+      console.error('Error cargando datos:', err);
+      setError('Error al conectar con Supabase.');
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    fetchProductos();
-  }, [fetchProductos]);
+    fetchData();
+  }, [fetchData]);
 
-  // 2. Lógica de Búsqueda (Filtro local para velocidad)
-  useEffect(() => {
-    const term = searchTerm.toLowerCase();
-    const filtered = productos.filter(p => 
-      p.nombre.toLowerCase().includes(term) || 
-      p.codigo_barra?.toLowerCase().includes(term) ||
-      p.categoria.toLowerCase().includes(term)
-    );
-    setFiltrados(filtered);
-  }, [searchTerm, productos]);
+  // Manejo de nueva categoría
+  const handleSaveCategory = async () => {
+    if (!newCategoryName.trim()) return;
+    try {
+      const { data, error } = await (supabase as any)
+        .from('Categoria')
+        .insert([{ nombre: newCategoryName.trim() }])
+        .select()
+        .single();
+      
+      if (error) throw error;
+      setCategorias([...categorias, data]);
+      setFormData({ ...formData, categoria: data.nombre });
+      setShowNewCategoryInput(false);
+      setNewCategoryName('');
+    } catch (err: any) {
+      alert('Error al crear categoría: ' + err.message);
+    }
+  };
 
   // 3. Acciones de CRUD
   const handleSave = async (e: React.FormEvent) => {
@@ -88,18 +121,16 @@ export default function ProductosPage() {
     try {
       setLoading(true);
       if (editingId) {
-        // ACTUALIZAR
         const { error } = await (supabase as any).from('Producto').update(formData).eq('id', editingId);
         if (error) throw error;
       } else {
-        // CREAR
         const { error } = await (supabase as any).from('Producto').insert([formData]);
         if (error) throw error;
       }
       
       setIsModalOpen(false);
       resetForm();
-      fetchProductos();
+      fetchData();
     } catch (err: any) {
       alert('Error al guardar: ' + err.message);
     } finally {
@@ -109,14 +140,14 @@ export default function ProductosPage() {
 
   const handleEliminar = async (id: string) => {
     if (role !== 'admin') {
-      alert('Acción restringida: Las bajas deben ser procesadas por un administrador.');
+      alert('Acción restringida.');
       return;
     }
 
     if (window.confirm('¿Eliminar este producto permanentemente?')) {
       const { error } = await (supabase as any).from('Producto').delete().eq('id', id);
       if (error) alert('Error: ' + error.message);
-      else fetchProductos();
+      else fetchData();
     }
   };
 
@@ -128,6 +159,7 @@ export default function ProductosPage() {
 
   const resetForm = () => {
     setEditingId(null);
+    setShowNewCategoryInput(false);
     setFormData({
       codigo_barra: '',
       nombre: '',
@@ -236,35 +268,90 @@ export default function ProductosPage() {
               <button onClick={() => setIsModalOpen(false)} className="text-2xl hover:rotate-90 transition-transform">✕</button>
             </div>
             
-            <form onSubmit={handleSave} className="p-8 space-y-4">
+            <form onSubmit={handleSave} className="p-8 space-y-4 max-h-[70vh] overflow-y-auto">
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2 sm:col-span-1">
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-1">Código de Barras</label>
                   <input required value={formData.codigo_barra} onChange={e => setFormData({...formData, codigo_barra: e.target.value})} className="w-full p-3 bg-gray-50 dark:bg-gray-900 rounded-xl focus:ring-2 focus:ring-blue-600 border-none font-bold" />
                 </div>
+                
                 <div className="col-span-2 sm:col-span-1">
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-1">Categoría</label>
-                  <input required value={formData.categoria} onChange={e => setFormData({...formData, categoria: e.target.value})} className="w-full p-3 bg-gray-50 dark:bg-gray-900 rounded-xl focus:ring-2 focus:ring-blue-600 border-none font-bold" />
+                  {!showNewCategoryInput ? (
+                    <select 
+                      required 
+                      value={formData.categoria} 
+                      onChange={e => {
+                        if (e.target.value === 'NEW') setShowNewCategoryInput(true);
+                        else setFormData({...formData, categoria: e.target.value});
+                      }} 
+                      className="w-full p-3 bg-gray-50 dark:bg-gray-900 rounded-xl focus:ring-2 focus:ring-blue-600 border-none font-bold appearance-none"
+                    >
+                      <option value="">Seleccionar...</option>
+                      {categorias.map(cat => (
+                        <option key={cat.id} value={cat.nombre}>{cat.nombre}</option>
+                      ))}
+                      <option value="NEW" className="text-blue-600 font-bold">+ Agregar nueva categoría</option>
+                    </select>
+                  ) : (
+                    <div className="flex gap-2">
+                      <input 
+                        autoFocus
+                        placeholder="Nombre categoría..."
+                        value={newCategoryName}
+                        onChange={e => setNewCategoryName(e.target.value)}
+                        className="flex-1 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-800 font-bold"
+                      />
+                      <button type="button" onClick={handleSaveCategory} className="px-4 bg-blue-600 text-white rounded-xl">✓</button>
+                      <button type="button" onClick={() => setShowNewCategoryInput(false)} className="px-4 bg-gray-200 text-gray-600 rounded-xl">✕</button>
+                    </div>
+                  )}
                 </div>
+
                 <div className="col-span-2">
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-1">Nombre del Producto</label>
                   <input required value={formData.nombre} onChange={e => setFormData({...formData, nombre: e.target.value})} className="w-full p-3 bg-gray-50 dark:bg-gray-900 rounded-xl focus:ring-2 focus:ring-blue-600 border-none font-bold" />
                 </div>
+
                 <div>
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-1">Precio Venta</label>
-                  <input required type="number" value={formData.precio_venta_publico} onChange={e => setFormData({...formData, precio_venta_publico: Number(e.target.value)})} className="w-full p-3 bg-gray-50 dark:bg-gray-900 rounded-xl focus:ring-2 focus:ring-blue-600 border-none font-bold" />
+                  <input 
+                    required 
+                    type="text" 
+                    value={formatNumber(formData.precio_venta_publico)} 
+                    onChange={e => setFormData({...formData, precio_venta_publico: parseNumber(e.target.value)})} 
+                    className="w-full p-3 bg-gray-50 dark:bg-gray-900 rounded-xl focus:ring-2 focus:ring-blue-600 border-none font-bold" 
+                  />
                 </div>
                 <div>
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-1">Costo Compra</label>
-                  <input required type="number" value={formData.precio_compra} onChange={e => setFormData({...formData, precio_compra: Number(e.target.value)})} className="w-full p-3 bg-gray-50 dark:bg-gray-900 rounded-xl focus:ring-2 focus:ring-blue-600 border-none font-bold" />
+                  <input 
+                    required 
+                    type="text" 
+                    value={formatNumber(formData.precio_compra)} 
+                    onChange={e => setFormData({...formData, precio_compra: parseNumber(e.target.value)})} 
+                    className="w-full p-3 bg-gray-50 dark:bg-gray-900 rounded-xl focus:ring-2 focus:ring-blue-600 border-none font-bold" 
+                  />
                 </div>
                 <div>
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-1">Stock Actual</label>
-                  <input required type="number" value={formData.stock_actual} onChange={e => setFormData({...formData, stock_actual: Number(e.target.value)})} className="w-full p-3 bg-gray-50 dark:bg-gray-900 rounded-xl focus:ring-2 focus:ring-blue-600 border-none font-bold" />
+                  <input 
+                    required 
+                    type="text" 
+                    value={formatNumber(formData.stock_actual)} 
+                    onChange={e => setFormData({...formData, stock_actual: parseNumber(e.target.value)})} 
+                    className="w-full p-3 bg-gray-50 dark:bg-gray-900 rounded-xl focus:ring-2 focus:ring-blue-600 border-none font-bold" 
+                  />
                 </div>
                 <div>
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-1">Stock Mínimo</label>
-                  <input required type="number" value={formData.stock_minimo} onChange={e => setFormData({...formData, stock_minimo: Number(e.target.value)})} className="w-full p-3 bg-gray-50 dark:bg-gray-900 rounded-xl focus:ring-2 focus:ring-blue-600 border-none font-bold" />
+                  <input 
+                    required 
+                    type="text" 
+                    value={formatNumber(formData.stock_minimo)} 
+                    onChange={e => setFormData({...formData, stock_minimo: parseNumber(e.target.value)})} 
+                    className="w-full p-3 bg-gray-50 dark:bg-gray-900 rounded-xl focus:ring-2 focus:ring-blue-600 border-none font-bold" 
+                  />
                 </div>
               </div>
               
