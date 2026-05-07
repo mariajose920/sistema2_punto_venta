@@ -17,59 +17,38 @@ export default function LoginPage() {
     setError(null);
 
     try {
-      // 1. Normalización de credenciales
       const cleanEmail = email.trim().toLowerCase();
       const cleanPassword = password.trim();
 
-      console.log('[Auth] Intento de login:', cleanEmail);
-
-      // 2. Autenticación en Supabase Auth
+      // 1. Autenticación en Supabase Auth
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email: cleanEmail,
         password: cleanPassword,
       });
 
       if (authError) {
-        console.error('[AuthError]', authError.status, authError.message);
-        
-        if (authError.status === 400 || authError.message.toLowerCase().includes('invalid login credentials')) {
-          throw new Error('ACCESO DENEGADO: El correo o la contraseña no coinciden. Verifica los datos en el panel de Supabase Auth.');
-        }
-        if (authError.message.includes('Email not confirmed')) {
-          throw new Error('CORREO NO CONFIRMADO: Debes validar tu email o marcarlo como verificado en el dashboard de Supabase.');
-        }
-        throw new Error(`FALLA DE CONEXIÓN: ${authError.message}`);
+        throw new Error(`ACCESO DENEGADO: ${authError.message}`);
       }
 
-      if (authData?.user) {
-        // 3. Resolución de Perfil y Rol (Tabla Usuario)
-        const { data: usuarioData, error: roleError } = await (supabase as any)
-          .from('Usuario')
-          .select('rol')
-          .eq('id', authData.user.id)
-          .single();
-
-        if (roleError || !usuarioData) {
-          console.error('[RoleError]', roleError);
-          throw new Error('PERFIL INCOMPLETO: Autenticación exitosa, pero el usuario no existe en la tabla pública "Usuario".');
-        }
-
-        // 4. Redirección basada en Rol
-        const userRole = usuarioData.rol;
-        const destination = userRole === 'admin' ? '/admin' : '/cajera';
-        
-        console.log('[LoginSuccess] Redirigiendo a:', destination);
-        router.push(destination);
+      if (!authData?.user?.id) {
+        throw new Error('No se pudo recuperar el usuario autenticado.');
       }
+
+      // 2. Obtención de perfil desde tabla pública "Usuario" usando el UUID
+      const { data: profile, error: profileError } = await supabase
+        .from('Usuario')
+        .select('rol')
+        .eq('id', authData.user.id)
+        .single<{ rol: string }>();
+
+      if (profileError || !profile) {
+        throw new Error('PERFIL INCOMPLETO: Autenticación exitosa, pero no tienes un perfil en la tabla pública "Usuario".');
+      }
+
+      // 3. Redirección basada en rol
+      router.push(profile.rol === 'admin' ? '/admin' : '/cajera');
     } catch (err: any) {
-      let errorMessage = err.message || 'Error inesperado en el servidor.';
-      
-      // Detectar el error clásico de recibir HTML en lugar de JSON
-      if (errorMessage.includes('Unexpected token') && errorMessage.includes('<')) {
-        errorMessage = 'ERROR DE CONFIGURACIÓN: El sistema recibió una página web en lugar de una respuesta de datos. Verifica que NEXT_PUBLIC_SUPABASE_URL en Vercel sea la URL de tu proyecto de Supabase (https://xxxx.supabase.co) y no la URL de tu sitio web.';
-      }
-
-      setError(errorMessage);
+      setError(err.message || 'Error crítico en el proceso de autenticación.');
       console.error('[LoginProcessError]', err);
     } finally {
       setLoading(false);
