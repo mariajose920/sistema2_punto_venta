@@ -42,7 +42,8 @@ export default function LoginPage() {
         .single<{ rol: string }>();
 
       if (profileError || !profile) {
-        throw new Error('PERFIL INCOMPLETO: Autenticación exitosa, pero no tienes un perfil en la tabla pública "Usuario".');
+        console.error('[AuthDebug] Usuario autenticado sin fila en public.Usuario. ID:', authData.user.id);
+        throw new Error('ACCESO RESTRINGIDO: Tu cuenta de autenticación es válida, pero no tienes un perfil operativo asignado. Contacta al administrador para que te asigne un rol.');
       }
 
       // 3. Redirección basada en rol

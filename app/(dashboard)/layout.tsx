@@ -9,19 +9,20 @@ import { supabase } from '@/lib/supabase';
 // Definición de ítems de navegación según el rol
 const NAV_ITEMS = {
   shared: [
-    { href: '/productos', label: 'Inventario', icon: '📦' },
-    { href: '/clientes', label: 'Clientes', icon: '👥' },
+    { href: '/productos', label: 'Lista de Productos', icon: '📦' },
+    { href: '/clientes', label: 'Lista de Clientes', icon: '👥' },
   ],
   admin: [
-    { href: '/admin', label: 'Dashboard Admin', icon: '📊' },
-    { href: '/usuarios', label: 'Personal', icon: '👮' },
-    { href: '/compras', label: 'Compras / Costos', icon: '📥' },
-    { href: '/reportes', label: 'Reportes Financieros', icon: '📈' },
+    { href: '/admin', label: 'Panel de Control', icon: '📊' },
+    { href: '/usuarios', label: 'Gestión de Usuarios', icon: '👮' },
+    { href: '/admin/calculadora', label: 'Calculadora de Costos', icon: '🧮' },
+    { href: '/compras', label: 'Compras y Proveedores', icon: '📥' },
+    { href: '/reportes', label: 'Reportes y Análisis', icon: '📈' },
   ],
   cajera: [
-    { href: '/cajera', label: 'Dashboard Caja', icon: '🏠' },
-    { href: '/ventas/nueva', label: 'Punto de Venta', icon: '🛒' },
-    { href: '/ventas/historial', label: 'Mis Ventas', icon: '🧾' },
+    { href: '/cajera', label: 'Inicio Caja', icon: '🏠' },
+    { href: '/ventas/nueva', label: 'Nueva Venta', icon: '🛒' },
+    { href: '/ventas/historial', label: 'Mi Historial', icon: '🧾' },
   ]
 };
 
