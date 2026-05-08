@@ -90,13 +90,28 @@ export default function ProductosPage() {
     fetchData();
   }, [fetchData]);
 
+  useEffect(() => {
+    const term = searchTerm.toLowerCase().trim();
+    if (!term) {
+      setFiltrados(productos);
+      return;
+    }
+    const filtered = productos.filter(p => 
+      (p.nombre || '').toLowerCase().includes(term) || 
+      (p.categoria || '').toLowerCase().includes(term) || 
+      (p.codigo_barra || '').toLowerCase().includes(term)
+    );
+    setFiltrados(filtered);
+  }, [searchTerm, productos]);
+
   // Manejo de nueva categoría
   const handleSaveCategory = async () => {
-    if (!newCategoryName.trim()) return;
+    const nameLower = newCategoryName.trim().toLowerCase();
+    if (!nameLower) return;
     try {
       const { data, error } = await (supabase as any)
         .from('Categoria')
-        .insert([{ nombre: newCategoryName.trim() }])
+        .insert([{ nombre: nameLower }])
         .select()
         .single();
       
@@ -121,13 +136,28 @@ export default function ProductosPage() {
     try {
       setLoading(true);
       
+      const nombreLower = (formData.nombre || '').trim().toLowerCase();
+      const codigoStr = String(formData.codigo_barra || '').trim();
+
+      // Validación de Nombre Único
+      const { data: nombreExistente } = await (supabase as any)
+        .from('Producto')
+        .select('id')
+        .eq('nombre', nombreLower)
+        .neq('id', editingId || '00000000-0000-0000-0000-000000000000')
+        .maybeSingle();
+
+      if (nombreExistente) {
+        throw new Error(`Ya existe un producto con el nombre: "${nombreLower}"`);
+      }
+      
       // Validación de Código de Barras Único (si se ingresó uno)
-      if (formData.codigo_barra && formData.codigo_barra.trim() !== '') {
-        const { data: existente, error: checkError } = await (supabase as any)
+      if (codigoStr !== '') {
+        const { data: existente } = await (supabase as any)
           .from('Producto')
           .select('id, nombre')
-          .eq('codigo_barra', formData.codigo_barra.trim())
-          .neq('id', editingId || '00000000-0000-0000-0000-000000000000') // Excluir el actual si editamos
+          .eq('codigo_barra', codigoStr)
+          .neq('id', editingId || '00000000-0000-0000-0000-000000000000')
           .maybeSingle();
 
         if (existente) {
@@ -135,10 +165,11 @@ export default function ProductosPage() {
         }
       }
 
-      // Limpiar código de barras si está vacío para evitar colisiones de strings vacíos
       const finalData = {
         ...formData,
-        codigo_barra: formData.codigo_barra?.trim() || null
+        nombre: nombreLower,
+        categoria: (formData.categoria || '').toLowerCase(),
+        codigo_barra: codigoStr || null
       };
 
       if (editingId) {

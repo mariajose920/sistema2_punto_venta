@@ -107,6 +107,7 @@ export default function ProveedoresPage() {
     try {
       setLoading(true);
       
+      const nombreLower = (formData.nombre_empresa || '').trim().toLowerCase();
       const rutLimpio = cleanRUT(formData.rut_empresa || '');
       
       if (rutLimpio && !validateRUT(rutLimpio)) {
@@ -116,6 +117,20 @@ export default function ProveedoresPage() {
       }
 
       const rutFormateado = formatRUT(rutLimpio);
+
+      // Verificar duplicado de NOMBRE
+      const { data: nombreExistente } = await supabase
+        .from('Proveedor')
+        .select('id_proveedor')
+        .eq('nombre_empresa', nombreLower)
+        .neq('id_proveedor', selectedProveedor?.id_proveedor || '00000000-0000-0000-0000-000000000000')
+        .maybeSingle();
+
+      if (nombreExistente) {
+        alert(`Ya existe un proveedor registrado con el nombre: "${nombreLower}".`);
+        setLoading(false);
+        return;
+      }
 
       // Verificar unicidad del RUT (Solo si es nuevo o cambió)
       if (rutFormateado && rutFormateado !== selectedProveedor?.rut_empresa) {
@@ -133,7 +148,13 @@ export default function ProveedoresPage() {
       }
 
       const { id_proveedor, ...dataToSave } = formData;
-      const finalData = { ...dataToSave, rut_empresa: rutFormateado };
+      const finalData = { 
+        ...dataToSave, 
+        nombre_empresa: nombreLower,
+        rut_empresa: rutFormateado,
+        correo_: (dataToSave.correo_ || '').toLowerCase(),
+        direccion: (dataToSave.direccion || '').toLowerCase()
+      };
 
       if (selectedProveedor?.id_proveedor) {
         const { error } = await (supabase.from('Proveedor') as any)
@@ -143,8 +164,7 @@ export default function ProveedoresPage() {
       } else {
         const newProveedor = {
           ...finalData,
-          id_proveedor: typeof crypto !== 'undefined' ? crypto.randomUUID() : Math.random().toString(36).substring(2),
-          nombre_empresa: dataToSave.nombre_empresa || ''
+          id_proveedor: typeof crypto !== 'undefined' ? crypto.randomUUID() : Math.random().toString(36).substring(2)
         };
         const { error } = await (supabase.from('Proveedor') as any).insert([newProveedor]);
         if (error) throw error;

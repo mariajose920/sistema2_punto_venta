@@ -128,6 +128,9 @@ export default function NuevaVentaPage() {
     setShowProductSearch(false);
   };
 
+  const [calcSearch, setCalcSearch] = useState('');
+  const [showCalcSearch, setShowCalcSearch] = useState(false);
+
   const addVariableItem = () => {
     const totalCalc = calcData.precioUnitario * calcData.cantidad;
     if (totalCalc <= 0) {
@@ -138,7 +141,7 @@ export default function NuevaVentaPage() {
     const newItem: CartItem = {
       id: `VAR_${Date.now()}`,
       codigo_barra: 'VARIABLE',
-      nombre: calcData.nombre,
+      nombre: calcData.nombre.toLowerCase(),
       precio_venta_publico: calcData.precioUnitario,
       stock_actual: 999999, 
       cantidad: calcData.cantidad,
@@ -149,7 +152,8 @@ export default function NuevaVentaPage() {
 
     updateCartWithPromos([...cart, newItem]);
     setIsCalcOpen(false);
-    setCalcData({ nombre: 'Producto por Peso/Medida', precioUnitario: 0, cantidad: 1 });
+    setCalcData({ nombre: 'producto por peso/medida', precioUnitario: 0, cantidad: 1 });
+    setCalcSearch('');
   };
 
   const updateQuantity = (id: string, qty: number) => {
@@ -427,13 +431,47 @@ export default function NuevaVentaPage() {
 
       {isCalcOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-white dark:bg-gray-800 w-full max-w-md rounded-[2.5rem] p-10 shadow-2xl animate-in zoom-in-95 duration-200">
-            <h2 className="text-2xl font-black text-gray-900 dark:text-white mb-8">🧮 Calculadora de Venta</h2>
+          <div className="bg-white dark:bg-gray-800 w-full max-w-md rounded-[2.5rem] p-10 shadow-2xl animate-in zoom-in-95 duration-200 overflow-y-auto max-h-[90vh]">
+            <h2 className="text-2xl font-black text-gray-900 dark:text-white mb-6 italic">🧮 Calculadora Variable</h2>
+            
             <div className="space-y-6">
-              <div>
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Nombre / Concepto</label>
-                <input value={calcData.nombre} onChange={e => setCalcData({...calcData, nombre: e.target.value})} className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl font-bold border-none" />
+              <div className="relative">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Buscar Producto Existente</label>
+                <input 
+                  type="text"
+                  placeholder="Escriba para buscar..."
+                  value={calcSearch}
+                  onChange={(e) => { setCalcSearch(e.target.value); setShowCalcSearch(e.target.value.length > 0); }}
+                  className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl font-bold border-none"
+                />
+                {showCalcSearch && (
+                  <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl shadow-2xl z-[110] max-h-40 overflow-auto">
+                    {productos.filter(p => p.nombre.toLowerCase().includes(calcSearch.toLowerCase())).map(p => (
+                      <button 
+                        key={p.id} 
+                        onClick={() => {
+                          setCalcData({ nombre: p.nombre.toLowerCase(), precioUnitario: p.precio_venta_publico, cantidad: 1 });
+                          setCalcSearch(p.nombre);
+                          setShowCalcSearch(false);
+                        }}
+                        className="w-full p-4 text-left hover:bg-blue-50 dark:hover:bg-blue-900/20 border-b last:border-0 border-gray-50 dark:border-gray-700 font-bold text-sm"
+                      >
+                        {p.nombre} (${p.precio_venta_publico.toLocaleString()})
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
+
+              <div className="pt-4 border-t border-gray-100 dark:border-gray-700">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Nombre / Concepto Final</label>
+                <input 
+                  value={calcData.nombre} 
+                  onChange={e => setCalcData({...calcData, nombre: e.target.value.toLowerCase()})} 
+                  className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl font-bold border-none" 
+                />
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Precio Unitario ($)</label>
@@ -444,20 +482,24 @@ export default function NuevaVentaPage() {
                   <input type="number" step="0.001" value={calcData.cantidad} onChange={e => setCalcData({...calcData, cantidad: Number(e.target.value)})} className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl font-bold border-none" />
                 </div>
               </div>
-              <div className="p-6 bg-blue-50 dark:bg-blue-900/20 rounded-3xl text-center">
-                <p className="text-blue-600 font-black uppercase text-[10px] tracking-widest mb-1">Cálculo Total</p>
-                <p className="font-black text-4xl text-gray-900 dark:text-white">
-                  ${(calcData.precioUnitario * calcData.cantidad).toLocaleString()}
+
+              <div className="p-6 bg-blue-50 dark:bg-blue-900/20 rounded-3xl text-center border-2 border-blue-100 dark:border-blue-900/30">
+                <p className="text-blue-600 font-black uppercase text-[10px] tracking-widest mb-1">Total Calculado</p>
+                <p className="font-black text-4xl text-gray-900 dark:text-white tracking-tighter">
+                  ${(calcData.precioUnitario * calcData.cantidad).toLocaleString(undefined, {maximumFractionDigits: 0})}
                 </p>
               </div>
+
               <div className="flex gap-4 pt-4">
                 <button onClick={() => setIsCalcOpen(false)} className="flex-1 font-bold text-gray-400 py-4">Cancelar</button>
-                <button onClick={addVariableItem} className="flex-2 py-4 bg-blue-600 text-white font-black rounded-2xl shadow-xl shadow-blue-200">AÑADIR A VENTA</button>
+                <button onClick={addVariableItem} className="flex-2 py-4 bg-blue-600 text-white font-black rounded-2xl shadow-xl shadow-blue-200 dark:shadow-none hover:bg-blue-700 transition-all">AÑADIR A VENTA</button>
               </div>
             </div>
           </div>
         </div>
       )}
     </div>
+  );
+}
   );
 }

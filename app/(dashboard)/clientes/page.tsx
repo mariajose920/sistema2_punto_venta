@@ -120,12 +120,26 @@ export default function ClientesPage() {
     e.preventDefault();
     try {
       if (!formData.nombre) throw new Error('El nombre es obligatorio');
+      const nombreLower = formData.nombre.trim().toLowerCase();
+      
       if (!(formData as any).rut) throw new Error('El RUT es obligatorio');
       
       const rutNormalizado = formatRUT((formData as any).rut);
       if (!validateRUT(rutNormalizado)) throw new Error('El RUT ingresado no es válido');
 
       setLoading(true);
+
+      // Validar duplicado de NOMBRE
+      const { data: nombreExistente } = await (supabase as any)
+        .from('Cliente')
+        .select('id')
+        .eq('nombre', nombreLower)
+        .neq('id', selectedCliente?.id || '00000000-0000-0000-0000-000000000000')
+        .maybeSingle();
+
+      if (nombreExistente) {
+        throw new Error(`Ya existe un cliente con el nombre: "${nombreLower}"`);
+      }
 
       // Validar duplicado de RUT
       const { data: existente } = await (supabase as any)
@@ -139,7 +153,11 @@ export default function ClientesPage() {
         throw new Error(`Ya existe un cliente registrado con el RUT: ${rutNormalizado} (${existente.nombre})`);
       }
 
-      const finalData = { ...formData, rut: rutNormalizado };
+      const finalData = { 
+        ...formData, 
+        nombre: nombreLower,
+        rut: rutNormalizado 
+      };
 
       if (selectedCliente?.id) {
         const { error } = await (supabase as any).from('Cliente').update(finalData).eq('id', selectedCliente.id);

@@ -32,23 +32,32 @@ export default function NuevaCompraPage() {
   const [cart, setCart] = useState<CompraItem[]>([]);
   const [selectedProviderId, setSelectedProviderId] = useState('');
   
+  const [categorias, setCategorias] = useState<{id: string, nombre: string}[]>([]);
+  
   const [search, setSearch] = useState('');
   const [showSearch, setShowSearch] = useState(false);
   const [loading, setLoading] = useState(false);
 
   // Estados para Creación Rápida
   const [isNewProvOpen, setIsNewProvOpen] = useState(false);
-  const [newProvName, setNewProvName] = useState('');
+  const [newProvData, setNewProvData] = useState({ 
+    nombre: '', rut: '', telefono: '', correo: '', direccion: '' 
+  });
+  
   const [isNewProdOpen, setIsNewProdOpen] = useState(false);
-  const [newProdData, setNewProdData] = useState({ nombre: '', codigo: '', costo: 0 });
+  const [newProdData, setNewProdData] = useState({ 
+    nombre: '', codigo: '', costo: 0, venta: 0, categoria: '', stockMin: 5 
+  });
 
   const fetchData = useCallback(async () => {
-    const [pRes, provRes] = await Promise.all([
+    const [pRes, provRes, catRes] = await Promise.all([
       (supabase as any).from('Producto').select('id, nombre, codigo_barra, precio_compra'),
-      (supabase as any).from('Proveedor').select('id_proveedor, nombre_empresa')
+      (supabase as any).from('Proveedor').select('id_proveedor, nombre_empresa'),
+      (supabase as any).from('Categoria').select('id, nombre')
     ]);
     setProductos(pRes.data || []);
     setProveedores(provRes.data || []);
+    setCategorias(catRes.data || []);
   }, []);
 
   useEffect(() => {
@@ -58,39 +67,84 @@ export default function NuevaCompraPage() {
   }, [role, router, isMounted, fetchData]);
 
   const handleCreateProvider = async () => {
-    if (!newProvName) return;
-    const { data, error } = await (supabase as any)
-      .from('Proveedor')
-      .insert([{ nombre_empresa: newProvName }])
-      .select().single();
-    
-    if (!error && data) {
-      setProveedores([...proveedores, data]);
-      setSelectedProviderId(data.id_proveedor);
-      setIsNewProvOpen(false);
-      setNewProvName('');
+    const nombreLower = newProvData.nombre.trim().toLowerCase();
+    if (!nombreLower) return;
+
+    try {
+      // Validar duplicado
+      const { data: exist } = await (supabase as any)
+        .from('Proveedor')
+        .select('id_proveedor')
+        .eq('nombre_empresa', nombreLower)
+        .maybeSingle();
+      
+      if (exist) {
+        alert('Ya existe un proveedor con ese nombre.');
+        return;
+      }
+
+      const { data, error } = await (supabase as any)
+        .from('Proveedor')
+        .insert([{ 
+          nombre_empresa: nombreLower,
+          rut_empresa: newProvData.rut,
+          telefono_: newProvData.telefono,
+          correo_: newProvData.correo.toLowerCase(),
+          direccion: newProvData.direccion.toLowerCase()
+        }])
+        .select().single();
+      
+      if (!error && data) {
+        setProveedores([...proveedores, data]);
+        setSelectedProviderId(data.id_proveedor);
+        setIsNewProvOpen(false);
+        setNewProvData({ nombre: '', rut: '', telefono: '', correo: '', direccion: '' });
+      }
+    } catch (err: any) {
+      alert('Error: ' + err.message);
     }
   };
 
   const handleCreateProduct = async () => {
-    if (!newProdData.nombre) return;
-    const { data, error } = await (supabase as any)
-      .from('Producto')
-      .insert([{ 
-        nombre: newProdData.nombre, 
-        codigo_barra: newProdData.codigo || null,
-        precio_compra: newProdData.costo,
-        stock_actual: 0 
-      }])
-      .select().single();
+    const nombreLower = newProdData.nombre.trim().toLowerCase();
+    if (!nombreLower) return;
 
-    if (!error && data) {
-      setProductos([...productos, data]);
-      addToCart(data);
-      setIsNewProdOpen(false);
-      setNewProdData({ nombre: '', codigo: '', costo: 0 });
-    } else {
-      alert('Error: ' + (error?.message || 'Código duplicado'));
+    try {
+      // Validar duplicado
+      const { data: exist } = await (supabase as any)
+        .from('Producto')
+        .select('id')
+        .eq('nombre', nombreLower)
+        .maybeSingle();
+      
+      if (exist) {
+        alert('Ya existe un producto con ese nombre.');
+        return;
+      }
+
+      const { data, error } = await (supabase as any)
+        .from('Producto')
+        .insert([{ 
+          nombre: nombreLower, 
+          codigo_barra: String(newProdData.codigo || '').trim() || null,
+          precio_compra: newProdData.costo,
+          precio_venta_publico: newProdData.venta,
+          categoria: newProdData.categoria.toLowerCase(),
+          stock_minimo: newProdData.stockMin,
+          stock_actual: 0 
+        }])
+        .select().single();
+
+      if (!error && data) {
+        setProductos([...productos, data]);
+        addToCart(data);
+        setIsNewProdOpen(false);
+        setNewProdData({ nombre: '', codigo: '', costo: 0, venta: 0, categoria: '', stockMin: 5 });
+      } else {
+        throw error;
+      }
+    } catch (err: any) {
+      alert('Error: ' + (err.message || 'Error al crear producto'));
     }
   };
 
@@ -275,18 +329,28 @@ export default function NuevaCompraPage() {
       {/* MODAL: Nuevo Proveedor Rápido */}
       {isNewProvOpen && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-white dark:bg-gray-800 w-full max-w-md rounded-[2.5rem] p-10 shadow-2xl animate-in zoom-in-95">
+          <div className="bg-white dark:bg-gray-800 w-full max-w-md rounded-[2.5rem] p-10 shadow-2xl animate-in zoom-in-95 overflow-y-auto max-h-[90vh]">
             <h2 className="text-2xl font-black text-gray-900 dark:text-white mb-6 italic">Nuevo Proveedor</h2>
             <div className="space-y-4">
               <div>
                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Nombre de Empresa</label>
-                <input 
-                  type="text" 
-                  value={newProvName}
-                  onChange={e => setNewProvName(e.target.value)}
-                  className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold"
-                  placeholder="Ej: Distribuidora Central"
-                />
+                <input value={newProvData.nombre} onChange={e => setNewProvData({...newProvData, nombre: e.target.value})} className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold" />
+              </div>
+              <div>
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">RUT / Empresa</label>
+                <input value={newProvData.rut} onChange={e => setNewProvData({...newProvData, rut: e.target.value})} className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold" />
+              </div>
+              <div>
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Teléfono</label>
+                <input value={newProvData.telefono} onChange={e => setNewProvData({...newProvData, telefono: e.target.value})} className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold" />
+              </div>
+              <div>
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Correo</label>
+                <input value={newProvData.correo} onChange={e => setNewProvData({...newProvData, correo: e.target.value})} className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold" />
+              </div>
+              <div>
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Dirección</label>
+                <input value={newProvData.direccion} onChange={e => setNewProvData({...newProvData, direccion: e.target.value})} className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold" />
               </div>
               <div className="flex gap-3 pt-4">
                 <button onClick={() => setIsNewProvOpen(false)} className="flex-1 py-4 bg-gray-100 text-gray-400 rounded-2xl font-black text-[10px] uppercase">Cancelar</button>
@@ -300,35 +364,39 @@ export default function NuevaCompraPage() {
       {/* MODAL: Nuevo Producto Rápido */}
       {isNewProdOpen && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-white dark:bg-gray-800 w-full max-w-md rounded-[2.5rem] p-10 shadow-2xl animate-in zoom-in-95">
+          <div className="bg-white dark:bg-gray-800 w-full max-w-md rounded-[2.5rem] p-10 shadow-2xl animate-in zoom-in-95 overflow-y-auto max-h-[90vh]">
             <h2 className="text-2xl font-black text-gray-900 dark:text-white mb-6 italic">Crear Producto</h2>
             <div className="space-y-4">
               <div>
                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Nombre del Producto</label>
-                <input 
-                  type="text" 
-                  value={newProdData.nombre}
-                  onChange={e => setNewProdData({...newProdData, nombre: e.target.value})}
-                  className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold"
-                />
+                <input value={newProdData.nombre} onChange={e => setNewProdData({...newProdData, nombre: e.target.value})} className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Código Barras</label>
+                  <input value={newProdData.codigo} onChange={e => setNewProdData({...newProdData, codigo: e.target.value})} className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold" />
+                </div>
+                <div>
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Categoría</label>
+                  <select value={newProdData.categoria} onChange={e => setNewProdData({...newProdData, categoria: e.target.value})} className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold">
+                    <option value="">Seleccionar...</option>
+                    {categorias.map(c => <option key={c.id} value={c.nombre}>{c.nombre}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Costo ($)</label>
+                  <input type="number" value={newProdData.costo} onChange={e => setNewProdData({...newProdData, costo: Number(e.target.value)})} className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold" />
+                </div>
+                <div>
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Venta ($)</label>
+                  <input type="number" value={newProdData.venta} onChange={e => setNewProdData({...newProdData, venta: Number(e.target.value)})} className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold" />
+                </div>
               </div>
               <div>
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Código de Barras (Opcional)</label>
-                <input 
-                  type="text" 
-                  value={newProdData.codigo}
-                  onChange={e => setNewProdData({...newProdData, codigo: e.target.value})}
-                  className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold"
-                />
-              </div>
-              <div>
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Costo de Compra sugerido ($)</label>
-                <input 
-                  type="number" 
-                  value={newProdData.costo}
-                  onChange={e => setNewProdData({...newProdData, costo: Number(e.target.value)})}
-                  className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold"
-                />
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Stock Mínimo</label>
+                <input type="number" value={newProdData.stockMin} onChange={e => setNewProdData({...newProdData, stockMin: Number(e.target.value)})} className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold" />
               </div>
               <div className="flex gap-3 pt-4">
                 <button onClick={() => setIsNewProdOpen(false)} className="flex-1 py-4 bg-gray-100 text-gray-400 rounded-2xl font-black text-[10px] uppercase">Cancelar</button>
