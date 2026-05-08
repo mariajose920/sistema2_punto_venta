@@ -414,7 +414,7 @@ export default function ClientesPage() {
             </table>
           </div>
         </div>
-      )
+      )}
 
       {/* Modal Abono Premium */}
       {isAbonoOpen && selectedCliente && (

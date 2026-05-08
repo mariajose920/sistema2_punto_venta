@@ -271,7 +271,6 @@ export default function NuevaCompraPage() {
           </div>
         </div>
       </div>
-      </div>
 
       {/* MODAL: Nuevo Proveedor Rápido */}
       {isNewProvOpen && (
