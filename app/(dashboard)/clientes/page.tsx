@@ -3,12 +3,13 @@
 import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
+import { normalizeText, cleanRUT, logAction, formatCurrency } from '@/lib/utils';
 
 interface Cliente {
   id: string;
   nombre: string;
   telefono: string;
-  rut: string; // Campo ahora explícito
+  rut: string;
   saldo_deudado: number;
   saldo_favor: number;
   created_at: string;
@@ -29,7 +30,7 @@ export default function ClientesPage() {
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [filtered, setFiltered] = useState<Cliente[]>([]);
   const [loading, setLoading] = useState(true);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null); // Nuevo: para mostrar errores al usuario
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   
   // Estados de Modales
@@ -52,9 +53,7 @@ export default function ClientesPage() {
     rut: ''
   });
 
-  // Utilidades de RUT
-  const cleanRUT = (rut: string) => (rut || '').replace(/[^0-9kK]/g, '').toUpperCase();
-
+  // Utilidades de RUT local para el input dinámico
   const validateRUT = (rut: string) => {
     const clean = cleanRUT(rut);
     if (clean.length < 2) return false;
@@ -71,7 +70,7 @@ export default function ClientesPage() {
     return calculatedDV === dv;
   };
 
-  const formatRUT = (rut: string) => {
+  const formatRUTDisplay = (rut: string) => {
     const clean = cleanRUT(rut);
     if (clean.length < 2) return clean;
     const body = clean.slice(0, -1);
@@ -109,10 +108,12 @@ export default function ClientesPage() {
   useEffect(() => { fetchClientes(); }, [fetchClientes]);
 
   useEffect(() => {
-    const term = search.toLowerCase();
+    const term = normalizeText(search);
+    const termClean = cleanRUT(search);
+    
     setFiltered(clientes.filter(c => 
-      c.nombre.toLowerCase().includes(term) || 
-      (c.rut && c.rut.toLowerCase().includes(term))
+      normalizeText(c.nombre).includes(term) || 
+      cleanRUT(c.rut || '').includes(termClean)
     ));
   }, [search, clientes]);
 
@@ -120,51 +121,56 @@ export default function ClientesPage() {
     e.preventDefault();
     try {
       if (!formData.nombre) throw new Error('El nombre es obligatorio');
-      const nombreLower = formData.nombre.trim().toLowerCase();
+      const nombreNorm = normalizeText(formData.nombre);
       
-      if (!(formData as any).rut) throw new Error('El RUT es obligatorio');
+      if (!formData.rut) throw new Error('El RUT es obligatorio');
+      const rutClean = cleanRUT(formData.rut);
+      const rutFormateado = formatRUTDisplay(rutClean);
       
-      const rutNormalizado = formatRUT((formData as any).rut);
-      if (!validateRUT(rutNormalizado)) throw new Error('El RUT ingresado no es válido');
+      if (!validateRUT(rutClean)) throw new Error('El RUT ingresado no es válido');
 
       setLoading(true);
-
-      // Validar duplicado de NOMBRE
-      const { data: nombreExistente } = await (supabase as any)
-        .from('Cliente')
-        .select('id')
-        .eq('nombre', nombreLower)
-        .neq('id', selectedCliente?.id || '00000000-0000-0000-0000-000000000000')
-        .maybeSingle();
-
-      if (nombreExistente) {
-        throw new Error(`Ya existe un cliente con el nombre: "${nombreLower}"`);
-      }
 
       // Validar duplicado de RUT
       const { data: existente } = await (supabase as any)
         .from('Cliente')
         .select('id, nombre')
-        .eq('rut', rutNormalizado)
+        .eq('rut', rutFormateado)
         .neq('id', selectedCliente?.id || '00000000-0000-0000-0000-000000000000')
         .maybeSingle();
 
       if (existente) {
-        throw new Error(`Ya existe un cliente registrado con el RUT: ${rutNormalizado} (${existente.nombre})`);
+        throw new Error(`Ya existe un cliente con el RUT: ${rutFormateado} (${existente.nombre})`);
       }
 
       const finalData = { 
         ...formData, 
-        nombre: nombreLower,
-        rut: rutNormalizado 
+        nombre: nombreNorm,
+        rut: rutFormateado 
       };
 
       if (selectedCliente?.id) {
         const { error } = await (supabase as any).from('Cliente').update(finalData).eq('id', selectedCliente.id);
         if (error) throw error;
+        
+        await logAction(supabase, {
+          usuario_id: user?.id || '',
+          email_usuario: user?.email || '',
+          accion: 'edicion',
+          modulo: 'clientes',
+          detalle: `actualizó datos del cliente: ${nombreNorm}`
+        });
       } else {
         const { error } = await (supabase as any).from('Cliente').insert([finalData]);
         if (error) throw error;
+
+        await logAction(supabase, {
+          usuario_id: user?.id || '',
+          email_usuario: user?.email || '',
+          accion: 'creacion',
+          modulo: 'clientes',
+          detalle: `creó nuevo cliente: ${nombreNorm}`
+        });
       }
       
       setIsModalOpen(false);
@@ -219,7 +225,18 @@ export default function ClientesPage() {
     try {
       setLoading(true);
       
-      // 1. Registrar el Pago
+      const { data: freshCliente, error: fError } = await (supabase as any)
+        .from('Cliente')
+        .select('saldo_deudado, saldo_favor')
+        .eq('id', selectedCliente.id)
+        .single();
+      
+      if (fError || !freshCliente) throw new Error('No se pudo obtener el saldo actual');
+
+      const saldoDeudadoActual = freshCliente.saldo_deudado || 0;
+      const saldoFavorActual = freshCliente.saldo_favor || 0;
+
+      // 1. Registrar Pago
       const { error: pError } = await (supabase as any).from('Pago').insert([{
         cliente_id: selectedCliente.id,
         monto: montoAbono,
@@ -227,9 +244,9 @@ export default function ClientesPage() {
       }]);
       if (pError) throw pError;
 
-      // 2. Calcular impacto en deuda y saldo a favor
-      let nuevaDeuda = selectedCliente.saldo_deudado - montoAbono;
-      let nuevoSaldoFavor = selectedCliente.saldo_favor;
+      // 2. Lógica REGLA: Deuda -> Favor
+      let nuevaDeuda = saldoDeudadoActual - montoAbono;
+      let nuevoSaldoFavor = saldoFavorActual;
 
       if (nuevaDeuda < 0) {
         nuevoSaldoFavor += Math.abs(nuevaDeuda);
@@ -243,33 +260,23 @@ export default function ClientesPage() {
       }).eq('id', selectedCliente.id);
       if (cError) throw cError;
 
-      // 4. Saldar créditos pendientes (Lógica interna: reduce saldo_pendiente de los créditos más viejos)
-      const { data: creditos } = await (supabase as any)
-        .from('Credito')
-        .select('*')
-        .eq('cliente_id', selectedCliente.id)
-        .eq('estado', 'vigente')
-        .order('created_at', { ascending: true });
+      // 4. Auditoría
+      await logAction(supabase, {
+        usuario_id: user?.id || '',
+        email_usuario: user?.email || '',
+        accion: 'abono',
+        modulo: 'clientes',
+        detalle: `registró abono de $${formatCurrency(montoAbono)} para ${selectedCliente.nombre}`
+      });
 
-      if (creditos && creditos.length > 0) {
-        let restante = montoAbono;
-        for (const cred of creditos) {
-          if (restante <= 0) break;
-          const aPagar = Math.min(cred.saldo_pendiente, restante);
-          const nuevoSaldoCred = cred.saldo_pendiente - aPagar;
-          await (supabase.from('Credito') as any).update({
-            saldo_pendiente: nuevoSaldoCred,
-            estado: nuevoSaldoCred <= 0 ? 'pagado' : 'vigente'
-          }).eq('id', cred.id);
-          restante -= aPagar;
-        }
-      }
-
-      alert('Abono registrado con éxito');
+      alert(`Abono procesado. Nuevo saldo deudor: $${formatCurrency(nuevaDeuda)}. Nuevo saldo favor: $${formatCurrency(nuevoSaldoFavor)}.`);
       setIsAbonoOpen(false);
       setMontoAbono(0);
       fetchClientes();
-      if (isStatementOpen) openStatement({ ...selectedCliente, saldo_deudado: nuevaDeuda, saldo_favor: nuevoSaldoFavor });
+      
+      if (isStatementOpen) {
+        openStatement({ ...selectedCliente, saldo_deudado: nuevaDeuda, saldo_favor: nuevoSaldoFavor });
+      }
     } catch (err: any) {
       alert('Error: ' + err.message);
     } finally {
@@ -278,50 +285,32 @@ export default function ClientesPage() {
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
+    <div className="space-y-6 animate-in fade-in duration-500 pb-20">
       
       {/* Header Premium */}
       <div className="bg-white dark:bg-gray-800 p-8 rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col md:flex-row justify-between items-center gap-6">
         <div className="flex items-center gap-6">
+          <div className="w-16 h-16 bg-blue-600 rounded-[1.5rem] flex items-center justify-center text-3xl shadow-xl shadow-blue-200 dark:shadow-none">👤</div>
           <div>
-            <h1 className="text-3xl font-black text-gray-900 dark:text-white tracking-tighter">Cuentas por Cobrar</h1>
-            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mt-1 italic">Gestión de Clientes y Fiados</p>
-          </div>
-          
-          {/* Switch de Vista */}
-          <div className="hidden sm:flex bg-gray-100 dark:bg-gray-900 p-1.5 rounded-2xl gap-1">
-            <button 
-              type="button"
-              onClick={() => setViewMode('grid')}
-              className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${viewMode === 'grid' ? 'bg-white dark:bg-gray-800 text-blue-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
-            >
-              Cards
-            </button>
-            <button 
-              type="button"
-              onClick={() => setViewMode('table')}
-              className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${viewMode === 'table' ? 'bg-white dark:bg-gray-800 text-blue-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
-            >
-              Lista
-            </button>
+            <h1 className="text-3xl font-black text-gray-900 dark:text-white tracking-tighter">Cuentas Corrientes</h1>
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] mt-1 italic">Gestión de Deuda y Saldo a Favor</p>
           </div>
         </div>
 
         <div className="flex w-full md:w-auto gap-4">
-          <div className="relative flex-1 md:w-80">
-            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
+          <div className="relative flex-1 md:w-96">
             <input 
               type="text" 
-              placeholder="Buscar por nombre o RUT..." 
+              placeholder="Buscar por nombre o RUT (ej: 12345678-9)..." 
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-12 pr-4 py-4 bg-gray-50 dark:bg-gray-900 border-none rounded-2xl font-bold text-sm focus:ring-4 focus:ring-blue-600/10 transition-all"
+              className="w-full pl-6 pr-4 py-5 bg-gray-50 dark:bg-gray-900 border-none rounded-2xl font-bold text-sm focus:ring-4 focus:ring-blue-600/10 transition-all italic"
             />
           </div>
           {role === 'admin' && (
             <button 
-              onClick={() => { setSelectedCliente(null); setFormData({ nombre: '', telefono: '', rut: '' } as any); setIsModalOpen(true); }}
-              className="bg-blue-600 text-white px-8 py-4 rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl shadow-blue-100 dark:shadow-none hover:bg-blue-700 transition-all"
+              onClick={() => { setSelectedCliente(null); setFormData({ nombre: '', telefono: '', rut: '' }); setIsModalOpen(true); }}
+              className="bg-gray-900 text-white px-8 py-5 rounded-2xl font-black text-xs uppercase tracking-widest shadow-2xl hover:scale-105 active:scale-95 transition-all"
             >
               Nuevo Cliente
             </button>
@@ -329,150 +318,88 @@ export default function ClientesPage() {
         </div>
       </div>
 
-      {/* Listado Dinámico de Clientes */}
       {loading && clientes.length === 0 ? (
-        <div className="py-20 text-center animate-pulse text-gray-400 font-bold">Consultando saldos...</div>
-      ) : errorMsg ? (
-        <div className="py-20 text-center text-red-500 bg-red-50 dark:bg-red-900/10 rounded-[2rem] border border-red-100 dark:border-red-900/30">
-          <p className="font-black uppercase tracking-widest mb-2">Acceso Restringido o Error</p>
-          <p className="text-sm font-bold opacity-70 mb-4">{errorMsg}</p>
-          <button onClick={() => fetchClientes()} className="bg-red-600 text-white px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest">Reintentar</button>
-        </div>
+        <div className="py-20 text-center animate-pulse text-gray-300 font-black uppercase tracking-[0.3em]">Sincronizando Carteras...</div>
       ) : filtered.length === 0 ? (
-        <div className="py-20 text-center text-gray-400 font-bold italic border-2 border-dashed border-gray-100 dark:border-gray-800 rounded-[2rem]">
-          No se encontraron clientes registrados.
+        <div className="py-20 text-center text-gray-400 font-bold italic border-4 border-dashed border-gray-50 dark:border-gray-800/50 rounded-[3rem]">
+           No se encontraron coincidencias.
         </div>
-      ) : viewMode === 'grid' ? (
-        /* VISTA DE CARDS (CUADRÍCULA) */
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-8">
           {filtered.map(c => (
-            <div key={c.id} className="bg-white dark:bg-gray-800 p-8 rounded-[2rem] border border-gray-100 dark:border-gray-700 shadow-sm hover:shadow-md transition-all group">
-              <div className="flex justify-between items-start mb-6">
+            <div key={c.id} className="bg-white dark:bg-gray-800 p-10 rounded-[3rem] border border-gray-100 dark:border-gray-700 shadow-sm hover:shadow-2xl transition-all group relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-blue-50 dark:bg-blue-900/10 rounded-full -mr-16 -mt-16 group-hover:scale-150 transition-transform duration-700"></div>
+              
+              <div className="flex justify-between items-start mb-10 relative">
                 <div>
-                  <h3 className="text-xl font-black text-gray-900 dark:text-white truncate max-w-[150px]">{c.nombre}</h3>
-                  <p className="text-[10px] font-bold text-blue-600 uppercase tracking-widest italic">{c.rut || 'Sin RUT'}</p>
-                  <p className="text-[10px] font-bold text-gray-400 uppercase">{c.telefono || 'Sin contacto'}</p>
+                  <h3 className="text-2xl font-black text-gray-900 dark:text-white truncate max-w-[200px] uppercase italic tracking-tighter">{c.nombre}</h3>
+                  <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mt-1">{c.rut}</p>
                 </div>
-                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-white shadow-lg ${c.saldo_deudado > 0 ? 'bg-red-500' : 'bg-emerald-500'}`}>
+                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center font-black text-xl text-white shadow-xl ${c.saldo_deudado > 0 ? 'bg-red-500 shadow-red-200' : 'bg-emerald-500 shadow-emerald-200'} dark:shadow-none`}>
                   {c.nombre.charAt(0).toUpperCase()}
                 </div>
               </div>
 
-              <div className="space-y-4">
-                <div className="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-2xl">
-                  <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Deuda Pendiente</p>
-                  <p className={`text-2xl font-black tracking-tighter ${c.saldo_deudado > 0 ? 'text-red-600' : 'text-gray-300'}`}>
-                    ${c.saldo_deudado.toLocaleString()}
+              <div className="grid grid-cols-2 gap-4 mb-10">
+                <div className="p-6 bg-gray-50 dark:bg-gray-900/50 rounded-3xl border border-gray-100 dark:border-gray-800">
+                  <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-2 italic text-center">Deuda Fiado</p>
+                  <p className={`text-3xl font-black tracking-tighter text-center ${c.saldo_deudado > 0 ? 'text-red-600' : 'text-gray-200'}`}>
+                    ${formatCurrency(c.saldo_deudado)}
                   </p>
                 </div>
-                {c.saldo_favor > 0 && (
-                  <div className="p-4 bg-emerald-50 dark:bg-emerald-900/10 rounded-2xl border border-emerald-100 dark:border-emerald-900/30">
-                    <p className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-1">Saldo a Favor</p>
-                    <p className="text-xl font-black text-emerald-600 tracking-tighter">
-                      ${c.saldo_favor.toLocaleString()}
-                    </p>
-                  </div>
-                )}
+                <div className="p-6 bg-emerald-50 dark:bg-emerald-900/10 rounded-3xl border border-emerald-100 dark:border-emerald-800/30">
+                  <p className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-2 italic text-center">Wallet Favor</p>
+                  <p className={`text-3xl font-black tracking-tighter text-center ${c.saldo_favor > 0 ? 'text-emerald-600' : 'text-gray-200'}`}>
+                    ${formatCurrency(c.saldo_favor)}
+                  </p>
+                </div>
               </div>
 
-              <div className="mt-8 flex gap-3">
-                <button onClick={() => openStatement(c)} className="flex-1 py-3 bg-gray-900 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-gray-800 transition-all">Movimientos</button>
-                <button onClick={() => { setSelectedCliente(c); setIsAbonoOpen(true); }} className="flex-1 py-3 bg-emerald-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100 dark:shadow-none">Abonar</button>
+              <div className="flex gap-3 relative">
+                <button onClick={() => openStatement(c)} className="flex-1 py-4 bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-gray-900 hover:text-white transition-all">Historial</button>
+                <button onClick={() => { setSelectedCliente(c); setIsAbonoOpen(true); }} className="flex-[2] py-4 bg-emerald-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-500 transition-all shadow-xl shadow-emerald-100 dark:shadow-none">Realizar Abono</button>
                 {role === 'admin' && (
-                  <button onClick={() => { setSelectedCliente(c); setFormData(c); setIsModalOpen(true); }} className="p-3 bg-gray-100 dark:bg-gray-700 text-gray-400 rounded-xl hover:text-blue-600 transition-all">✏️</button>
+                  <button onClick={() => { setSelectedCliente(c); setFormData(c); setIsModalOpen(true); }} className="w-12 h-12 flex items-center justify-center bg-blue-50 dark:bg-blue-900/30 text-blue-600 rounded-2xl hover:bg-blue-600 hover:text-white transition-all">✏️</button>
                 )}
               </div>
             </div>
           ))}
         </div>
-      ) : (
-        /* VISTA DE TABLA (LISTA) */
-        <div className="bg-white dark:bg-gray-800 rounded-[2rem] border border-gray-100 dark:border-gray-700 overflow-hidden shadow-sm">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
-              <thead className="bg-gray-50 dark:bg-gray-900/50 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">
-                <tr>
-                  <th className="px-8 py-5">Cliente</th>
-                  <th className="px-8 py-5">RUT</th>
-                  <th className="px-8 py-5 text-right">Deuda</th>
-                  <th className="px-8 py-5 text-right">A Favor</th>
-                  <th className="px-8 py-5 text-center">Acciones</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
-                {filtered.map(c => (
-                  <tr key={c.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-700/20 transition-colors">
-                    <td className="px-8 py-5">
-                      <div className="flex items-center gap-3">
-                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-black text-white text-[10px] ${c.saldo_deudado > 0 ? 'bg-red-500' : 'bg-emerald-500'}`}>
-                          {c.nombre.charAt(0).toUpperCase()}
-                        </div>
-                        <span className="font-bold text-gray-900 dark:text-white">{c.nombre}</span>
-                      </div>
-                    </td>
-                    <td className="px-8 py-5 text-xs font-mono text-gray-400">{c.rut || '---'}</td>
-                    <td className={`px-8 py-5 text-right font-black ${c.saldo_deudado > 0 ? 'text-red-600' : 'text-gray-300'}`}>
-                      ${c.saldo_deudado.toLocaleString()}
-                    </td>
-                    <td className={`px-8 py-5 text-right font-black ${c.saldo_favor > 0 ? 'text-emerald-600' : 'text-gray-300'}`}>
-                      ${c.saldo_favor.toLocaleString()}
-                    </td>
-                    <td className="px-8 py-5">
-                      <div className="flex justify-center gap-3">
-                        <button onClick={() => openStatement(c)} className="text-xs font-black text-blue-600 uppercase tracking-widest hover:underline">Historial</button>
-                        <button onClick={() => { setSelectedCliente(c); setIsAbonoOpen(true); }} className="text-xs font-black text-emerald-600 uppercase tracking-widest hover:underline">Abonar</button>
-                        {role === 'admin' && (
-                          <button onClick={() => { setSelectedCliente(c); setFormData(c); setIsModalOpen(true); }} className="text-gray-400 hover:text-blue-600">✏️</button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
       )}
 
-      {/* Modal Abono Premium */}
+      {/* Modal Abono */}
       {isAbonoOpen && selectedCliente && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-white dark:bg-gray-800 w-full max-w-md rounded-[2.5rem] p-10 shadow-2xl animate-in zoom-in-95">
-            <h2 className="text-2xl font-black text-gray-900 dark:text-white mb-2 italic">Registrar Abono</h2>
-            <p className="text-sm text-gray-400 font-bold mb-8">Cliente: {selectedCliente.nombre}</p>
+        <div className="fixed inset-0 z-[130] flex items-center justify-center p-4 bg-black/80 backdrop-blur-xl">
+          <div className="bg-white dark:bg-gray-800 w-full max-md rounded-[3rem] p-12 shadow-2xl animate-in zoom-in-95 relative">
+             <button onClick={() => setIsAbonoOpen(false)} className="absolute top-8 right-8 text-2xl opacity-20 hover:opacity-100">✕</button>
             
-            <form onSubmit={handleGeneralAbono} className="space-y-6">
-              <div>
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Monto a Recibir ($)</label>
+            <h2 className="text-4xl font-black text-gray-900 dark:text-white mb-2 italic tracking-tighter">Registrar Pago</h2>
+            <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-10">Titular: {selectedCliente.nombre}</p>
+            
+            <form onSubmit={handleGeneralAbono} className="space-y-8">
+              <div className="p-8 bg-gray-50 dark:bg-gray-900 rounded-[2.5rem] border-2 border-dashed border-gray-200 dark:border-gray-700">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-4 text-center">Efectivo / Monto del Abono</label>
                 <input 
-                  type="text" 
+                  type="number" 
                   required 
                   autoFocus
-                  value={montoAbono === 0 ? '' : montoAbono.toLocaleString('es-CL')} 
-                  onChange={e => {
-                    // Eliminamos cualquier caracter no numérico
-                    let cleanValue = e.target.value.replace(/\D/g, '');
-                    // Eliminamos ceros iniciales si el número tiene más de un dígito o si es solo '0'
-                    if (cleanValue.startsWith('0')) {
-                      cleanValue = cleanValue.replace(/^0+/, '');
-                    }
-                    const numValue = parseInt(cleanValue, 10) || 0;
-                    setMontoAbono(numValue);
-                  }} 
-                  className="w-full p-5 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-black text-3xl text-emerald-600 focus:ring-4 focus:ring-emerald-600/10 transition-all"
-                  placeholder="Escriba el monto..."
+                  value={montoAbono || ''} 
+                  onChange={e => setMontoAbono(Number(e.target.value))} 
+                  className="w-full bg-transparent border-none text-center font-black text-6xl text-emerald-600 focus:ring-0"
+                  placeholder="0"
                 />
+                <p className="text-[10px] text-gray-400 font-bold text-center mt-4">El excedente se guardará como Saldo a Favor.</p>
               </div>
 
               <div>
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Medio de Pago</label>
-                <div className="grid grid-cols-2 gap-3">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-4">Medio de Captura</label>
+                <div className="grid grid-cols-3 gap-3">
                   {['efectivo', 'transferencia', 'tarjeta'].map(m => (
                     <button
                       key={m}
                       type="button"
                       onClick={() => setMetodoPago(m)}
-                      className={`py-3 rounded-xl font-black text-[10px] uppercase tracking-widest border-2 transition-all ${metodoPago === m ? 'border-blue-600 bg-blue-50 text-blue-600' : 'border-gray-50 text-gray-400'}`}
+                      className={`py-3 rounded-xl font-black text-[9px] uppercase tracking-widest border-2 transition-all ${metodoPago === m ? 'bg-gray-900 text-white border-gray-900' : 'bg-transparent text-gray-400 border-gray-100 dark:border-gray-700'}`}
                     >
                       {m}
                     </button>
@@ -480,100 +407,105 @@ export default function ClientesPage() {
                 </div>
               </div>
 
-              <div className="pt-4 flex gap-4">
-                <button type="button" onClick={() => setIsAbonoOpen(false)} className="flex-1 font-bold text-gray-400">Cancelar</button>
-                <button type="submit" disabled={loading} className="flex-[2] py-5 bg-emerald-600 text-white font-black rounded-2xl shadow-xl shadow-emerald-100 dark:shadow-none hover:bg-emerald-700 transition-all">
-                  {loading ? 'PROCESANDO...' : 'CONFIRMAR PAGO'}
+              <div className="pt-4 flex flex-col gap-4">
+                <button type="submit" disabled={loading} className="w-full py-6 bg-blue-600 text-white font-black rounded-3xl shadow-2xl shadow-blue-200 dark:shadow-none hover:bg-blue-500 transition-all uppercase tracking-widest text-xs">
+                  {loading ? 'SINCRONIZANDO...' : 'PROCESAR ABONO'}
                 </button>
+                <button type="button" onClick={() => setIsAbonoOpen(false)} className="w-full py-4 text-gray-400 font-black text-[10px] uppercase tracking-widest">Descartar Operación</button>
               </div>
             </form>
           </div>
         </div>
       )}
 
-      {/* Modal Estado de Cuenta Detallado */}
+      {/* Modal Historial */}
       {isStatementOpen && selectedCliente && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-white dark:bg-gray-800 w-full max-w-2xl rounded-[3rem] p-10 shadow-2xl max-h-[85vh] overflow-hidden flex flex-col animate-in zoom-in-95">
-            <div className="flex justify-between items-start mb-8 shrink-0">
-              <div>
-                <h2 className="text-3xl font-black text-gray-900 dark:text-white tracking-tighter italic">Estado de Cuenta</h2>
-                <p className="text-gray-400 font-bold uppercase text-[10px] tracking-widest mt-1">{selectedCliente.nombre}</p>
-              </div>
-              <button onClick={() => setIsStatementOpen(false)} className="w-12 h-12 bg-gray-50 dark:bg-gray-900 rounded-full flex items-center justify-center text-2xl hover:rotate-90 transition-transform">✕</button>
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/80 backdrop-blur-xl">
+          <div className="bg-white dark:bg-gray-800 w-full max-w-3xl rounded-[3rem] p-12 shadow-2xl max-h-[90vh] overflow-hidden flex flex-col animate-in zoom-in-95 relative">
+            <button onClick={() => setIsStatementOpen(false)} className="absolute top-8 right-8 w-12 h-12 bg-gray-50 dark:bg-gray-900 rounded-2xl flex items-center justify-center text-xl hover:rotate-90 transition-all">✕</button>
+            
+            <div className="mb-12">
+                <h2 className="text-4xl font-black text-gray-900 dark:text-white tracking-tighter italic uppercase">Estado de Cuenta</h2>
+                <div className="flex items-center gap-4 mt-2">
+                    <span className="text-blue-600 font-black uppercase text-[10px] tracking-widest">{selectedCliente.nombre}</span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-gray-300"></span>
+                    <span className="text-gray-400 font-bold text-[10px] uppercase tracking-widest">{selectedCliente.rut}</span>
+                </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-6 mb-8 shrink-0">
-              <div className="p-6 bg-red-50 dark:bg-red-900/10 rounded-3xl border border-red-100 dark:border-red-900/30 text-center">
-                <p className="text-[9px] font-black text-red-600 uppercase tracking-widest mb-1">Deuda Actual</p>
-                <p className="text-3xl font-black text-red-600 tracking-tighter">${selectedCliente.saldo_deudado.toLocaleString()}</p>
+            <div className="grid grid-cols-2 gap-8 mb-12 shrink-0">
+              <div className="p-8 bg-red-50 dark:bg-red-900/10 rounded-[2.5rem] border-2 border-red-100 dark:border-red-900/20 text-center">
+                <p className="text-[9px] font-black text-red-600 uppercase tracking-[0.3em] mb-2">Total Adeudado</p>
+                <p className="text-4xl font-black text-red-600 tracking-tighter italic">${formatCurrency(selectedCliente.saldo_deudado)}</p>
               </div>
-              <div className="p-6 bg-emerald-50 dark:bg-emerald-900/10 rounded-3xl border border-emerald-100 dark:border-emerald-900/30 text-center">
-                <p className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-1">Saldo a Favor</p>
-                <p className="text-3xl font-black text-emerald-600 tracking-tighter">${selectedCliente.saldo_favor.toLocaleString()}</p>
+              <div className="p-8 bg-emerald-50 dark:bg-emerald-900/10 rounded-[2.5rem] border-2 border-emerald-100 dark:border-emerald-900/20 text-center">
+                <p className="text-[9px] font-black text-emerald-600 uppercase tracking-[0.3em] mb-2">Wallet a Favor</p>
+                <p className="text-4xl font-black text-emerald-600 tracking-tighter italic">${formatCurrency(selectedCliente.saldo_favor)}</p>
               </div>
             </div>
 
-            <div className="flex-1 overflow-auto space-y-4 pr-2 custom-scrollbar">
-              <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4">Cronología de Movimientos</h3>
+            <div className="flex-1 overflow-auto space-y-4 pr-4 custom-scrollbar">
+              <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.4em] mb-6 pl-4 border-l-4 border-blue-600">Línea de Tiempo</h3>
               {historial.map((mov, idx) => (
-                <div key={mov.id + idx} className="p-6 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-3xl flex justify-between items-center group hover:border-blue-200 transition-all">
-                  <div className="flex items-center gap-4">
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg ${mov.tipo === 'venta' ? 'bg-red-50 text-red-500' : 'bg-emerald-50 text-emerald-500'}`}>
-                      {mov.tipo === 'venta' ? '📉' : '📈'}
+                <div key={mov.id + idx} className="p-8 bg-gray-50/50 dark:bg-gray-900/40 border border-gray-100 dark:border-gray-800 rounded-[2rem] flex justify-between items-center group hover:bg-white dark:hover:bg-gray-800 transition-all">
+                  <div className="flex items-center gap-6">
+                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-2xl shadow-sm ${mov.tipo === 'venta' ? 'bg-red-100 text-red-500' : 'bg-emerald-100 text-emerald-500'}`}>
+                      {mov.tipo === 'venta' ? '💸' : '💰'}
                     </div>
                     <div>
-                      <p className="text-[10px] font-black text-gray-400 uppercase mb-1">{new Date(mov.fecha).toLocaleDateString()} - {new Date(mov.fecha).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
-                      <p className="font-bold text-gray-900 dark:text-white text-sm">{mov.referencia}</p>
+                      <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1 opacity-60">
+                        {new Date(mov.fecha).toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long' })}
+                      </p>
+                      <p className="font-black text-gray-900 dark:text-white text-lg tracking-tight italic uppercase">{mov.referencia}</p>
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className={`text-lg font-black tracking-tighter ${mov.tipo === 'venta' ? 'text-red-600' : 'text-emerald-600'}`}>
-                      {mov.tipo === 'venta' ? '-' : '+'}${mov.monto.toLocaleString()}
+                    <p className={`text-2xl font-black tracking-tighter italic ${mov.tipo === 'venta' ? 'text-red-600' : 'text-emerald-600'}`}>
+                      {mov.tipo === 'venta' ? '-' : '+'}${formatCurrency(mov.monto)}
                     </p>
-                    <p className="text-[9px] font-black text-gray-400 uppercase">Procesado</p>
                   </div>
                 </div>
               ))}
-              {historial.length === 0 && <div className="p-20 text-center text-gray-300 font-bold italic">No hay movimientos registrados para este cliente.</div>}
+              {historial.length === 0 && <div className="py-20 text-center text-gray-300 font-black uppercase tracking-widest text-xs opacity-50">Sin registros históricos.</div>}
             </div>
           </div>
         </div>
       )}
 
-      {/* Modal Formulario Cliente (Admin) */}
+      {/* Modal Formulario Cliente */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-white dark:bg-gray-800 w-full max-w-md rounded-[2.5rem] p-10 shadow-2xl animate-in zoom-in-95">
-            <h2 className="text-2xl font-black text-gray-900 dark:text-white mb-8 italic">
-              {selectedCliente ? 'Actualizar Cliente' : 'Nuevo Cliente en Sistema'}
+        <div className="fixed inset-0 z-[140] flex items-center justify-center p-4 bg-black/80 backdrop-blur-xl">
+          <div className="bg-white dark:bg-gray-800 w-full max-w-lg rounded-[3rem] p-12 shadow-2xl animate-in zoom-in-95 relative">
+            <button onClick={() => setIsModalOpen(false)} className="absolute top-8 right-8 text-2xl opacity-20">✕</button>
+            
+            <h2 className="text-4xl font-black text-gray-900 dark:text-white mb-10 italic tracking-tighter">
+              {selectedCliente ? 'Modificar Registro' : 'Alta de Cliente'}
             </h2>
-            <form onSubmit={handleSaveCliente} className="space-y-4">
+            <form onSubmit={handleSaveCliente} className="space-y-6">
               <div>
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">RUT (Sin puntos ni guion)</label>
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-3">RUT del Cliente</label>
                 <input 
                   required 
                   autoFocus
-                  placeholder="12345678-9"
-                  value={(formData as any).rut || ''} 
-                  onBlur={e => setFormData({...formData, rut: formatRUT(e.target.value)} as any)}
-                  onChange={e => setFormData({...formData, rut: e.target.value} as any)} 
-                  className="w-full p-4 bg-blue-50 dark:bg-blue-900/20 rounded-2xl border-none font-black text-xl text-blue-600" 
+                  placeholder="ej: 12.345.678-9"
+                  value={formData.rut || ''} 
+                  onChange={e => setFormData({...formData, rut: e.target.value})} 
+                  className="w-full p-5 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-black text-2xl text-blue-600 tracking-tighter" 
                 />
               </div>
               <div>
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Nombre Completo / Razón Social</label>
-                <input required value={formData.nombre} onChange={e => setFormData({...formData, nombre: e.target.value})} className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold" placeholder="Ej: Juan Pérez" />
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-3">Nombre Completo / Empresa</label>
+                <input required value={formData.nombre} onChange={e => setFormData({...formData, nombre: e.target.value})} className="w-full p-5 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold text-lg italic" placeholder="Ej: Maria José Villegas" />
               </div>
               <div>
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Teléfono de Contacto</label>
-                <input value={formData.telefono} onChange={e => setFormData({...formData, telefono: e.target.value})} className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold" placeholder="+56 9..." />
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-3">WhatsApp / Teléfono</label>
+                <input value={formData.telefono} onChange={e => setFormData({...formData, telefono: e.target.value})} className="w-full p-5 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold text-lg" placeholder="+56 9..." />
               </div>
               
-              <div className="flex gap-4 pt-8">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 font-bold text-gray-400">Cancelar</button>
-                <button type="submit" disabled={loading} className="flex-[2] py-5 bg-blue-600 text-white font-black rounded-2xl shadow-xl shadow-blue-100 dark:shadow-none hover:bg-blue-700 transition-all">
-                  {loading ? 'GUARDANDO...' : selectedCliente ? 'ACTUALIZAR FICHA' : 'CREAR CLIENTE'}
+              <div className="flex gap-4 pt-10">
+                <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 font-black text-gray-400 uppercase tracking-widest text-[10px]">Cancelar</button>
+                <button type="submit" disabled={loading} className="flex-[3] py-6 bg-gray-900 text-white font-black rounded-3xl shadow-2xl hover:bg-blue-600 transition-all uppercase tracking-[0.2em] text-xs">
+                  {loading ? 'PROCESANDO...' : selectedCliente ? 'ACTUALIZAR DATOS' : 'DAR DE ALTA'}
                 </button>
               </div>
             </form>
