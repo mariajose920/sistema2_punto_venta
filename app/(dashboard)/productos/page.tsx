@@ -1,9 +1,7 @@
-"use client";
-
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
-import { normalizeText, logAction, formatCurrency, formatRawInt } from '@/lib/utils';
+import { normalizeText, formatCurrency } from '@/lib/utils';
 
 interface Producto {
   id: string;
@@ -16,8 +14,10 @@ interface Producto {
   stock_minimo: number;
 }
 
+type OrderType = 'stock_asc' | 'stock_desc' | 'price_asc' | 'price_desc' | 'name_asc';
+
 export default function ProductosPage() {
-  const { role, user, isMounted } = useAuth();
+  const { role } = useAuth();
   
   // Estados de datos
   const [productos, setProductos] = useState<Producto[]>([]);
@@ -26,9 +26,11 @@ export default function ProductosPage() {
   
   // Estados de UI
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string>('todas');
-  const [sortBy, setSortBy] = useState<string>('nombre-asc');
+  const [categoryFilter, setCategoryFilter] = useState('todas');
+  const [sortBy, setSortBy] = useState<OrderType>('name_asc');
+  
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [showNewCategoryInput, setShowNewCategoryInput] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
@@ -45,19 +47,22 @@ export default function ProductosPage() {
     stock_minimo: 5
   });
 
+  const barcodeRef = useRef<HTMLInputElement>(null);
+
+  // Utilidades de Formateo
   const parseNumber = (val: string) => {
     const clean = val.replace(/\D/g, '');
     const num = parseInt(clean, 10);
     return isNaN(num) ? 0 : num;
   };
 
+  // 1. Cargar datos desde Supabase
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
       const { data: prodData, error: prodError } = await (supabase as any)
         .from('Producto')
-        .select('*')
-        .order('nombre', { ascending: true });
+        .select('*');
       if (prodError) throw prodError;
       
       const { data: catData, error: catError } = await (supabase as any)
@@ -69,44 +74,50 @@ export default function ProductosPage() {
       setCategorias(catData || []);
     } catch (err: any) {
       console.error('Error cargando datos:', err);
+      setError('Error al conectar con Supabase.');
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    if (isMounted) fetchData();
-  }, [fetchData, isMounted]);
+    fetchData();
+  }, [fetchData]);
 
+  // Lógica combinada de Búsqueda, Filtrado y Ordenamiento
   useEffect(() => {
     let result = [...productos];
 
-    const term = normalizeText(searchTerm);
+    // 1. Búsqueda parcial (Nombre o Código de Barras solamente)
+    const term = searchTerm.toLowerCase().trim();
     if (term) {
       result = result.filter(p => 
-        normalizeText(p.nombre).includes(term) || 
-        (p.codigo_barra || '').includes(term)
+        (p.nombre || '').toLowerCase().includes(term) || 
+        (p.codigo_barra || '').toString().toLowerCase().includes(term)
       );
     }
 
-    if (selectedCategory !== 'todas') {
-      result = result.filter(p => p.categoria === selectedCategory);
+    // 2. Filtro por Categoría
+    if (categoryFilter !== 'todas') {
+      result = result.filter(p => p.categoria === categoryFilter);
     }
 
+    // 3. Ordenamiento
     result.sort((a, b) => {
       switch (sortBy) {
-        case 'stock-desc': return b.stock_actual - a.stock_actual;
-        case 'stock-asc': return a.stock_actual - b.stock_actual;
-        case 'precio-desc': return b.precio_venta_publico - a.precio_venta_publico;
-        case 'precio-asc': return a.precio_venta_publico - b.precio_venta_publico;
-        case 'nombre-desc': return b.nombre.localeCompare(a.nombre);
-        default: return a.nombre.localeCompare(b.nombre);
+        case 'stock_asc': return a.stock_actual - b.stock_actual;
+        case 'stock_desc': return b.stock_actual - a.stock_actual;
+        case 'price_asc': return a.precio_venta_publico - b.precio_venta_publico;
+        case 'price_desc': return b.precio_venta_publico - a.precio_venta_publico;
+        case 'name_asc': return a.nombre.localeCompare(b.nombre);
+        default: return 0;
       }
     });
 
     setFiltrados(result);
-  }, [searchTerm, productos, selectedCategory, sortBy]);
+  }, [searchTerm, categoryFilter, sortBy, productos]);
 
+  // Manejo de nueva categoría
   const handleSaveCategory = async () => {
     const nameLower = normalizeText(newCategoryName);
     if (!nameLower) return;
@@ -118,17 +129,6 @@ export default function ProductosPage() {
         .single();
       
       if (error) throw error;
-      
-      if (user) {
-        await logAction(supabase, {
-          usuario_id: user.id,
-          email_usuario: user.email!,
-          accion: 'creacion',
-          modulo: 'productos',
-          detalle: `creó categoría: ${nameLower}`
-        });
-      }
-
       setCategorias([...categorias, data]);
       setFormData({ ...formData, categoria: data.nombre });
       setShowNewCategoryInput(false);
@@ -138,15 +138,26 @@ export default function ProductosPage() {
     }
   };
 
+  // 3. Acciones de CRUD
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (role !== 'admin') return;
+    if (role !== 'admin') {
+      alert('Solo el administrador puede realizar cambios directos en el catálogo.');
+      return;
+    }
 
     try {
       setLoading(true);
+      
       const nombreNorm = normalizeText(formData.nombre);
-      if (!nombreNorm) throw new Error('El nombre es obligatorio.');
+      const categoriaNorm = normalizeText(formData.categoria);
+      const codigoStr = String(formData.codigo_barra || '').trim();
 
+      if (!nombreNorm || !categoriaNorm) {
+        throw new Error("El nombre y la categoría son obligatorios.");
+      }
+
+      // Validación de Nombre Único
       const { data: nombreExistente } = await (supabase as any)
         .from('Producto')
         .select('id')
@@ -154,42 +165,23 @@ export default function ProductosPage() {
         .neq('id', editingId || '00000000-0000-0000-0000-000000000000')
         .maybeSingle();
 
-      if (nombreExistente) throw new Error(`Ya existe un producto con el nombre: "${nombreNorm}"`);
+      if (nombreExistente) {
+        throw new Error(`Ya existe un producto con el nombre: "${nombreNorm}"`);
+      }
       
       const finalData = {
+        ...formData,
         nombre: nombreNorm,
-        categoria: normalizeText(formData.categoria),
-        precio_compra: Math.round(formData.precio_compra || 0),
-        precio_venta_publico: Math.round(formData.precio_venta_publico || 0),
-        codigo_barra: (formData.codigo_barra || '').trim() || null,
-        stock_actual: Math.round(formData.stock_actual || 0),
-        stock_minimo: Math.round(formData.stock_minimo || 5)
+        categoria: categoriaNorm,
+        codigo_barra: codigoStr || null
       };
 
       if (editingId) {
         const { error } = await (supabase as any).from('Producto').update(finalData).eq('id', editingId);
         if (error) throw error;
-        if (user) {
-          await logAction(supabase, {
-            usuario_id: user.id,
-            email_usuario: user.email!,
-            accion: 'edicion',
-            modulo: 'productos',
-            detalle: `editó producto: ${nombreNorm}`
-          });
-        }
       } else {
         const { error } = await (supabase as any).from('Producto').insert([finalData]);
         if (error) throw error;
-        if (user) {
-          await logAction(supabase, {
-            usuario_id: user.id,
-            email_usuario: user.email!,
-            accion: 'creacion',
-            modulo: 'productos',
-            detalle: `creó producto: ${nombreNorm}`
-          });
-        }
       }
       
       setIsModalOpen(false);
@@ -202,25 +194,16 @@ export default function ProductosPage() {
     }
   };
 
-  const handleEliminar = async (p: Producto) => {
-    if (role !== 'admin') return;
-    if (window.confirm(`¿Eliminar "${p.nombre.toUpperCase()}"?`)) {
-      try {
-        const { error } = await (supabase as any).from('Producto').delete().eq('id', p.id);
-        if (error) throw error;
-        if (user) {
-          await logAction(supabase, {
-            usuario_id: user.id,
-            email_usuario: user.email!,
-            accion: 'eliminacion',
-            modulo: 'productos',
-            detalle: `eliminó producto: ${p.nombre}`
-          });
-        }
-        fetchData();
-      } catch (err: any) {
-        alert('Error: ' + err.message);
-      }
+  const handleEliminar = async (id: string) => {
+    if (role !== 'admin') {
+      alert('Acción restringida.');
+      return;
+    }
+
+    if (window.confirm('¿Eliminar este producto permanentemente?')) {
+      const { error } = await (supabase as any).from('Producto').delete().eq('id', id);
+      if (error) alert('Error: ' + error.message);
+      else fetchData();
     }
   };
 
@@ -244,193 +227,228 @@ export default function ProductosPage() {
     });
   };
 
-  if (!isMounted) return null;
-
   return (
-    <div className="space-y-6 animate-in fade-in duration-500 pb-20">
+    <div className="space-y-6 animate-in fade-in duration-500">
       
-      {/* Encabezado Premium */}
-      <div className="bg-white dark:bg-gray-800 p-10 rounded-[3rem] shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-8">
-        <div>
-            <div className="flex items-center gap-4 mb-4">
-                <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-2xl shadow-xl shadow-blue-100 dark:shadow-none">📦</div>
-                <h1 className="text-3xl font-black text-gray-900 dark:text-white tracking-tighter italic uppercase">Inventario Maestro</h1>
+      {/* Encabezado y Filtros */}
+      <div className="bg-white dark:bg-gray-800 p-8 rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-gray-700 space-y-6">
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
+          <div className="flex-1 w-full">
+            <h1 className="text-3xl font-black text-gray-900 dark:text-white mb-4 tracking-tight">Inventario de Productos</h1>
+            <div className="relative group">
+              <span className="absolute left-5 top-1/2 -translate-y-1/2 text-2xl group-focus-within:scale-110 transition-transform">🔍</span>
+              <input 
+                type="text" 
+                placeholder="Buscar por nombre o código de barras..." 
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-14 pr-6 py-4 bg-gray-50 dark:bg-gray-900 border-none rounded-2xl focus:ring-4 focus:ring-blue-600/20 transition-all font-bold text-lg"
+              />
             </div>
-            <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.4em] ml-2 italic">Control Centralizado de Mercancías</p>
-        </div>
-        {role === 'admin' && (
-          <button 
-            onClick={() => { resetForm(); setIsModalOpen(true); }}
-            className="px-10 py-5 bg-gray-900 hover:bg-blue-600 text-white rounded-[2rem] font-black text-xs uppercase tracking-widest shadow-2xl transition-all transform hover:scale-105 active:scale-95"
-          >
-            + Añadir Producto
-          </button>
-        )}
-      </div>
-
-      {/* Buscadores */}
-      <div className="bg-white dark:bg-gray-800 p-8 rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-gray-700 grid grid-cols-1 md:grid-cols-12 gap-6">
-        <div className="md:col-span-6 relative group">
-          <span className="absolute left-6 top-1/2 -translate-y-1/2 text-xl grayscale opacity-30 group-focus-within:opacity-100 transition-opacity">🔍</span>
-          <input 
-            type="text" 
-            placeholder="Buscar por descripción o SKU..." 
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-16 pr-6 py-5 bg-gray-50 dark:bg-gray-900 border-none rounded-[1.5rem] focus:ring-4 focus:ring-blue-600/10 transition-all font-black text-sm italic uppercase"
-          />
+          </div>
+          
+          {role === 'admin' && (
+            <button 
+              onClick={() => { resetForm(); setIsModalOpen(true); }}
+              className="w-full lg:w-auto bg-gray-900 text-white px-8 py-4 rounded-2xl font-black shadow-2xl hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-3 uppercase text-xs tracking-widest"
+            >
+              <span>➕</span> Nuevo Producto
+            </button>
+          )}
         </div>
 
-        <div className="md:col-span-3">
-           <select 
-            value={selectedCategory}
-            onChange={(e) => setSelectedCategory(e.target.value)}
-            className="w-full px-6 py-5 bg-gray-50 dark:bg-gray-900 border-none rounded-[1.5rem] focus:ring-4 focus:ring-blue-600/10 transition-all font-black text-[10px] uppercase tracking-widest appearance-none text-blue-600 italic"
-           >
-             <option value="todas">-- Todas las Familias --</option>
-             {categorias.map(cat => <option key={cat.id} value={cat.nombre}>{cat.nombre.toUpperCase()}</option>)}
-           </select>
-        </div>
-
-        <div className="md:col-span-3">
-           <select 
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value)}
-            className="w-full px-6 py-5 bg-gray-50 dark:bg-gray-900 border-none rounded-[1.5rem] focus:ring-4 focus:ring-blue-600/10 transition-all font-black text-[10px] uppercase tracking-widest appearance-none text-gray-400 italic"
-           >
-             <option value="nombre-asc">Nombre (A-Z)</option>
-             <option value="nombre-desc">Nombre (Z-A)</option>
-             <option value="stock-desc">Stock (Mayor a Menor)</option>
-             <option value="stock-asc">Stock (Crítico)</option>
-             <option value="precio-desc">Precio (Mayor a Menor)</option>
-             <option value="precio-asc">Precio (Menor a Mayor)</option>
-           </select>
-        </div>
-      </div>
-
-      {/* Tabla Premium */}
-      <div className="bg-white dark:bg-gray-800 rounded-[3rem] shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
-        <table className="w-full text-left border-collapse">
-            <thead className="bg-gray-50 dark:bg-gray-900/50 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">
-              <tr>
-                <th className="px-10 py-6">Identificación</th>
-                <th className="px-10 py-6">Descripción del Ítem</th>
-                <th className="px-10 py-6 text-center">Unidades</th>
-                <th className="px-10 py-6 text-right">P. Venta</th>
-                {role === 'admin' && <th className="px-10 py-6 text-right">Costo Neto</th>}
-                <th className="px-10 py-6 text-center">Acciones</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
-              {filtrados.map(p => (
-                <tr key={p.id} className={`group transition-all hover:bg-gray-50/50 dark:hover:bg-gray-700/20 ${p.stock_actual <= p.stock_minimo ? 'bg-red-50/10' : ''}`}>
-                  <td className="px-10 py-8">
-                    <span className="font-mono text-[10px] font-black text-gray-400 bg-gray-50 dark:bg-gray-900 px-4 py-2 rounded-xl border border-gray-100 dark:border-gray-800">{p.codigo_barra || 'SIN SKU'}</span>
-                  </td>
-                  <td className="px-10 py-8">
-                    <p className="font-black text-gray-900 dark:text-white text-lg tracking-tighter uppercase italic group-hover:text-blue-600 transition-colors">{p.nombre}</p>
-                    <p className="text-[9px] font-black text-blue-500 uppercase tracking-[0.3em] mt-1">{p.categoria}</p>
-                  </td>
-                  <td className="px-10 py-8 text-center">
-                    <div className={`inline-flex flex-col items-center min-w-[80px] p-4 rounded-3xl border-2 transition-all ${
-                      p.stock_actual <= p.stock_minimo 
-                        ? 'border-red-200 bg-red-50 text-red-600 shadow-lg shadow-red-100' 
-                        : 'border-emerald-100 bg-emerald-50 text-emerald-600'
-                    }`}>
-                      <span className="text-2xl font-black tracking-tighter italic leading-none">{formatRawInt(p.stock_actual)}</span>
-                      <span className="text-[8px] uppercase font-black tracking-widest mt-1 opacity-50">Stock</span>
-                    </div>
-                  </td>
-                  <td className="px-10 py-8 text-right">
-                    <p className="font-black text-gray-900 dark:text-white text-2xl tracking-tighter italic">${formatCurrency(p.precio_venta_publico)}</p>
-                  </td>
-                  {role === 'admin' && (
-                    <td className="px-10 py-8 text-right">
-                      <p className="text-gray-400 font-black text-sm tracking-tighter italic">${formatCurrency(p.precio_compra)}</p>
-                    </td>
-                  )}
-                  <td className="px-10 py-8 text-center">
-                    <div className="flex justify-center gap-3">
-                      <button onClick={() => openEdit(p)} className="w-12 h-12 flex items-center justify-center bg-gray-50 dark:bg-gray-700 text-gray-400 rounded-2xl hover:bg-blue-600 hover:text-white transition-all shadow-sm">✏️</button>
-                      {role === 'admin' && (
-                        <button onClick={() => handleEliminar(p)} className="w-12 h-12 flex items-center justify-center bg-red-50 dark:bg-red-900/20 text-red-600 rounded-2xl hover:bg-red-600 hover:text-white transition-all shadow-sm">🗑️</button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
+        <div className="flex flex-wrap gap-3">
+          <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-900 p-2 rounded-2xl border border-gray-100 dark:border-gray-800">
+            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2">Categoría:</span>
+            <select 
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+              className="bg-transparent border-none font-bold text-xs focus:ring-0 cursor-pointer"
+            >
+              <option value="todas">Todas las categorías</option>
+              {categorias.map(cat => (
+                <option key={cat.id} value={cat.nombre}>{cat.nombre.toUpperCase()}</option>
               ))}
-            </tbody>
-        </table>
+            </select>
+          </div>
+
+          <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-900 p-2 rounded-2xl border border-gray-100 dark:border-gray-800">
+            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2">Ordenar por:</span>
+            <select 
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as OrderType)}
+              className="bg-transparent border-none font-bold text-xs focus:ring-0 cursor-pointer"
+            >
+              <option value="name_asc">Nombre (A-Z)</option>
+              <option value="stock_asc">Menor Stock</option>
+              <option value="stock_desc">Mayor Stock</option>
+              <option value="price_asc">Menor Precio</option>
+              <option value="price_desc">Mayor Precio</option>
+            </select>
+          </div>
+        </div>
       </div>
 
-      {/* Modal Premium */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-xl">
-          <div className="bg-white dark:bg-gray-800 w-full max-w-xl rounded-[3.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 relative">
-            <button onClick={() => setIsModalOpen(false)} className="absolute top-12 right-12 w-12 h-12 flex items-center justify-center rounded-full hover:bg-gray-100 transition-all text-2xl opacity-20 hover:opacity-100">✕</button>
-            
-            <div className="p-12 border-b border-gray-50 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/20">
-                <h2 className="text-4xl font-black text-gray-900 dark:text-white italic tracking-tighter uppercase">
-                  {editingId ? 'Editar Perfil' : 'Alta de Ítem'}
-                </h2>
-                <p className="text-[10px] font-black text-blue-600 uppercase tracking-[0.4em] mt-2 italic">Sincronización con Base de Datos Maestro</p>
-            </div>
-            
-            <form onSubmit={handleSave} className="p-12 space-y-8 max-h-[65vh] overflow-y-auto">
-              <div className="grid grid-cols-2 gap-8">
-                <div className="col-span-2">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-3">Descripción Oficial</label>
-                  <input required value={formData.nombre} onChange={e => setFormData({...formData, nombre: e.target.value})} className="w-full p-5 bg-gray-50 dark:bg-gray-900 rounded-[1.5rem] border-none font-black text-xl italic focus:ring-4 focus:ring-blue-600/10 transition-all uppercase" placeholder="Ej: Bebida Cola 3L" />
+      {/* Lista de Productos */}
+      {filtrados.length === 0 ? (
+        <div className="bg-white dark:bg-gray-800 p-20 rounded-[3.5rem] text-center border-4 border-dashed border-gray-100 dark:border-gray-800">
+          <div className="text-8xl mb-6 opacity-20 grayscale">📦</div>
+          <h3 className="text-2xl font-black text-gray-300 uppercase tracking-[0.2em]">Sin resultados</h3>
+          <p className="text-gray-400 font-bold mt-2">Prueba ajustando los filtros o el término de búsqueda.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+          {filtrados.map(p => (
+            <div key={p.id} className="bg-white dark:bg-gray-800 p-8 rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-gray-700 relative group transition-all hover:shadow-2xl hover:-translate-y-2 overflow-hidden">
+              <div className="flex justify-between items-start mb-6">
+                <div className="w-14 h-14 bg-gray-50 dark:bg-gray-900 rounded-2xl flex items-center justify-center text-3xl group-hover:scale-110 transition-transform">
+                  {categorias.find(c => c.nombre === p.categoria) ? '📁' : '📦'}
                 </div>
+                <div className="text-right">
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Precio Venta</p>
+                  <p className="text-2xl font-black text-blue-600 tracking-tighter">{formatCurrency(p.precio_venta_publico)}</p>
+                </div>
+              </div>
 
+              <div className="mb-8">
+                <h3 className="text-lg font-black text-gray-900 dark:text-white truncate uppercase italic">{p.nombre}</h3>
+                <p className="text-[10px] font-bold text-blue-600 uppercase tracking-widest">{p.categoria || 'Sin Categoría'}</p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 mb-8">
+                <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl">
+                  <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Stock</p>
+                  <p className={`text-xl font-black tracking-tighter ${p.stock_actual <= (p.stock_minimo || 0) ? 'text-red-600' : 'text-gray-900 dark:text-white'}`}>
+                    {p.stock_actual}
+                  </p>
+                </div>
+                <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl text-right">
+                  <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Código</p>
+                  <p className="text-[10px] font-black text-gray-400 truncate">{p.codigo_barra || 'S/N'}</p>
+                </div>
+              </div>
+
+              <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-all">
+                <button onClick={() => openEdit(p)} className="flex-1 py-3 bg-gray-900 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-gray-800 transition-all">Editar</button>
+                {role === 'admin' && (
+                  <button onClick={() => handleEliminar(p.id)} className="p-3 bg-red-50 text-red-600 rounded-xl hover:bg-red-600 hover:text-white transition-all">🗑️</button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Modal de Producto */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
+          <div className="bg-white dark:bg-gray-800 w-full max-w-2xl rounded-[3rem] p-10 shadow-2xl animate-in zoom-in-95 duration-200">
+            <h2 className="text-4xl font-black text-gray-900 dark:text-white mb-2 italic">
+              {editingId ? 'Editar Ítem' : 'Nuevo Ítem'}
+            </h2>
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-10">Completa la ficha del producto</p>
+            
+            <form onSubmit={handleSave} className="space-y-6 max-h-[60vh] overflow-y-auto px-2">
+              <div className="grid grid-cols-2 gap-6">
                 <div className="col-span-2 sm:col-span-1">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-3">Código / SKU</label>
-                  <input placeholder="Escanear..." value={formData.codigo_barra || ''} onChange={e => setFormData({...formData, codigo_barra: e.target.value})} className="w-full p-5 bg-gray-50 dark:bg-gray-900 rounded-[1.5rem] border-none font-black text-sm tracking-widest focus:ring-4 focus:ring-blue-600/10 transition-all" />
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Código de Barras</label>
+                  <input 
+                    placeholder="Escanear o digitar..."
+                    value={formData.codigo_barra || ''} 
+                    onChange={e => setFormData({...formData, codigo_barra: e.target.value})} 
+                    className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold text-lg" 
+                  />
                 </div>
                 
                 <div className="col-span-2 sm:col-span-1">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-3">Familia / Categoría</label>
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Categoría</label>
                   {!showNewCategoryInput ? (
                     <div className="space-y-3">
-                      <select required value={formData.categoria} onChange={e => setFormData({...formData, categoria: e.target.value})} className="w-full p-5 bg-gray-50 dark:bg-gray-900 rounded-[1.5rem] border-none font-black text-[10px] uppercase tracking-widest appearance-none text-blue-600 italic">
+                      <select 
+                        required 
+                        value={formData.categoria} 
+                        onChange={e => setFormData({...formData, categoria: e.target.value})} 
+                        className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold appearance-none"
+                      >
                         <option value="">Seleccionar...</option>
-                        {categorias.map(cat => <option key={cat.id} value={cat.nombre}>{cat.nombre.toUpperCase()}</option>)}
+                        {categorias.map(cat => (
+                          <option key={cat.id} value={cat.nombre}>{cat.nombre.toUpperCase()}</option>
+                        ))}
                       </select>
-                      <button type="button" onClick={() => setShowNewCategoryInput(true)} className="text-[9px] font-black text-blue-500 hover:underline uppercase ml-2 tracking-widest">+ Crear Nueva Familia</button>
+                      <button 
+                        type="button"
+                        onClick={() => setShowNewCategoryInput(true)}
+                        className="text-[10px] font-black text-blue-600 uppercase tracking-widest px-2"
+                      >
+                        + Crear nueva categoría
+                      </button>
                     </div>
                   ) : (
-                    <div className="flex items-center gap-2 animate-in slide-in-from-top-2">
-                      <input autoFocus placeholder="Nombre..." value={newCategoryName} onChange={e => setNewCategoryName(e.target.value)} className="flex-1 p-5 bg-blue-50 dark:bg-blue-900/20 rounded-[1.5rem] border-2 border-blue-100 font-black text-[10px] uppercase" />
-                      <button type="button" onClick={handleSaveCategory} className="w-14 h-14 bg-blue-600 text-white rounded-2xl">✓</button>
+                    <div className="flex gap-2">
+                      <input 
+                        autoFocus
+                        placeholder="Nueva categoría..."
+                        value={newCategoryName}
+                        onChange={e => setNewCategoryName(e.target.value)}
+                        className="flex-1 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-2xl border border-blue-200 dark:border-blue-800 font-bold"
+                      />
+                      <button type="button" onClick={handleSaveCategory} className="p-4 bg-blue-600 text-white rounded-2xl">✓</button>
+                      <button type="button" onClick={() => setShowNewCategoryInput(false)} className="p-4 bg-gray-200 dark:bg-gray-700 rounded-2xl">✕</button>
                     </div>
                   )}
                 </div>
 
-                <div className="col-span-2 grid grid-cols-2 gap-8 bg-gray-50 dark:bg-gray-900/50 p-8 rounded-[2.5rem] border border-gray-100">
-                  <div>
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-3 italic">Precio Venta ($)</label>
-                    <input required type="text" value={formatRawInt(formData.precio_venta_publico)} onChange={e => setFormData({...formData, precio_venta_publico: parseNumber(e.target.value)})} className="w-full p-4 bg-white dark:bg-gray-800 rounded-2xl border-none font-black text-3xl text-emerald-600 tracking-tighter italic" />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-3 italic">Costo Neto ($)</label>
-                    <input required type="text" value={formatRawInt(formData.precio_compra)} onChange={e => setFormData({...formData, precio_compra: parseNumber(e.target.value)})} className="w-full p-4 bg-white dark:bg-gray-800 rounded-2xl border-none font-black text-3xl text-gray-400 tracking-tighter italic" />
-                  </div>
+                <div className="col-span-2">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Nombre del Producto</label>
+                  <input required value={formData.nombre} onChange={e => setFormData({...formData, nombre: e.target.value})} className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold text-lg" />
                 </div>
 
                 <div>
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-3">Stock Físico</label>
-                  <input required type="text" value={formatRawInt(formData.stock_actual)} onChange={e => setFormData({...formData, stock_actual: parseNumber(e.target.value)})} className="w-full p-5 bg-gray-50 dark:bg-gray-900 rounded-[1.5rem] border-none font-black text-xl italic" />
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Precio Venta</label>
+                  <input 
+                    required 
+                    type="number" 
+                    value={formData.precio_venta_publico} 
+                    onChange={e => setFormData({...formData, precio_venta_publico: Number(e.target.value)})} 
+                    className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-black text-xl text-blue-600" 
+                  />
                 </div>
                 <div>
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-3">Umbral Crítico</label>
-                  <input required type="text" value={formatRawInt(formData.stock_minimo)} onChange={e => setFormData({...formData, stock_minimo: parseNumber(e.target.value)})} className="w-full p-5 bg-gray-50 dark:bg-gray-900 rounded-[1.5rem] border-none font-black text-xl italic" />
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Costo Compra</label>
+                  <input 
+                    required 
+                    type="number" 
+                    value={formData.precio_compra} 
+                    onChange={e => setFormData({...formData, precio_compra: Number(e.target.value)})} 
+                    className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold text-xl" 
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Stock Actual</label>
+                  <input 
+                    required 
+                    type="number" 
+                    value={formData.stock_actual} 
+                    onChange={e => setFormData({...formData, stock_actual: Number(e.target.value)})} 
+                    className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-black text-xl" 
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Stock Mínimo</label>
+                  <input 
+                    required 
+                    type="number" 
+                    value={formData.stock_minimo} 
+                    onChange={e => setFormData({...formData, stock_minimo: Number(e.target.value)})} 
+                    className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold text-xl text-red-500" 
+                  />
                 </div>
               </div>
               
-              <div className="pt-10 flex gap-6">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 font-black text-gray-400 uppercase text-[10px] tracking-widest">Cancelar</button>
-                <button type="submit" disabled={loading} className="flex-[3] py-6 bg-gray-900 hover:bg-blue-600 text-white font-black rounded-[2rem] shadow-2xl transition-all uppercase tracking-[0.3em] text-xs">
-                  {loading ? 'Sincronizando...' : editingId ? 'Actualizar Ficha' : 'Confirmar Alta'}
+              <div className="pt-8 flex gap-4">
+                <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 py-5 font-black text-gray-400 uppercase tracking-widest">Cancelar</button>
+                <button type="submit" className="flex-[2] py-5 bg-gray-900 text-white font-black rounded-3xl shadow-2xl hover:scale-105 active:scale-95 transition-all uppercase tracking-[0.2em] text-xs">
+                  {editingId ? 'Actualizar Ficha' : 'Registrar Producto'}
                 </button>
               </div>
             </form>

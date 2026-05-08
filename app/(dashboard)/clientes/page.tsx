@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
-import { normalizeText, cleanRUT, logAction, formatCurrency } from '@/lib/utils';
+import { normalizeText, normalizeRUT, formatCurrency } from '@/lib/utils';
 
 interface Cliente {
   id: string;
@@ -30,7 +30,7 @@ export default function ClientesPage() {
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [filtered, setFiltered] = useState<Cliente[]>([]);
   const [loading, setLoading] = useState(true);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null); // Nuevo: para mostrar errores al usuario
   const [search, setSearch] = useState('');
   
   // Estados de Modales
@@ -53,9 +53,11 @@ export default function ClientesPage() {
     rut: ''
   });
 
-  // Utilidades de RUT local para el input dinámico
+  // Utilidades de RUT (Mantenemos validación y formato visual, pero normalizamos para búsqueda)
+  const cleanRUTInternal = (rut: string) => (rut || '').replace(/[^0-9kK]/g, '').toUpperCase();
+
   const validateRUT = (rut: string) => {
-    const clean = cleanRUT(rut);
+    const clean = cleanRUTInternal(rut);
     if (clean.length < 2) return false;
     const body = clean.slice(0, -1);
     const dv = clean.slice(-1);
@@ -70,8 +72,8 @@ export default function ClientesPage() {
     return calculatedDV === dv;
   };
 
-  const formatRUTDisplay = (rut: string) => {
-    const clean = cleanRUT(rut);
+  const formatRUTVisual = (rut: string) => {
+    const clean = cleanRUTInternal(rut);
     if (clean.length < 2) return clean;
     const body = clean.slice(0, -1);
     const dv = clean.slice(-1);
@@ -94,9 +96,7 @@ export default function ClientesPage() {
         .order('nombre', { ascending: true });
       
       if (error) throw error;
-      
       setClientes(data || []);
-      setFiltered(data || []);
     } catch (err: any) {
       console.error('Error cargando clientes:', err);
       setErrorMsg(err.message || 'Error al conectar con la base de datos');
@@ -107,70 +107,66 @@ export default function ClientesPage() {
 
   useEffect(() => { fetchClientes(); }, [fetchClientes]);
 
-  useEffect(() => {
+  // Búsqueda Flexible por Nombre o RUT normalizado
+  const filtered = useMemo(() => {
     const term = normalizeText(search);
-    const termClean = cleanRUT(search);
-    
-    setFiltered(clientes.filter(c => 
-      normalizeText(c.nombre).includes(term) || 
-      cleanRUT(c.rut || '').includes(termClean)
-    ));
+    const termRUT = normalizeRUT(search);
+
+    return clientes.filter(c => {
+      const nombreNorm = normalizeText(c.nombre);
+      const rutNorm = normalizeRUT(c.rut);
+      return nombreNorm.includes(term) || rutNorm.includes(termRUT);
+    });
   }, [search, clientes]);
 
   const handleSaveCliente = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      if (!formData.nombre) throw new Error('El nombre es obligatorio');
       const nombreNorm = normalizeText(formData.nombre);
+      if (!nombreNorm) throw new Error('El nombre es obligatorio');
       
       if (!formData.rut) throw new Error('El RUT es obligatorio');
-      const rutClean = cleanRUT(formData.rut);
-      const rutFormateado = formatRUTDisplay(rutClean);
-      
-      if (!validateRUT(rutClean)) throw new Error('El RUT ingresado no es válido');
+      const rutNormalizado = formatRUTVisual(formData.rut);
+      if (!validateRUT(rutNormalizado)) throw new Error('El RUT ingresado no es válido');
 
       setLoading(true);
+
+      // Validar duplicado de NOMBRE
+      const { data: nombreExistente } = await (supabase as any)
+        .from('Cliente')
+        .select('id')
+        .eq('nombre', nombreNorm)
+        .neq('id', selectedCliente?.id || '00000000-0000-0000-0000-000000000000')
+        .maybeSingle();
+
+      if (nombreExistente) {
+        throw new Error(`Ya existe un cliente con el nombre: "${nombreNorm}"`);
+      }
 
       // Validar duplicado de RUT
       const { data: existente } = await (supabase as any)
         .from('Cliente')
         .select('id, nombre')
-        .eq('rut', rutFormateado)
+        .eq('rut', rutNormalizado)
         .neq('id', selectedCliente?.id || '00000000-0000-0000-0000-000000000000')
         .maybeSingle();
 
       if (existente) {
-        throw new Error(`Ya existe un cliente con el RUT: ${rutFormateado} (${existente.nombre})`);
+        throw new Error(`Ya existe un cliente registrado con el RUT: ${rutNormalizado} (${existente.nombre})`);
       }
 
       const finalData = { 
         ...formData, 
         nombre: nombreNorm,
-        rut: rutFormateado 
+        rut: rutNormalizado 
       };
 
       if (selectedCliente?.id) {
         const { error } = await (supabase as any).from('Cliente').update(finalData).eq('id', selectedCliente.id);
         if (error) throw error;
-        
-        await logAction(supabase, {
-          usuario_id: user?.id || '',
-          email_usuario: user?.email || '',
-          accion: 'edicion',
-          modulo: 'clientes',
-          detalle: `actualizó datos del cliente: ${nombreNorm}`
-        });
       } else {
         const { error } = await (supabase as any).from('Cliente').insert([finalData]);
         if (error) throw error;
-
-        await logAction(supabase, {
-          usuario_id: user?.id || '',
-          email_usuario: user?.email || '',
-          accion: 'creacion',
-          modulo: 'clientes',
-          detalle: `creó nuevo cliente: ${nombreNorm}`
-        });
       }
       
       setIsModalOpen(false);
@@ -231,12 +227,12 @@ export default function ClientesPage() {
         .eq('id', selectedCliente.id)
         .single();
       
-      if (fError || !freshCliente) throw new Error('No se pudo obtener el saldo actual');
+      if (fError || !freshCliente) throw new Error('No se pudo obtener el saldo actual del cliente');
 
       const saldoDeudadoActual = freshCliente.saldo_deudado || 0;
       const saldoFavorActual = freshCliente.saldo_favor || 0;
 
-      // 1. Registrar Pago
+      // 1. Registrar el Pago en el historial
       const { error: pError } = await (supabase as any).from('Pago').insert([{
         cliente_id: selectedCliente.id,
         monto: montoAbono,
@@ -244,13 +240,21 @@ export default function ClientesPage() {
       }]);
       if (pError) throw pError;
 
-      // 2. Lógica REGLA: Deuda -> Favor
-      let nuevaDeuda = saldoDeudadoActual - montoAbono;
+      // 2. Calcular impacto en deuda y saldo a favor
+      let restante = montoAbono;
+      let nuevaDeuda = saldoDeudadoActual;
       let nuevoSaldoFavor = saldoFavorActual;
 
-      if (nuevaDeuda < 0) {
-        nuevoSaldoFavor += Math.abs(nuevaDeuda);
-        nuevaDeuda = 0;
+      // Si tiene deuda, pagamos primero la deuda
+      if (nuevaDeuda > 0) {
+        const pagoADeuda = Math.min(restante, nuevaDeuda);
+        nuevaDeuda -= pagoADeuda;
+        restante -= pagoADeuda;
+      }
+
+      // Si sobra dinero (restante > 0), va a saldo a favor
+      if (restante > 0) {
+        nuevoSaldoFavor += restante;
       }
 
       // 3. Actualizar Cliente
@@ -260,16 +264,29 @@ export default function ClientesPage() {
       }).eq('id', selectedCliente.id);
       if (cError) throw cError;
 
-      // 4. Auditoría
-      await logAction(supabase, {
-        usuario_id: user?.id || '',
-        email_usuario: user?.email || '',
-        accion: 'abono',
-        modulo: 'clientes',
-        detalle: `registró abono de $${formatCurrency(montoAbono)} para ${selectedCliente.nombre}`
-      });
+      // 4. Saldar créditos individuales
+      const { data: creditos } = await (supabase as any)
+        .from('Credito')
+        .select('*')
+        .eq('cliente_id', selectedCliente.id)
+        .eq('estado', 'vigente')
+        .order('created_at', { ascending: true });
 
-      alert(`Abono procesado. Nuevo saldo deudor: $${formatCurrency(nuevaDeuda)}. Nuevo saldo favor: $${formatCurrency(nuevoSaldoFavor)}.`);
+      if (creditos && creditos.length > 0) {
+        let montoParaCreditos = montoAbono;
+        for (const cred of creditos) {
+          if (montoParaCreditos <= 0) break;
+          const aPagar = Math.min(cred.saldo_pendiente, montoParaCreditos);
+          const nuevoSaldoCred = cred.saldo_pendiente - aPagar;
+          await (supabase.from('Credito') as any).update({
+            saldo_pendiente: nuevoSaldoCred,
+            estado: nuevoSaldoCred <= 0 ? 'pagado' : 'vigente'
+          }).eq('id', cred.id);
+          montoParaCreditos -= aPagar;
+        }
+      }
+
+      alert('Abono registrado con éxito.');
       setIsAbonoOpen(false);
       setMontoAbono(0);
       fetchClientes();
@@ -285,32 +302,35 @@ export default function ClientesPage() {
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500 pb-20">
+    <div className="space-y-6 animate-in fade-in duration-500">
       
       {/* Header Premium */}
       <div className="bg-white dark:bg-gray-800 p-8 rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col md:flex-row justify-between items-center gap-6">
-        <div className="flex items-center gap-6">
-          <div className="w-16 h-16 bg-blue-600 rounded-[1.5rem] flex items-center justify-center text-3xl shadow-xl shadow-blue-200 dark:shadow-none">👤</div>
-          <div>
-            <h1 className="text-3xl font-black text-gray-900 dark:text-white tracking-tighter">Cuentas Corrientes</h1>
-            <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] mt-1 italic">Gestión de Deuda y Saldo a Favor</p>
-          </div>
+        <div>
+          <h1 className="text-3xl font-black text-gray-900 dark:text-white tracking-tighter">Cuentas por Cobrar</h1>
+          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-1 italic opacity-60">Gestión de Billeteras y Fiados</p>
         </div>
 
-        <div className="flex w-full md:w-auto gap-4">
-          <div className="relative flex-1 md:w-96">
+        <div className="flex w-full md:w-auto gap-4 items-center">
+          <div className="bg-gray-100 dark:bg-gray-900 p-1.5 rounded-2xl flex gap-1 h-fit">
+            <button onClick={() => setViewMode('grid')} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${viewMode === 'grid' ? 'bg-white dark:bg-gray-800 text-blue-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}>Cards</button>
+            <button onClick={() => setViewMode('table')} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${viewMode === 'table' ? 'bg-white dark:bg-gray-800 text-blue-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}>Lista</button>
+          </div>
+
+          <div className="relative flex-1 md:w-80">
+            <span className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
             <input 
               type="text" 
-              placeholder="Buscar por nombre o RUT (ej: 12345678-9)..." 
+              placeholder="Buscar por nombre o RUT..." 
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-6 pr-4 py-5 bg-gray-50 dark:bg-gray-900 border-none rounded-2xl font-bold text-sm focus:ring-4 focus:ring-blue-600/10 transition-all italic"
+              className="w-full pl-14 pr-6 py-4 bg-gray-50 dark:bg-gray-900 border-none rounded-2xl font-bold text-sm focus:ring-4 focus:ring-blue-600/10 transition-all"
             />
           </div>
           {role === 'admin' && (
             <button 
               onClick={() => { setSelectedCliente(null); setFormData({ nombre: '', telefono: '', rut: '' }); setIsModalOpen(true); }}
-              className="bg-gray-900 text-white px-8 py-5 rounded-2xl font-black text-xs uppercase tracking-widest shadow-2xl hover:scale-105 active:scale-95 transition-all"
+              className="bg-gray-900 text-white px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-2xl hover:scale-105 active:scale-95 transition-all"
             >
               Nuevo Cliente
             </button>
@@ -319,200 +339,216 @@ export default function ClientesPage() {
       </div>
 
       {loading && clientes.length === 0 ? (
-        <div className="py-20 text-center animate-pulse text-gray-300 font-black uppercase tracking-[0.3em]">Sincronizando Carteras...</div>
+        <div className="py-20 text-center animate-pulse text-gray-400 font-bold uppercase tracking-widest text-xs">Sincronizando con Servidor...</div>
       ) : filtered.length === 0 ? (
-        <div className="py-20 text-center text-gray-400 font-bold italic border-4 border-dashed border-gray-50 dark:border-gray-800/50 rounded-[3rem]">
-           No se encontraron coincidencias.
+        <div className="py-20 text-center bg-white dark:bg-gray-800 rounded-[3rem] border-4 border-dashed border-gray-100 dark:border-gray-700">
+          <p className="text-6xl mb-4 grayscale opacity-20">👤</p>
+          <p className="text-gray-300 font-black uppercase tracking-widest">Sin coincidencias para "{search}"</p>
         </div>
-      ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-8">
+      ) : viewMode === 'grid' ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {filtered.map(c => (
-            <div key={c.id} className="bg-white dark:bg-gray-800 p-10 rounded-[3rem] border border-gray-100 dark:border-gray-700 shadow-sm hover:shadow-2xl transition-all group relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-blue-50 dark:bg-blue-900/10 rounded-full -mr-16 -mt-16 group-hover:scale-150 transition-transform duration-700"></div>
-              
-              <div className="flex justify-between items-start mb-10 relative">
+            <div key={c.id} className="bg-white dark:bg-gray-800 p-10 rounded-[3rem] border border-gray-100 dark:border-gray-700 shadow-sm group hover:shadow-2xl hover:-translate-y-2 transition-all">
+              <div className="flex justify-between items-start mb-8">
                 <div>
-                  <h3 className="text-2xl font-black text-gray-900 dark:text-white truncate max-w-[200px] uppercase italic tracking-tighter">{c.nombre}</h3>
-                  <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mt-1">{c.rut}</p>
+                  <h3 className="text-2xl font-black text-gray-900 dark:text-white uppercase italic truncate max-w-[200px]">{c.nombre}</h3>
+                  <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest">{c.rut || 'RUT NO REGISTRADO'}</p>
                 </div>
-                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center font-black text-xl text-white shadow-xl ${c.saldo_deudado > 0 ? 'bg-red-500 shadow-red-200' : 'bg-emerald-500 shadow-emerald-200'} dark:shadow-none`}>
+                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center font-black text-white shadow-2xl text-xl ${c.saldo_deudado > 0 ? 'bg-red-500' : 'bg-emerald-500'}`}>
                   {c.nombre.charAt(0).toUpperCase()}
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4 mb-10">
-                <div className="p-6 bg-gray-50 dark:bg-gray-900/50 rounded-3xl border border-gray-100 dark:border-gray-800">
-                  <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-2 italic text-center">Deuda Fiado</p>
-                  <p className={`text-3xl font-black tracking-tighter text-center ${c.saldo_deudado > 0 ? 'text-red-600' : 'text-gray-200'}`}>
-                    ${formatCurrency(c.saldo_deudado)}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-6 bg-gray-50 dark:bg-gray-900 rounded-[2rem]">
+                  <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Deuda</p>
+                  <p className={`text-xl font-black tracking-tighter ${c.saldo_deudado > 0 ? 'text-red-600' : 'text-gray-300'}`}>
+                    {formatCurrency(c.saldo_deudado)}
                   </p>
                 </div>
-                <div className="p-6 bg-emerald-50 dark:bg-emerald-900/10 rounded-3xl border border-emerald-100 dark:border-emerald-800/30">
-                  <p className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-2 italic text-center">Wallet Favor</p>
-                  <p className={`text-3xl font-black tracking-tighter text-center ${c.saldo_favor > 0 ? 'text-emerald-600' : 'text-gray-200'}`}>
-                    ${formatCurrency(c.saldo_favor)}
+                <div className={`p-6 rounded-[2rem] border-2 transition-colors ${c.saldo_favor > 0 ? 'bg-emerald-50 border-emerald-100 dark:bg-emerald-900/10 dark:border-emerald-900/30' : 'bg-gray-50 border-transparent dark:bg-gray-900'}`}>
+                  <p className={`text-[9px] font-black uppercase tracking-widest mb-1 ${c.saldo_favor > 0 ? 'text-emerald-600' : 'text-gray-400'}`}>A Favor</p>
+                  <p className={`text-xl font-black tracking-tighter ${c.saldo_favor > 0 ? 'text-emerald-600' : 'text-gray-300'}`}>
+                    {formatCurrency(c.saldo_favor)}
                   </p>
                 </div>
               </div>
 
-              <div className="flex gap-3 relative">
-                <button onClick={() => openStatement(c)} className="flex-1 py-4 bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-gray-900 hover:text-white transition-all">Historial</button>
-                <button onClick={() => { setSelectedCliente(c); setIsAbonoOpen(true); }} className="flex-[2] py-4 bg-emerald-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-500 transition-all shadow-xl shadow-emerald-100 dark:shadow-none">Realizar Abono</button>
+              <div className="mt-8 pt-8 border-t border-gray-50 dark:border-gray-800 flex gap-3">
+                <button onClick={() => openStatement(c)} className="flex-1 py-4 bg-gray-100 dark:bg-gray-900 text-gray-500 dark:text-gray-400 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-gray-900 hover:text-white transition-all">Historial</button>
+                <button onClick={() => { setSelectedCliente(c); setIsAbonoOpen(true); }} className="flex-1 py-4 bg-emerald-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-500/20">Abonar</button>
                 {role === 'admin' && (
-                  <button onClick={() => { setSelectedCliente(c); setFormData(c); setIsModalOpen(true); }} className="w-12 h-12 flex items-center justify-center bg-blue-50 dark:bg-blue-900/30 text-blue-600 rounded-2xl hover:bg-blue-600 hover:text-white transition-all">✏️</button>
+                  <button onClick={() => { setSelectedCliente(c); setFormData(c); setIsModalOpen(true); }} className="p-4 bg-gray-50 dark:bg-gray-900 text-gray-300 hover:text-blue-600 rounded-2xl transition-all">✏️</button>
                 )}
               </div>
             </div>
           ))}
         </div>
+      ) : (
+        <div className="bg-white dark:bg-gray-800 rounded-[3rem] border border-gray-100 dark:border-gray-700 overflow-hidden shadow-sm">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead className="bg-gray-50 dark:bg-gray-900/50 text-[10px] font-black text-gray-400 uppercase tracking-[0.3em]">
+                <tr>
+                  <th className="px-10 py-6">Ficha Cliente</th>
+                  <th className="px-10 py-6">RUT</th>
+                  <th className="px-10 py-6 text-right">Deuda</th>
+                  <th className="px-10 py-6 text-right">Saldo Favor</th>
+                  <th className="px-10 py-6 text-center">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
+                {filtered.map(c => (
+                  <tr key={c.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-700/20 transition-colors">
+                    <td className="px-10 py-6 font-black text-gray-900 dark:text-white uppercase italic">{c.nombre}</td>
+                    <td className="px-10 py-6 text-xs font-mono text-gray-400">{c.rut || '---'}</td>
+                    <td className={`px-10 py-6 text-right font-black ${c.saldo_deudado > 0 ? 'text-red-600' : 'text-gray-300'}`}>{formatCurrency(c.saldo_deudado)}</td>
+                    <td className={`px-10 py-6 text-right font-black ${c.saldo_favor > 0 ? 'text-emerald-600' : 'text-gray-300'}`}>{formatCurrency(c.saldo_favor)}</td>
+                    <td className="px-10 py-6">
+                      <div className="flex justify-center gap-6">
+                        <button onClick={() => openStatement(c)} className="text-[10px] font-black text-blue-600 uppercase tracking-widest hover:underline">Movimientos</button>
+                        <button onClick={() => { setSelectedCliente(c); setIsAbonoOpen(true); }} className="text-[10px] font-black text-emerald-600 uppercase tracking-widest hover:underline">Abonar</button>
+                        {role === 'admin' && (
+                          <button onClick={() => { setSelectedCliente(c); setFormData(c); setIsModalOpen(true); }} className="text-gray-300 hover:text-blue-600">✏️</button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       )}
 
       {/* Modal Abono */}
       {isAbonoOpen && selectedCliente && (
-        <div className="fixed inset-0 z-[130] flex items-center justify-center p-4 bg-black/80 backdrop-blur-xl">
-          <div className="bg-white dark:bg-gray-800 w-full max-md rounded-[3rem] p-12 shadow-2xl animate-in zoom-in-95 relative">
-             <button onClick={() => setIsAbonoOpen(false)} className="absolute top-8 right-8 text-2xl opacity-20 hover:opacity-100">✕</button>
-            
-            <h2 className="text-4xl font-black text-gray-900 dark:text-white mb-2 italic tracking-tighter">Registrar Pago</h2>
-            <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-10">Titular: {selectedCliente.nombre}</p>
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md">
+          <div className="bg-white dark:bg-gray-800 w-full max-w-md rounded-[3rem] p-12 shadow-2xl animate-in zoom-in-95">
+            <h2 className="text-3xl font-black text-gray-900 dark:text-white mb-2 italic">Registrar Pago</h2>
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-10">{selectedCliente.nombre}</p>
             
             <form onSubmit={handleGeneralAbono} className="space-y-8">
-              <div className="p-8 bg-gray-50 dark:bg-gray-900 rounded-[2.5rem] border-2 border-dashed border-gray-200 dark:border-gray-700">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-4 text-center">Efectivo / Monto del Abono</label>
+              <div>
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-3 px-2">Monto del Abono</label>
                 <input 
                   type="number" 
                   required 
                   autoFocus
                   value={montoAbono || ''} 
                   onChange={e => setMontoAbono(Number(e.target.value))} 
-                  className="w-full bg-transparent border-none text-center font-black text-6xl text-emerald-600 focus:ring-0"
-                  placeholder="0"
+                  className="w-full p-6 bg-gray-50 dark:bg-gray-900 rounded-[2rem] border-none font-black text-4xl text-emerald-600 text-center"
                 />
-                <p className="text-[10px] text-gray-400 font-bold text-center mt-4">El excedente se guardará como Saldo a Favor.</p>
               </div>
 
               <div>
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-4">Medio de Captura</label>
-                <div className="grid grid-cols-3 gap-3">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-3 px-2">Método de Recepción</label>
+                <div className="grid grid-cols-3 gap-2">
                   {['efectivo', 'transferencia', 'tarjeta'].map(m => (
-                    <button
-                      key={m}
-                      type="button"
-                      onClick={() => setMetodoPago(m)}
-                      className={`py-3 rounded-xl font-black text-[9px] uppercase tracking-widest border-2 transition-all ${metodoPago === m ? 'bg-gray-900 text-white border-gray-900' : 'bg-transparent text-gray-400 border-gray-100 dark:border-gray-700'}`}
-                    >
-                      {m}
-                    </button>
+                    <button key={m} type="button" onClick={() => setMetodoPago(m)} className={`py-4 rounded-2xl font-black text-[9px] uppercase tracking-widest border-2 transition-all ${metodoPago === m ? 'border-blue-600 bg-blue-600 text-white shadow-xl' : 'border-transparent bg-gray-50 text-gray-400'}`}>{m}</button>
                   ))}
                 </div>
               </div>
 
-              <div className="pt-4 flex flex-col gap-4">
-                <button type="submit" disabled={loading} className="w-full py-6 bg-blue-600 text-white font-black rounded-3xl shadow-2xl shadow-blue-200 dark:shadow-none hover:bg-blue-500 transition-all uppercase tracking-widest text-xs">
-                  {loading ? 'SINCRONIZANDO...' : 'PROCESAR ABONO'}
-                </button>
-                <button type="button" onClick={() => setIsAbonoOpen(false)} className="w-full py-4 text-gray-400 font-black text-[10px] uppercase tracking-widest">Descartar Operación</button>
+              <div className="flex gap-4 pt-4">
+                <button type="button" onClick={() => setIsAbonoOpen(false)} className="flex-1 font-black text-gray-400 uppercase text-[10px]">Cancelar</button>
+                <button type="submit" disabled={loading} className="flex-[2] py-5 bg-gray-900 text-white font-black rounded-3xl shadow-2xl hover:bg-black transition-all uppercase tracking-widest text-xs">Confirmar Abono</button>
               </div>
             </form>
           </div>
         </div>
       )}
 
-      {/* Modal Historial */}
+      {/* Modal Estado de Cuenta */}
       {isStatementOpen && selectedCliente && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/80 backdrop-blur-xl">
-          <div className="bg-white dark:bg-gray-800 w-full max-w-3xl rounded-[3rem] p-12 shadow-2xl max-h-[90vh] overflow-hidden flex flex-col animate-in zoom-in-95 relative">
-            <button onClick={() => setIsStatementOpen(false)} className="absolute top-8 right-8 w-12 h-12 bg-gray-50 dark:bg-gray-900 rounded-2xl flex items-center justify-center text-xl hover:rotate-90 transition-all">✕</button>
-            
-            <div className="mb-12">
-                <h2 className="text-4xl font-black text-gray-900 dark:text-white tracking-tighter italic uppercase">Estado de Cuenta</h2>
-                <div className="flex items-center gap-4 mt-2">
-                    <span className="text-blue-600 font-black uppercase text-[10px] tracking-widest">{selectedCliente.nombre}</span>
-                    <span className="w-1.5 h-1.5 rounded-full bg-gray-300"></span>
-                    <span className="text-gray-400 font-bold text-[10px] uppercase tracking-widest">{selectedCliente.rut}</span>
-                </div>
+        <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md">
+          <div className="bg-white dark:bg-gray-800 w-full max-w-3xl rounded-[3.5rem] p-12 shadow-2xl max-h-[90vh] overflow-hidden flex flex-col animate-in zoom-in-95">
+            <div className="flex justify-between items-start mb-10">
+              <div>
+                <h2 className="text-4xl font-black text-gray-900 dark:text-white tracking-tighter italic">Historial de Cuenta</h2>
+                <p className="text-gray-400 font-black uppercase text-[10px] tracking-[0.3em] mt-2">{selectedCliente.nombre} • RUT {selectedCliente.rut}</p>
+              </div>
+              <button onClick={() => setIsStatementOpen(false)} className="w-14 h-14 bg-gray-50 dark:bg-gray-900 rounded-full flex items-center justify-center text-3xl hover:rotate-90 transition-transform">✕</button>
             </div>
 
-            <div className="grid grid-cols-2 gap-8 mb-12 shrink-0">
-              <div className="p-8 bg-red-50 dark:bg-red-900/10 rounded-[2.5rem] border-2 border-red-100 dark:border-red-900/20 text-center">
-                <p className="text-[9px] font-black text-red-600 uppercase tracking-[0.3em] mb-2">Total Adeudado</p>
-                <p className="text-4xl font-black text-red-600 tracking-tighter italic">${formatCurrency(selectedCliente.saldo_deudado)}</p>
+            <div className="grid grid-cols-2 gap-8 mb-10">
+              <div className="p-8 bg-red-50 dark:bg-red-900/10 rounded-[2.5rem] border-2 border-red-100 dark:border-red-900/30 text-center">
+                <p className="text-[10px] font-black text-red-600 uppercase tracking-widest mb-2">Deuda Pendiente</p>
+                <p className="text-4xl font-black text-red-600 tracking-tighter">{formatCurrency(selectedCliente.saldo_deudado)}</p>
               </div>
-              <div className="p-8 bg-emerald-50 dark:bg-emerald-900/10 rounded-[2.5rem] border-2 border-emerald-100 dark:border-emerald-900/20 text-center">
-                <p className="text-[9px] font-black text-emerald-600 uppercase tracking-[0.3em] mb-2">Wallet a Favor</p>
-                <p className="text-4xl font-black text-emerald-600 tracking-tighter italic">${formatCurrency(selectedCliente.saldo_favor)}</p>
+              <div className="p-8 bg-emerald-50 dark:bg-emerald-900/10 rounded-[2.5rem] border-2 border-emerald-100 dark:border-emerald-900/30 text-center">
+                <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-2">Billetera (Saldo a Favor)</p>
+                <p className="text-4xl font-black text-emerald-600 tracking-tighter">{formatCurrency(selectedCliente.saldo_favor)}</p>
               </div>
             </div>
 
             <div className="flex-1 overflow-auto space-y-4 pr-4 custom-scrollbar">
-              <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.4em] mb-6 pl-4 border-l-4 border-blue-600">Línea de Tiempo</h3>
               {historial.map((mov, idx) => (
-                <div key={mov.id + idx} className="p-8 bg-gray-50/50 dark:bg-gray-900/40 border border-gray-100 dark:border-gray-800 rounded-[2rem] flex justify-between items-center group hover:bg-white dark:hover:bg-gray-800 transition-all">
+                <div key={mov.id + idx} className="p-6 bg-gray-50/50 dark:bg-gray-900/50 rounded-[2rem] flex justify-between items-center border border-transparent hover:border-blue-500/30 transition-all">
                   <div className="flex items-center gap-6">
-                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-2xl shadow-sm ${mov.tipo === 'venta' ? 'bg-red-100 text-red-500' : 'bg-emerald-100 text-emerald-500'}`}>
-                      {mov.tipo === 'venta' ? '💸' : '💰'}
+                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-2xl shadow-sm ${mov.tipo === 'venta' ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-600'}`}>
+                      {mov.tipo === 'venta' ? '📉' : '📈'}
                     </div>
                     <div>
-                      <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1 opacity-60">
-                        {new Date(mov.fecha).toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long' })}
-                      </p>
-                      <p className="font-black text-gray-900 dark:text-white text-lg tracking-tight italic uppercase">{mov.referencia}</p>
+                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">{new Date(mov.fecha).toLocaleDateString()} • {new Date(mov.fecha).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
+                      <p className="font-black text-gray-900 dark:text-white text-lg italic">{mov.referencia.toUpperCase()}</p>
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className={`text-2xl font-black tracking-tighter italic ${mov.tipo === 'venta' ? 'text-red-600' : 'text-emerald-600'}`}>
-                      {mov.tipo === 'venta' ? '-' : '+'}${formatCurrency(mov.monto)}
+                    <p className={`text-2xl font-black tracking-tighter ${mov.tipo === 'venta' ? 'text-red-600' : 'text-emerald-600'}`}>
+                      {mov.tipo === 'venta' ? '-' : '+'}{formatCurrency(mov.monto)}
                     </p>
+                    <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Movimiento Confirmado</p>
                   </div>
                 </div>
               ))}
-              {historial.length === 0 && <div className="py-20 text-center text-gray-300 font-black uppercase tracking-widest text-xs opacity-50">Sin registros históricos.</div>}
+              {historial.length === 0 && <div className="p-20 text-center text-gray-300 font-bold italic opacity-40 uppercase tracking-widest">Sin registros históricos.</div>}
             </div>
           </div>
         </div>
       )}
 
-      {/* Modal Formulario Cliente */}
+      {/* Modal Ficha Cliente */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-[140] flex items-center justify-center p-4 bg-black/80 backdrop-blur-xl">
-          <div className="bg-white dark:bg-gray-800 w-full max-w-lg rounded-[3rem] p-12 shadow-2xl animate-in zoom-in-95 relative">
-            <button onClick={() => setIsModalOpen(false)} className="absolute top-8 right-8 text-2xl opacity-20">✕</button>
-            
-            <h2 className="text-4xl font-black text-gray-900 dark:text-white mb-10 italic tracking-tighter">
-              {selectedCliente ? 'Modificar Registro' : 'Alta de Cliente'}
+        <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md">
+          <div className="bg-white dark:bg-gray-800 w-full max-w-lg rounded-[3.5rem] p-12 shadow-2xl animate-in zoom-in-95">
+            <h2 className="text-4xl font-black text-gray-900 dark:text-white mb-2 italic tracking-tighter">
+              {selectedCliente ? 'Editar Ficha' : 'Nueva Ficha'}
             </h2>
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] mb-10">Información del Cliente</p>
+            
             <form onSubmit={handleSaveCliente} className="space-y-6">
               <div>
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-3">RUT del Cliente</label>
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2 px-2">RUT de Identidad</label>
                 <input 
                   required 
                   autoFocus
-                  placeholder="ej: 12.345.678-9"
+                  placeholder="12.345.678-9"
                   value={formData.rut || ''} 
+                  onBlur={e => setFormData({...formData, rut: formatRUTVisual(e.target.value)})}
                   onChange={e => setFormData({...formData, rut: e.target.value})} 
-                  className="w-full p-5 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-black text-2xl text-blue-600 tracking-tighter" 
+                  className="w-full p-5 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-black text-2xl text-blue-600" 
                 />
               </div>
               <div>
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-3">Nombre Completo / Empresa</label>
-                <input required value={formData.nombre} onChange={e => setFormData({...formData, nombre: e.target.value})} className="w-full p-5 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold text-lg italic" placeholder="Ej: Maria José Villegas" />
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2 px-2">Nombre o Razón Social</label>
+                <input required value={formData.nombre} onChange={e => setFormData({...formData, nombre: e.target.value})} className="w-full p-5 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold text-xl uppercase italic" placeholder="Nombre completo" />
               </div>
               <div>
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-3">WhatsApp / Teléfono</label>
-                <input value={formData.telefono} onChange={e => setFormData({...formData, telefono: e.target.value})} className="w-full p-5 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold text-lg" placeholder="+56 9..." />
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2 px-2">Teléfono Movil</label>
+                <input value={formData.telefono} onChange={e => setFormData({...formData, telefono: e.target.value})} className="w-full p-5 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold text-xl" placeholder="+56 9..." />
               </div>
               
-              <div className="flex gap-4 pt-10">
+              <div className="flex gap-4 pt-8">
                 <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 font-black text-gray-400 uppercase tracking-widest text-[10px]">Cancelar</button>
-                <button type="submit" disabled={loading} className="flex-[3] py-6 bg-gray-900 text-white font-black rounded-3xl shadow-2xl hover:bg-blue-600 transition-all uppercase tracking-[0.2em] text-xs">
-                  {loading ? 'PROCESANDO...' : selectedCliente ? 'ACTUALIZAR DATOS' : 'DAR DE ALTA'}
+                <button type="submit" disabled={loading} className="flex-[2] py-5 bg-gray-900 text-white font-black rounded-3xl shadow-2xl hover:scale-105 active:scale-95 transition-all uppercase tracking-widest text-xs">
+                  {selectedCliente ? 'Actualizar Datos' : 'Registrar Cliente'}
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
-
     </div>
   );
 }
