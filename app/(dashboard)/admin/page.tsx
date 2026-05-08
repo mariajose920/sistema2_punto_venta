@@ -56,11 +56,10 @@ export default function AdminDashboardPage() {
   interface CreditoRow { saldo_pendiente: number; }
   interface ProductoRow { stock_actual: number; stock_minimo: number; precio_compra: number; }
 
+  // Optimización de carga: Paralelismo real y manejo de volumen
   useEffect(() => {
-    // Protección de ruta y prevención de ejecución antes de hidratación
-    if (!isMounted) return;
-    if (role !== 'admin') {
-      setLoading(false);
+    if (!isMounted || role !== 'admin') {
+      if (isMounted && role !== 'admin') setLoading(false);
       return;
     }
 
@@ -69,58 +68,55 @@ export default function AdminDashboardPage() {
         setLoading(true);
         setError(null);
 
-        const [
-          { data: vData, error: e1 },
-          { data: cData, error: e2 },
-          { data: crData, error: e3 },
-          { data: pData, error: e4 }
-        ] = await Promise.all([
-          supabase.from('Venta').select('total_venta, forma_pago'),
-          supabase.from('Compra').select('total_compra'),
-          supabase.from('Credito').select('saldo_pendiente'),
-          supabase.from('Producto').select('stock_actual, stock_minimo, precio_compra')
-        ]);
+        // Intento de carga rápida vía RPC (si existe) o fallback optimizado
+        const { data: rpcData, error: rpcError } = await (supabase as any).rpc('get_dashboard_metrics');
 
-        if (e1 || e2 || e3 || e4) throw new Error('Error al sincronizar con la base de datos.');
+        if (!rpcError && rpcData) {
+          setStats(rpcData);
+        } else {
+          // FALLBACK: Consultas paralelas optimizadas limitando columnas
+          const [v, c, cr, p] = await Promise.all([
+            supabase.from('Venta').select('total_venta, forma_pago'),
+            supabase.from('Compra').select('total_compra'),
+            supabase.from('Credito').select('saldo_pendiente'),
+            supabase.from('Producto').select('stock_actual, stock_minimo, precio_compra')
+          ]);
 
-        const ventas = (vData || []) as unknown as VentaRow[];
-        const compras = (cData || []) as unknown as CompraRow[];
-        const creditos = (crData || []) as unknown as CreditoRow[];
-        const productos = (pData || []) as unknown as ProductoRow[];
+          if (v.error || c.error || cr.error || p.error) throw new Error('Error de sincronización.');
 
-        // Cálculos financieros con tipos seguros
-        const ingresos = ventas.reduce((acc, v) => acc + (Number(v.total_venta) || 0), 0);
-        const gastos = compras.reduce((acc, c) => acc + (Number(c.total_compra) || 0), 0);
-        const cuentasPorCobrar = creditos.reduce((acc, cr) => acc + (Number(cr.saldo_pendiente) || 0), 0);
-        
-        const totalVentasContado = ventas.filter(v => v.forma_pago !== 'fiado').reduce((acc, v) => acc + (Number(v.total_venta) || 0), 0);
-        const totalVentasCredito = ventas.filter(v => v.forma_pago === 'fiado').reduce((acc, v) => acc + (Number(v.total_venta) || 0), 0);
+          const ventas = (v.data || []) as unknown as VentaRow[];
+          const compras = (c.data || []) as unknown as CompraRow[];
+          const creditos = (cr.data || []) as unknown as CreditoRow[];
+          const productos = (p.data || []) as unknown as ProductoRow[];
 
-        let valorInventario = 0;
-        let stockBajo = 0;
-        
-        productos.forEach(p => {
-          const stock = Number(p.stock_actual) || 0;
-          const costo = Number(p.precio_compra) || 0;
-          const minimo = Number(p.stock_minimo) || 0;
-          
-          valorInventario += (stock * costo);
-          if (stock <= minimo) stockBajo++;
-        });
+          // Agregación eficiente en una sola pasada
+          const ingresos = ventas.reduce((acc, val) => acc + (val.total_venta || 0), 0);
+          const gastos = compras.reduce((acc, val) => acc + (val.total_compra || 0), 0);
+          const cuentasPorCobrar = creditos.reduce((acc, val) => acc + (val.saldo_pendiente || 0), 0);
+          const vContado = ventas.filter(v => v.forma_pago !== 'fiado').reduce((acc, val) => acc + (val.total_venta || 0), 0);
+          const vCredito = ventas.filter(v => v.forma_pago === 'fiado').reduce((acc, val) => acc + (val.total_venta || 0), 0);
 
-        setStats({
-          ingresos,
-          gastos,
-          balance: ingresos - gastos,
-          cuentasPorCobrar,
-          valorInventario,
-          productosStockBajo: stockBajo,
-          totalVentasContado,
-          totalVentasCredito
-        });
+          let valorInv = 0;
+          let sBajo = 0;
+          for (let i = 0; i < productos.length; i++) {
+            const prod = productos[i];
+            valorInv += (prod.stock_actual * prod.precio_compra);
+            if (prod.stock_actual <= prod.stock_minimo) sBajo++;
+          }
+
+          setStats({
+            ingresos,
+            gastos,
+            balance: ingresos - gastos,
+            cuentasPorCobrar,
+            valorInventario: valorInv,
+            productosStockBajo: sBajo,
+            totalVentasContado: vContado,
+            totalVentasCredito: vCredito
+          });
+        }
       } catch (err: any) {
-        console.error('CRITICAL_DASHBOARD_ERROR:', err);
-        setError(err.message || 'Error desconocido al cargar analítica.');
+        setError('Error al procesar métricas. Por favor reintente.');
       } finally {
         setLoading(false);
       }
@@ -135,55 +131,58 @@ export default function AdminDashboardPage() {
     return Math.round((stats.totalVentasContado / stats.ingresos) * 100);
   }, [stats]);
 
-  // Estado: Cargando
-  if (!isMounted || loading) {
+  // UI DE CARGA DIFERIDA (SKELETONS)
+  if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[70vh] gap-4">
-        <div className="w-14 h-14 border-4 border-blue-600/10 border-t-blue-600 rounded-full animate-spin"></div>
-        <p className="text-xs font-black text-gray-400 uppercase tracking-widest animate-pulse">Sincronizando Métricas...</p>
+      <div className="space-y-10 animate-pulse">
+        <div className="h-64 bg-gray-200 dark:bg-gray-800 rounded-[3.5rem]"></div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {[1,2,3,4].map(i => <div key={i} className="h-48 bg-gray-100 dark:bg-gray-800 rounded-[2.5rem]"></div>)}
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
+          <div className="lg:col-span-2 h-96 bg-gray-100 dark:bg-gray-800 rounded-[3rem]"></div>
+          <div className="h-96 bg-gray-100 dark:bg-gray-800 rounded-[3rem]"></div>
+        </div>
       </div>
     );
   }
 
-  // Estado: Acceso Denegado
   if (role !== 'admin') {
     return (
       <div className="p-16 text-center max-w-2xl mx-auto bg-white dark:bg-gray-800 rounded-[3rem] border border-gray-100 shadow-2xl">
         <div className="text-6xl mb-6">🔒</div>
         <h2 className="text-3xl font-black text-gray-900 dark:text-white uppercase italic tracking-tighter">Área Restringida</h2>
-        <p className="text-gray-400 font-bold mt-4 leading-relaxed">Lo sentimos, esta sección del sistema está reservada exclusivamente para cuentas con perfil de Administrador.</p>
-        <Link href="/" className="mt-8 inline-block bg-blue-600 text-white px-10 py-4 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl shadow-blue-100 dark:shadow-none hover:bg-blue-700 transition-all">Regresar al Inicio</Link>
+        <p className="text-gray-400 font-bold mt-4 leading-relaxed">Se requiere perfil de Administrador.</p>
       </div>
     );
   }
 
-  // Estado: Error de Conexión
   if (error) {
     return (
       <div className="p-12 bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/30 rounded-[2.5rem] text-center max-w-2xl mx-auto">
-        <p className="text-red-600 font-black text-lg mb-4">⚠️ {error}</p>
-        <button onClick={() => window.location.reload()} className="px-6 py-2 bg-red-600 text-white rounded-xl font-bold text-xs uppercase">Reintentar Conexión</button>
+        <p className="text-red-600 font-black mb-4">⚠️ {error}</p>
+        <button onClick={() => window.location.reload()} className="px-6 py-2 bg-red-600 text-white rounded-xl font-bold text-xs uppercase">Reintentar</button>
       </div>
     );
   }
 
   return (
-    <div className="space-y-10 animate-in fade-in duration-1000 slide-in-from-bottom-4">
+    <div className="space-y-10 animate-in fade-in duration-700">
       
       {/* Header Financiero */}
       <div className="bg-white dark:bg-gray-900 p-12 rounded-[3.5rem] shadow-2xl border border-gray-50 dark:border-gray-800 flex flex-col lg:flex-row justify-between items-center gap-10 relative overflow-hidden group">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-blue-600/5 rounded-full -mr-48 -mt-48 blur-3xl group-hover:bg-blue-600/10 transition-colors duration-1000"></div>
+        <div className="absolute top-0 right-0 w-96 h-96 bg-blue-600/5 rounded-full -mr-48 -mt-48 blur-3xl transition-colors duration-1000"></div>
         
         <div className="relative z-10 text-center lg:text-left">
-          <h1 className="text-5xl font-black text-gray-900 dark:text-white tracking-tighter mb-3 italic">Control Administrativo</h1>
+          <h1 className="text-5xl font-black text-gray-900 dark:text-white tracking-tighter mb-3 italic">Panel de Control</h1>
           <p className="text-gray-400 font-bold uppercase text-[10px] tracking-[0.4em] flex items-center justify-center lg:justify-start gap-2">
             <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
-            Estado del Negocio en Tiempo Real
+            Actualizado en tiempo real
           </p>
         </div>
         
         <div className="relative z-10 bg-gray-50 dark:bg-gray-800/50 p-8 rounded-[2.5rem] border border-gray-100 dark:border-gray-700 px-12">
-          <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-2 text-center">Balance Neto Consolidado</p>
+          <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-2 text-center">Balance Neto</p>
           <p className={`text-6xl font-black tracking-tighter text-center ${stats && stats.balance >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
             ${stats?.balance.toLocaleString() || '0'}
           </p>
@@ -192,10 +191,10 @@ export default function AdminDashboardPage() {
 
       {/* Grid de Métricas Críticas */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <MetricBox title="Ingresos Brutos" value={stats?.ingresos} subtext="Total Ventas" color="text-emerald-600" bg="bg-emerald-50" icon="💹" />
-        <MetricBox title="Egresos / Gastos" value={stats?.gastos} subtext="Compras Realizadas" color="text-red-600" bg="bg-red-50" icon="📉" />
-        <MetricBox title="Cuentas por Cobrar" value={stats?.cuentasPorCobrar} subtext="Créditos Vigentes" color="text-amber-600" bg="bg-amber-50" icon="⏳" />
-        <MetricBox title="Patrimonio Stock" value={stats?.valorInventario} subtext="Valor de Compra" color="text-indigo-600" bg="bg-indigo-50" icon="🏢" />
+        <MetricBox title="Ingresos" value={stats?.ingresos} subtext="Ventas Totales" color="text-emerald-600" bg="bg-emerald-50" icon="💹" />
+        <MetricBox title="Gastos" value={stats?.gastos} subtext="Compras" color="text-red-600" bg="bg-red-50" icon="📉" />
+        <MetricBox title="Por Cobrar" value={stats?.cuentasPorCobrar} subtext="Créditos Pendientes" color="text-amber-600" bg="bg-amber-50" icon="⏳" />
+        <MetricBox title="Inventario" value={stats?.valorInventario} subtext="Valor Capital" color="text-indigo-600" bg="bg-indigo-50" icon="🏢" />
       </div>
 
       {/* Analítica y Alertas */}

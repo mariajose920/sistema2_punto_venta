@@ -36,6 +36,7 @@ export default function ClientesPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isStatementOpen, setIsStatementOpen] = useState(false);
   const [isAbonoOpen, setIsAbonoOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
   
   const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
   const [historial, setHistorial] = useState<Movimiento[]>([]);
@@ -263,10 +264,31 @@ export default function ClientesPage() {
       
       {/* Header Premium */}
       <div className="bg-white dark:bg-gray-800 p-8 rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col md:flex-row justify-between items-center gap-6">
-        <div>
-          <h1 className="text-3xl font-black text-gray-900 dark:text-white tracking-tighter">Cuentas por Cobrar</h1>
-          <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mt-1 italic">Gestión de Clientes y Fiados</p>
+        <div className="flex items-center gap-6">
+          <div>
+            <h1 className="text-3xl font-black text-gray-900 dark:text-white tracking-tighter">Cuentas por Cobrar</h1>
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mt-1 italic">Gestión de Clientes y Fiados</p>
+          </div>
+          
+          {/* Switch de Vista */}
+          <div className="hidden sm:flex bg-gray-100 dark:bg-gray-900 p-1.5 rounded-2xl gap-1">
+            <button 
+              type="button"
+              onClick={() => setViewMode('grid')}
+              className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${viewMode === 'grid' ? 'bg-white dark:bg-gray-800 text-blue-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+            >
+              Cards
+            </button>
+            <button 
+              type="button"
+              onClick={() => setViewMode('table')}
+              className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${viewMode === 'table' ? 'bg-white dark:bg-gray-800 text-blue-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+            >
+              Lista
+            </button>
+          </div>
         </div>
+
         <div className="flex w-full md:w-auto gap-4">
           <div className="relative flex-1 md:w-80">
             <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
@@ -289,75 +311,110 @@ export default function ClientesPage() {
         </div>
       </div>
 
-      {/* Grid de Clientes con Resumen de Deuda */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {loading && clientes.length === 0 ? (
-          <div className="col-span-full py-20 text-center animate-pulse text-gray-400 font-bold">Consultando saldos...</div>
-        ) : errorMsg ? (
-          <div className="col-span-full py-20 text-center text-red-500 bg-red-50 dark:bg-red-900/10 rounded-[2rem] border border-red-100 dark:border-red-900/30">
-            <p className="font-black uppercase tracking-widest mb-2">Acceso Restringido o Error</p>
-            <p className="text-sm font-bold opacity-70 mb-4">{errorMsg}</p>
-            <button onClick={() => fetchClientes()} className="bg-red-600 text-white px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest">Reintentar</button>
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="col-span-full py-20 text-center text-gray-400 font-bold italic border-2 border-dashed border-gray-100 dark:border-gray-800 rounded-[2rem]">
-            No se encontraron clientes registrados.
-          </div>
-        ) : filtered.map(c => (
-          <div key={c.id} className="bg-white dark:bg-gray-800 p-8 rounded-[2rem] border border-gray-100 dark:border-gray-700 shadow-sm hover:shadow-md transition-all group">
-            <div className="flex justify-between items-start mb-6">
-              <div>
-                <h3 className="text-xl font-black text-gray-900 dark:text-white truncate max-w-[150px]">{c.nombre}</h3>
-                <p className="text-[10px] font-bold text-blue-600 uppercase tracking-widest italic">{(c as any).rut || 'Sin RUT'}</p>
-                <p className="text-[10px] font-bold text-gray-400 uppercase">{c.telefono || 'Sin contacto'}</p>
+      {/* Listado Dinámico de Clientes */}
+      {loading && clientes.length === 0 ? (
+        <div className="py-20 text-center animate-pulse text-gray-400 font-bold">Consultando saldos...</div>
+      ) : errorMsg ? (
+        <div className="py-20 text-center text-red-500 bg-red-50 dark:bg-red-900/10 rounded-[2rem] border border-red-100 dark:border-red-900/30">
+          <p className="font-black uppercase tracking-widest mb-2">Acceso Restringido o Error</p>
+          <p className="text-sm font-bold opacity-70 mb-4">{errorMsg}</p>
+          <button onClick={() => fetchClientes()} className="bg-red-600 text-white px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest">Reintentar</button>
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="py-20 text-center text-gray-400 font-bold italic border-2 border-dashed border-gray-100 dark:border-gray-800 rounded-[2rem]">
+          No se encontraron clientes registrados.
+        </div>
+      ) : viewMode === 'grid' ? (
+        /* VISTA DE CARDS (CUADRÍCULA) */
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filtered.map(c => (
+            <div key={c.id} className="bg-white dark:bg-gray-800 p-8 rounded-[2rem] border border-gray-100 dark:border-gray-700 shadow-sm hover:shadow-md transition-all group">
+              <div className="flex justify-between items-start mb-6">
+                <div>
+                  <h3 className="text-xl font-black text-gray-900 dark:text-white truncate max-w-[150px]">{c.nombre}</h3>
+                  <p className="text-[10px] font-bold text-blue-600 uppercase tracking-widest italic">{c.rut || 'Sin RUT'}</p>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase">{c.telefono || 'Sin contacto'}</p>
+                </div>
+                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-white shadow-lg ${c.saldo_deudado > 0 ? 'bg-red-500' : 'bg-emerald-500'}`}>
+                  {c.nombre.charAt(0).toUpperCase()}
+                </div>
               </div>
-              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-white shadow-lg ${c.saldo_deudado > 0 ? 'bg-red-500' : 'bg-emerald-500'}`}>
-                {c.nombre.charAt(0).toUpperCase()}
-              </div>
-            </div>
 
-            <div className="space-y-4">
-              <div className="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-2xl">
-                <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Deuda Pendiente</p>
-                <p className={`text-2xl font-black tracking-tighter ${c.saldo_deudado > 0 ? 'text-red-600' : 'text-gray-300'}`}>
-                  ${c.saldo_deudado.toLocaleString()}
-                </p>
-              </div>
-              {c.saldo_favor > 0 && (
-                <div className="p-4 bg-emerald-50 dark:bg-emerald-900/10 rounded-2xl border border-emerald-100 dark:border-emerald-900/30">
-                  <p className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-1">Saldo a Favor</p>
-                  <p className="text-xl font-black text-emerald-600 tracking-tighter">
-                    ${c.saldo_favor.toLocaleString()}
+              <div className="space-y-4">
+                <div className="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-2xl">
+                  <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Deuda Pendiente</p>
+                  <p className={`text-2xl font-black tracking-tighter ${c.saldo_deudado > 0 ? 'text-red-600' : 'text-gray-300'}`}>
+                    ${c.saldo_deudado.toLocaleString()}
                   </p>
                 </div>
-              )}
-            </div>
+                {c.saldo_favor > 0 && (
+                  <div className="p-4 bg-emerald-50 dark:bg-emerald-900/10 rounded-2xl border border-emerald-100 dark:border-emerald-900/30">
+                    <p className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-1">Saldo a Favor</p>
+                    <p className="text-xl font-black text-emerald-600 tracking-tighter">
+                      ${c.saldo_favor.toLocaleString()}
+                    </p>
+                  </div>
+                )}
+              </div>
 
-            <div className="mt-8 flex gap-3">
-              <button 
-                onClick={() => openStatement(c)}
-                className="flex-1 py-3 bg-gray-900 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-gray-800 transition-all"
-              >
-                Movimientos
-              </button>
-              <button 
-                onClick={() => { setSelectedCliente(c); setIsAbonoOpen(true); }}
-                className="flex-1 py-3 bg-emerald-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100 dark:shadow-none"
-              >
-                Abonar
-              </button>
-              {role === 'admin' && (
-                <button 
-                  onClick={() => { setSelectedCliente(c); setFormData(c); setIsModalOpen(true); }}
-                  className="p-3 bg-gray-100 dark:bg-gray-700 text-gray-400 rounded-xl hover:text-blue-600 transition-all"
-                >
-                  ✏️
-                </button>
-              )}
+              <div className="mt-8 flex gap-3">
+                <button onClick={() => openStatement(c)} className="flex-1 py-3 bg-gray-900 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-gray-800 transition-all">Movimientos</button>
+                <button onClick={() => { setSelectedCliente(c); setIsAbonoOpen(true); }} className="flex-1 py-3 bg-emerald-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100 dark:shadow-none">Abonar</button>
+                {role === 'admin' && (
+                  <button onClick={() => { setSelectedCliente(c); setFormData(c); setIsModalOpen(true); }} className="p-3 bg-gray-100 dark:bg-gray-700 text-gray-400 rounded-xl hover:text-blue-600 transition-all">✏️</button>
+                )}
+              </div>
             </div>
+          ))}
+        </div>
+      ) : (
+        /* VISTA DE TABLA (LISTA) */
+        <div className="bg-white dark:bg-gray-800 rounded-[2rem] border border-gray-100 dark:border-gray-700 overflow-hidden shadow-sm">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead className="bg-gray-50 dark:bg-gray-900/50 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">
+                <tr>
+                  <th className="px-8 py-5">Cliente</th>
+                  <th className="px-8 py-5">RUT</th>
+                  <th className="px-8 py-5 text-right">Deuda</th>
+                  <th className="px-8 py-5 text-right">A Favor</th>
+                  <th className="px-8 py-5 text-center">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
+                {filtered.map(c => (
+                  <tr key={c.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-700/20 transition-colors">
+                    <td className="px-8 py-5">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-black text-white text-[10px] ${c.saldo_deudado > 0 ? 'bg-red-500' : 'bg-emerald-500'}`}>
+                          {c.nombre.charAt(0).toUpperCase()}
+                        </div>
+                        <span className="font-bold text-gray-900 dark:text-white">{c.nombre}</span>
+                      </div>
+                    </td>
+                    <td className="px-8 py-5 text-xs font-mono text-gray-400">{c.rut || '---'}</td>
+                    <td className={`px-8 py-5 text-right font-black ${c.saldo_deudado > 0 ? 'text-red-600' : 'text-gray-300'}`}>
+                      ${c.saldo_deudado.toLocaleString()}
+                    </td>
+                    <td className={`px-8 py-5 text-right font-black ${c.saldo_favor > 0 ? 'text-emerald-600' : 'text-gray-300'}`}>
+                      ${c.saldo_favor.toLocaleString()}
+                    </td>
+                    <td className="px-8 py-5">
+                      <div className="flex justify-center gap-3">
+                        <button onClick={() => openStatement(c)} className="text-xs font-black text-blue-600 uppercase tracking-widest hover:underline">Historial</button>
+                        <button onClick={() => { setSelectedCliente(c); setIsAbonoOpen(true); }} className="text-xs font-black text-emerald-600 uppercase tracking-widest hover:underline">Abonar</button>
+                        {role === 'admin' && (
+                          <button onClick={() => { setSelectedCliente(c); setFormData(c); setIsModalOpen(true); }} className="text-gray-400 hover:text-blue-600">✏️</button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        ))}
-      </div>
+        </div>
+      )
 
       {/* Modal Abono Premium */}
       {isAbonoOpen && selectedCliente && (
@@ -370,13 +427,17 @@ export default function ClientesPage() {
               <div>
                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Monto a Recibir ($)</label>
                 <input 
-                  type="number" 
+                  type="text" 
                   required 
                   autoFocus
-                  value={montoAbono} 
-                  onChange={e => setMontoAbono(Number(e.target.value))} 
+                  value={montoAbono === 0 ? '' : montoAbono.toLocaleString('es-CL')} 
+                  onChange={e => {
+                    const cleanValue = e.target.value.replace(/\D/g, '');
+                    const numValue = parseInt(cleanValue, 10) || 0;
+                    setMontoAbono(numValue);
+                  }} 
                   className="w-full p-5 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-black text-3xl text-emerald-600 focus:ring-4 focus:ring-emerald-600/10 transition-all"
-                  placeholder="0.00"
+                  placeholder="0"
                 />
               </div>
 

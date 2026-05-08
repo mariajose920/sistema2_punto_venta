@@ -17,6 +17,7 @@ interface Client {
   id: string;
   nombre: string;
   saldo_deudado: number;
+  saldo_favor: number;
 }
 
 interface Promotion {
@@ -66,7 +67,7 @@ export default function NuevaVentaPage() {
       const today = new Date().toISOString().split('T')[0];
       const [pRes, cRes, promoRes] = await Promise.all([
         (supabase as any).from('Producto').select('id, codigo_barra, nombre, precio_venta_publico, stock_actual').gt('stock_actual', 0),
-        (supabase as any).from('Cliente').select('id, nombre, saldo_deudado'),
+        (supabase as any).from('Cliente').select('id, nombre, saldo_deudado, saldo_favor'),
         (supabase as any).from('Promocion')
           .select('id, nombre, tipo, valor')
           .eq('activa', true)
@@ -162,12 +163,17 @@ export default function NuevaVentaPage() {
     updateCartWithPromos(cart.filter(item => item.id !== id));
   };
 
-  const totalFinal = cart.reduce((acc, curr) => acc + curr.subtotal, 0);
+  const subtotalVenta = cart.reduce((acc, curr) => acc + curr.subtotal, 0);
+  const selectedClient = clientes.find(c => c.id === selectedClientId);
+  
+  // Cálculo de Wallet / Saldo a Favor
+  const saldoFavorAplicado = selectedClient ? Math.min(selectedClient.saldo_favor, subtotalVenta) : 0;
+  const totalFinal = subtotalVenta - saldoFavorAplicado;
 
   const handleFinalizarVenta = async () => {
     if (cart.length === 0) return;
     if (paymentMethod === 'fiado' && !selectedClientId) {
-      alert('Seleccione un cliente para fiado.');
+      alert('Seleccione un cliente para realizar la venta al fiado.');
       return;
     }
 
@@ -185,10 +191,11 @@ export default function NuevaVentaPage() {
         .insert([{
           id_usuario_cajera: user.id,
           id_cliente: selectedClientId || null,
-          total_venta: totalFinal,
+          total_venta: subtotalVenta,
           forma_pago: paymentMethod,
-          iva: totalFinal * 0.19,
-          estado: 'cerrada'
+          iva: subtotalVenta * 0.19,
+          estado: 'cerrada',
+          observacion: saldoFavorAplicado > 0 ? `Se aplicó saldo a favor de $${saldoFavorAplicado}` : null
         }])
         .select()
         .single();
@@ -209,34 +216,49 @@ export default function NuevaVentaPage() {
         if (dError) throw dError;
 
         if (!item.isVariable) {
-          const { data: prod, error: pFetchError } = await (supabase as any).from('Producto').select('stock_actual').eq('id', item.id).single();
-          if (pFetchError) throw pFetchError;
-          
-          const stockUpdate: any = { stock_actual: (prod?.stock_actual || 0) - item.cantidad };
-          const { error: pUpdateError } = await (supabase as any).from('Producto').update(stockUpdate).eq('id', item.id);
-          if (pUpdateError) throw pUpdateError;
+          const { data: prod } = await (supabase as any).from('Producto').select('stock_actual').eq('id', item.id).single();
+          await (supabase as any).from('Producto').update({ stock_actual: (prod?.stock_actual || 0) - item.cantidad }).eq('id', item.id);
         }
       }
 
-      // 3. Manejar Crédito si es Fiado
-      if (paymentMethod === 'fiado' && selectedClientId) {
-        const { error: cError } = await (supabase as any).from('Credito').insert([{
-          cliente_id: selectedClientId,
-          venta_id: venta.id_venta,
-          monto_inicial: totalFinal,
-          saldo_pendiente: totalFinal,
-          estado: 'vigente'
-        }]);
+      // 3. Lógica de Wallet y Deuda
+      if (selectedClient) {
+        let nuevoSaldoFavor = selectedClient.saldo_favor - saldoFavorAplicado;
+        let nuevaDeuda = selectedClient.saldo_deudado;
 
-        if (cError) throw cError;
+        if (paymentMethod === 'fiado') {
+          nuevaDeuda += totalFinal;
+          if (totalFinal > 0) {
+            await (supabase as any).from('Credito').insert([{
+              cliente_id: selectedClientId,
+              venta_id: venta.id_venta,
+              monto_inicial: totalFinal,
+              saldo_pendiente: totalFinal,
+              estado: 'vigente'
+            }]);
+          }
+        }
 
-        const { data: cli, error: cliFetchError } = await (supabase as any).from('Cliente').select('saldo_deudado').eq('id', selectedClientId).single();
-        if (cliFetchError) throw cliFetchError;
-
-        const clienteUpdate: any = { saldo_deudado: (cli?.saldo_deudado || 0) + totalFinal };
-        const { error: cliUpdateError } = await (supabase as any).from('Cliente').update(clienteUpdate).eq('id', selectedClientId);
+        const { error: cliUpdateError } = await (supabase as any)
+          .from('Cliente')
+          .update({ 
+            saldo_favor: nuevoSaldoFavor,
+            saldo_deudado: nuevaDeuda
+          })
+          .eq('id', selectedClientId);
+        
         if (cliUpdateError) throw cliUpdateError;
       }
+
+      alert('Venta completada con éxito');
+      setCart([]);
+      router.push(role === 'admin' ? '/admin' : '/cajera');
+    } catch (err: any) {
+      alert('Error: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
       alert('Venta completada');
       setCart([]);
@@ -336,27 +358,78 @@ export default function NuevaVentaPage() {
 
       <div className="w-full lg:w-96 flex flex-col gap-6 h-fit sticky top-24">
         <div className="bg-white dark:bg-gray-800 p-8 rounded-[2.5rem] shadow-2xl border border-gray-100 dark:border-gray-700 space-y-8">
-          <h2 className="font-black text-gray-900 dark:text-white uppercase tracking-widest text-xs">Resumen</h2>
+          <h2 className="font-black text-gray-900 dark:text-white uppercase tracking-widest text-xs">Finalizar Venta</h2>
+          
           <div className="space-y-6">
+            {/* Selección de Cliente Universal */}
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">Asignar Cliente (Opcional)</label>
+              <select 
+                value={selectedClientId} 
+                onChange={(e) => setSelectedClientId(e.target.value)} 
+                className={`w-full p-4 rounded-2xl font-bold text-sm border-none transition-colors ${
+                  selectedClient?.saldo_favor && selectedClient.saldo_favor > 0 
+                    ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400' 
+                    : 'bg-gray-50 dark:bg-gray-900 text-gray-500'
+                }`}
+              >
+                <option value="">-- Venta General (Sin Cliente) --</option>
+                {clientes.map(c => (
+                  <option key={c.id} value={c.id}>
+                    {c.nombre} {c.saldo_favor > 0 ? `(Saldo: $${c.saldo_favor.toLocaleString()})` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             <div className="grid grid-cols-2 gap-2">
               {['efectivo', 'transferencia', 'tarjeta', 'fiado'].map(m => (
-                <button key={m} onClick={() => setPaymentMethod(m as any)} className={`py-3 rounded-xl text-[10px] font-black uppercase border-2 ${paymentMethod === m ? 'bg-blue-600 text-white border-blue-600 shadow-xl' : 'bg-gray-50 dark:bg-gray-900 text-gray-500 border-transparent'}`}>{m}</button>
+                <button 
+                  key={m} 
+                  onClick={() => setPaymentMethod(m as any)} 
+                  className={`py-3 rounded-xl text-[10px] font-black uppercase border-2 transition-all ${
+                    paymentMethod === m 
+                      ? 'bg-blue-600 text-white border-blue-600 shadow-xl' 
+                      : 'bg-gray-50 dark:bg-gray-900 text-gray-500 border-transparent'
+                  }`}
+                >
+                  {m}
+                </button>
               ))}
             </div>
-            {paymentMethod === 'fiado' && (
-              <select value={selectedClientId} onChange={(e) => setSelectedClientId(e.target.value)} className="w-full p-4 bg-amber-50 dark:bg-amber-900/10 rounded-2xl font-bold text-sm border-none">
-                <option value="">-- Seleccionar Cliente --</option>
-                {clientes.map(c => <option key={c.id} value={c.id}>{c.nombre} (Deuda: ${c.saldo_deudado})</option>)}
-              </select>
-            )}
-            <div className="bg-blue-50 dark:bg-blue-900/20 p-6 rounded-3xl text-center">
-              <p className="text-blue-600 font-black uppercase text-[10px] tracking-widest mb-1">Total Cobrar</p>
-              <p className="font-black text-5xl text-gray-900 dark:text-white tracking-tighter">
-                ${totalFinal.toLocaleString()}
-              </p>
+
+            {/* Desglose de Totales */}
+            <div className="bg-gray-50 dark:bg-gray-900/50 p-6 rounded-3xl space-y-3">
+              <div className="flex justify-between items-center text-sm">
+                <span className="font-bold text-gray-400 uppercase text-[10px]">Subtotal</span>
+                <span className="font-black text-gray-900 dark:text-white">${subtotalVenta.toLocaleString()}</span>
+              </div>
+              
+              {saldoFavorAplicado > 0 && (
+                <div className="flex justify-between items-center text-sm text-emerald-600">
+                  <span className="font-bold uppercase text-[10px]">Saldo a Favor Aplicado</span>
+                  <span className="font-black">-${saldoFavorAplicado.toLocaleString()}</span>
+                </div>
+              )}
+
+              <div className="pt-3 border-t border-gray-200 dark:border-gray-700">
+                <p className="text-blue-600 font-black uppercase text-[10px] tracking-widest mb-1 text-center">Total a Cobrar</p>
+                <p className="font-black text-5xl text-gray-900 dark:text-white tracking-tighter text-center">
+                  ${totalFinal.toLocaleString()}
+                </p>
+              </div>
             </div>
-            <button disabled={loading || cart.length === 0} onClick={handleFinalizarVenta} className={`w-full py-5 rounded-3xl font-black text-xl shadow-2xl transition-all active:scale-95 ${loading || cart.length === 0 ? 'bg-gray-100 text-gray-300' : 'bg-blue-600 text-white shadow-blue-200'}`}>
-              {loading ? '...' : 'COMPLETAR VENTA'}
+
+            <button 
+              disabled={loading || cart.length === 0} 
+              onClick={handleFinalizarVenta} 
+              className={`w-full py-5 rounded-3xl font-black text-xl shadow-2xl transition-all active:scale-95 ${
+                loading || cart.length === 0 
+                  ? 'bg-gray-100 text-gray-300 cursor-not-allowed' 
+                  : 'bg-blue-600 text-white shadow-blue-200 dark:shadow-none hover:bg-blue-700'
+              }`}
+            >
+              {loading ? 'PROCESANDO...' : totalFinal === 0 ? 'FINALIZAR (CON SALDO)' : 'COMPLETAR VENTA'}
             </button>
           </div>
         </div>

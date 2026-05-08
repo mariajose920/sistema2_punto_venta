@@ -70,21 +70,79 @@ export default function ProveedoresPage() {
     ));
   }, [search, proveedores]);
 
+  // Utilidades de RUT (Consistente con Clientes)
+  const cleanRUT = (rut: string) => (rut || '').replace(/[^0-9kK]/g, '').toUpperCase();
+
+  const validateRUT = (rut: string) => {
+    const clean = cleanRUT(rut);
+    if (clean.length < 2) return false;
+    const body = clean.slice(0, -1);
+    const dv = clean.slice(-1);
+    let sum = 0;
+    let mul = 2;
+    for (let i = body.length - 1; i >= 0; i--) {
+      sum += parseInt(body.charAt(i)) * mul;
+      mul = mul === 7 ? 2 : mul + 1;
+    }
+    const expectedDV = 11 - (sum % 11);
+    const finalDV = expectedDV === 11 ? '0' : expectedDV === 10 ? 'K' : expectedDV.toString();
+    return dv === finalDV;
+  };
+
+  const formatRUT = (rut: string) => {
+    const clean = cleanRUT(rut);
+    if (clean.length < 2) return clean;
+    const body = clean.slice(0, -1);
+    const dv = clean.slice(-1);
+    let formattedBody = '';
+    for (let i = body.length - 1, j = 1; i >= 0; i--, j++) {
+      formattedBody = body.charAt(i) + formattedBody;
+      if (j % 3 === 0 && i !== 0) formattedBody = '.' + formattedBody;
+    }
+    return `${formattedBody}-${dv}`;
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       setLoading(true);
-      // Extraemos el ID para no enviarlo en el cuerpo del update/insert si no es necesario o manejarlo por separado
+      
+      const rutLimpio = cleanRUT(formData.rut_empresa || '');
+      
+      if (rutLimpio && !validateRUT(rutLimpio)) {
+        alert('El RUT ingresado no es válido. Por favor verifique el dígito verificador.');
+        setLoading(false);
+        return;
+      }
+
+      const rutFormateado = formatRUT(rutLimpio);
+
+      // Verificar unicidad del RUT (Solo si es nuevo o cambió)
+      if (rutFormateado && rutFormateado !== selectedProveedor?.rut_empresa) {
+        const { data: existente } = await supabase
+          .from('Proveedor')
+          .select('id_proveedor')
+          .eq('rut_empresa', rutFormateado)
+          .maybeSingle();
+
+        if (existente) {
+          alert('Ya existe un proveedor registrado con este RUT.');
+          setLoading(false);
+          return;
+        }
+      }
+
       const { id_proveedor, ...dataToSave } = formData;
+      const finalData = { ...dataToSave, rut_empresa: rutFormateado };
 
       if (selectedProveedor?.id_proveedor) {
         const { error } = await (supabase.from('Proveedor') as any)
-          .update(dataToSave)
+          .update(finalData)
           .eq('id_proveedor', selectedProveedor.id_proveedor);
         if (error) throw error;
       } else {
         const newProveedor = {
-          ...dataToSave,
+          ...finalData,
           id_proveedor: typeof crypto !== 'undefined' ? crypto.randomUUID() : Math.random().toString(36).substring(2),
           nombre_empresa: dataToSave.nombre_empresa || ''
         };

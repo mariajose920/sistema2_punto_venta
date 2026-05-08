@@ -36,22 +36,63 @@ export default function NuevaCompraPage() {
   const [showSearch, setShowSearch] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  // Estados para Creación Rápida
+  const [isNewProvOpen, setIsNewProvOpen] = useState(false);
+  const [newProvName, setNewProvName] = useState('');
+  const [isNewProdOpen, setIsNewProdOpen] = useState(false);
+  const [newProdData, setNewProdData] = useState({ nombre: '', codigo: '', costo: 0 });
+
+  const fetchData = useCallback(async () => {
+    const [pRes, provRes] = await Promise.all([
+      (supabase as any).from('Producto').select('id, nombre, codigo_barra, precio_compra'),
+      (supabase as any).from('Proveedor').select('id_proveedor, nombre_empresa')
+    ]);
+    setProductos(pRes.data || []);
+    setProveedores(provRes.data || []);
+  }, []);
+
   useEffect(() => {
     if (!isMounted) return;
-    if (role !== 'admin') {
-      router.push('/login');
-      return;
-    }
-    const fetchData = async () => {
-      const [pRes, provRes] = await Promise.all([
-        (supabase as any).from('Producto').select('id, nombre, codigo_barra, precio_compra'),
-        (supabase as any).from('Proveedor').select('id_proveedor, nombre_empresa')
-      ]);
-      setProductos(pRes.data || []);
-      setProveedores(provRes.data || []);
-    };
+    if (role !== 'admin') { router.push('/login'); return; }
     fetchData();
-  }, [role, router, isMounted]);
+  }, [role, router, isMounted, fetchData]);
+
+  const handleCreateProvider = async () => {
+    if (!newProvName) return;
+    const { data, error } = await (supabase as any)
+      .from('Proveedor')
+      .insert([{ nombre_empresa: newProvName }])
+      .select().single();
+    
+    if (!error && data) {
+      setProveedores([...proveedores, data]);
+      setSelectedProviderId(data.id_proveedor);
+      setIsNewProvOpen(false);
+      setNewProvName('');
+    }
+  };
+
+  const handleCreateProduct = async () => {
+    if (!newProdData.nombre) return;
+    const { data, error } = await (supabase as any)
+      .from('Producto')
+      .insert([{ 
+        nombre: newProdData.nombre, 
+        codigo_barra: newProdData.codigo || null,
+        precio_compra: newProdData.costo,
+        stock_actual: 0 
+      }])
+      .select().single();
+
+    if (!error && data) {
+      setProductos([...productos, data]);
+      addToCart(data);
+      setIsNewProdOpen(false);
+      setNewProdData({ nombre: '', codigo: '', costo: 0 });
+    } else {
+      alert('Error: ' + (error?.message || 'Código duplicado'));
+    }
+  };
 
   const addToCart = (product: Product) => {
     const existing = cart.find(item => item.id === product.id);
@@ -85,7 +126,6 @@ export default function NuevaCompraPage() {
 
     try {
       setLoading(true);
-      // 1. Insertar Compra
       const { data: compra, error: cError } = await (supabase as any)
         .from('Compra')
         .insert([{ 
@@ -96,21 +136,21 @@ export default function NuevaCompraPage() {
         }])
         .select().single();
 
-      if (cError || !compra) throw cError || new Error('Error al crear cabecera de compra');
+      if (cError || !compra) throw cError;
 
-      // 2. Insertar Detalles y Actualizar Productos
       for (const item of cart) {
+        // CORRECCIÓN: Aseguramos que los nombres de columnas coincidan con el esquema real
         const { error: dError } = await (supabase as any).from('DetalleCompra').insert([{
           id_compra: compra.id_compra,
           id_producto: item.id,
-          cantidad: item.cantidad,
+          cantidad: item.cantidad, // <-- Verificado en Paso 1 SQL
           precio_unitario_compra: item.costo_unitario,
           subtotal: item.subtotal
         }]);
 
         if (dError) throw dError;
 
-        // Actualizar Stock y Precio de Compra en catálogo
+        // Actualizar Stock
         const { data: currentProd } = await (supabase as any).from('Producto').select('stock_actual').eq('id', item.id).single();
         await (supabase as any).from('Producto').update({
           stock_actual: (currentProd?.stock_actual || 0) + item.cantidad,
@@ -118,10 +158,10 @@ export default function NuevaCompraPage() {
         }).eq('id', item.id);
       }
 
-      alert('Compra registrada y stock actualizado.');
+      alert('Compra registrada exitosamente.');
       router.push('/compras');
     } catch (err: any) {
-      alert('Error: ' + err.message);
+      alert('Error en registro: ' + err.message);
     } finally {
       setLoading(false);
     }
@@ -130,12 +170,15 @@ export default function NuevaCompraPage() {
   if (!isMounted) return null;
 
   return (
-    <div className="flex flex-col lg:flex-row gap-8 animate-in fade-in duration-500">
+    <div className="flex flex-col lg:flex-row gap-8 animate-in fade-in duration-500 pb-20">
       
       <div className="flex-1 space-y-6">
         {/* Selector de Proveedor */}
         <div className="bg-white dark:bg-gray-800 p-8 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700">
-          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-3">Proveedor de Mercancía</label>
+          <div className="flex justify-between items-center mb-3">
+            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">Proveedor de Mercancía</label>
+            <button onClick={() => setIsNewProvOpen(true)} className="text-[10px] font-black text-emerald-600 uppercase tracking-widest hover:underline">+ Nuevo Proveedor</button>
+          </div>
           <select 
             value={selectedProviderId} 
             onChange={e => setSelectedProviderId(e.target.value)}
@@ -148,10 +191,13 @@ export default function NuevaCompraPage() {
 
         {/* Buscador de Productos */}
         <div className="bg-white dark:bg-gray-800 p-8 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 relative">
-          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-3">Buscar Productos para Añadir</label>
+          <div className="flex justify-between items-center mb-3">
+            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">Buscar Productos para Añadir</label>
+            <button onClick={() => setIsNewProdOpen(true)} className="text-[10px] font-black text-emerald-600 uppercase tracking-widest hover:underline">+ Crear Nuevo Producto</button>
+          </div>
           <input 
             type="text" 
-            placeholder="Escribe nombre o código del producto..." 
+            placeholder="Escribe nombre o escanea código..." 
             value={search}
             onChange={e => { setSearch(e.target.value); setShowSearch(e.target.value.length > 0); }}
             className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold"
@@ -159,9 +205,12 @@ export default function NuevaCompraPage() {
           {showSearch && (
             <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl shadow-2xl z-50 max-h-60 overflow-auto">
               {productos.filter(p => p.nombre.toLowerCase().includes(search.toLowerCase()) || p.codigo_barra?.includes(search)).map(p => (
-                <button key={p.id} onClick={() => addToCart(p)} className="w-full p-4 text-left hover:bg-emerald-50 dark:hover:bg-emerald-900/20 border-b last:border-0 border-gray-50 dark:border-gray-700">
-                  <p className="font-bold text-gray-900 dark:text-white">{p.nombre}</p>
-                  <p className="text-[10px] font-black text-gray-400">Último Costo: ${p.precio_compra?.toLocaleString()}</p>
+                <button key={p.id} onClick={() => addToCart(p)} className="w-full p-4 text-left hover:bg-emerald-50 dark:hover:bg-emerald-900/20 border-b last:border-0 border-gray-50 dark:border-gray-700 flex justify-between items-center">
+                  <div>
+                    <p className="font-bold text-gray-900 dark:text-white">{p.nombre}</p>
+                    <p className="text-[10px] font-black text-gray-400 uppercase">{p.codigo_barra || 'Sin Código'}</p>
+                  </div>
+                  <p className="font-black text-emerald-600">${p.precio_compra?.toLocaleString()}</p>
                 </button>
               ))}
             </div>
@@ -222,6 +271,74 @@ export default function NuevaCompraPage() {
           </div>
         </div>
       </div>
+      </div>
+
+      {/* MODAL: Nuevo Proveedor Rápido */}
+      {isNewProvOpen && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white dark:bg-gray-800 w-full max-w-md rounded-[2.5rem] p-10 shadow-2xl animate-in zoom-in-95">
+            <h2 className="text-2xl font-black text-gray-900 dark:text-white mb-6 italic">Nuevo Proveedor</h2>
+            <div className="space-y-4">
+              <div>
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Nombre de Empresa</label>
+                <input 
+                  type="text" 
+                  value={newProvName}
+                  onChange={e => setNewProvName(e.target.value)}
+                  className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold"
+                  placeholder="Ej: Distribuidora Central"
+                />
+              </div>
+              <div className="flex gap-3 pt-4">
+                <button onClick={() => setIsNewProvOpen(false)} className="flex-1 py-4 bg-gray-100 text-gray-400 rounded-2xl font-black text-[10px] uppercase">Cancelar</button>
+                <button onClick={handleCreateProvider} className="flex-1 py-4 bg-emerald-600 text-white rounded-2xl font-black text-[10px] uppercase shadow-lg shadow-emerald-100 dark:shadow-none">Guardar</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: Nuevo Producto Rápido */}
+      {isNewProdOpen && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white dark:bg-gray-800 w-full max-w-md rounded-[2.5rem] p-10 shadow-2xl animate-in zoom-in-95">
+            <h2 className="text-2xl font-black text-gray-900 dark:text-white mb-6 italic">Crear Producto</h2>
+            <div className="space-y-4">
+              <div>
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Nombre del Producto</label>
+                <input 
+                  type="text" 
+                  value={newProdData.nombre}
+                  onChange={e => setNewProdData({...newProdData, nombre: e.target.value})}
+                  className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Código de Barras (Opcional)</label>
+                <input 
+                  type="text" 
+                  value={newProdData.codigo}
+                  onChange={e => setNewProdData({...newProdData, codigo: e.target.value})}
+                  className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Costo de Compra sugerido ($)</label>
+                <input 
+                  type="number" 
+                  value={newProdData.costo}
+                  onChange={e => setNewProdData({...newProdData, costo: Number(e.target.value)})}
+                  className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold"
+                />
+              </div>
+              <div className="flex gap-3 pt-4">
+                <button onClick={() => setIsNewProdOpen(false)} className="flex-1 py-4 bg-gray-100 text-gray-400 rounded-2xl font-black text-[10px] uppercase">Cancelar</button>
+                <button onClick={handleCreateProduct} className="flex-1 py-4 bg-blue-600 text-white rounded-2xl font-black text-[10px] uppercase shadow-lg shadow-blue-100 dark:shadow-none">Crear y Añadir</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

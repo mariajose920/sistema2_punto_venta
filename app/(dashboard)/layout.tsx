@@ -18,6 +18,8 @@ const NAV_ITEMS = {
     { href: '/admin/calculadora', label: 'Calculadora de Costos', icon: '🧮' },
     { href: '/compras', label: 'Compras y Proveedores', icon: '📥' },
     { href: '/reportes', label: 'Reportes y Análisis', icon: '📈' },
+    { href: '/ventas/nueva', label: 'Nueva Venta', icon: '🛒' },
+    { href: '/ventas/historial', label: 'Historial de Ventas', icon: '🧾' },
   ],
   cajera: [
     { href: '/cajera', label: 'Inicio Caja', icon: '🏠' },
@@ -80,13 +82,23 @@ export default function DashboardLayout({
               </div>
             </div>
 
-            {/* Sección Operativa */}
+            {/* Sección de Ventas (NUEVA) */}
             <div>
-              <p className="px-4 text-[11px] font-bold text-gray-400 uppercase tracking-[0.2em] mb-4">Operaciones</p>
+              <p className="px-4 text-[11px] font-bold text-gray-400 uppercase tracking-[0.2em] mb-4">Ventas</p>
               <div className="space-y-1">
+                {role === 'admin' && NAV_ITEMS.admin.slice(5, 7).map(item => (
+                  <NavLink key={item.href} item={item} active={pathname === item.href} />
+                ))}
                 {role === 'cajera' && NAV_ITEMS.cajera.slice(1).map(item => (
                   <NavLink key={item.href} item={item} active={pathname === item.href} />
                 ))}
+              </div>
+            </div>
+
+            {/* Sección Operativa */}
+            <div>
+              <p className="px-4 text-[11px] font-bold text-gray-400 uppercase tracking-[0.2em] mb-4">Catálogos</p>
+              <div className="space-y-1">
                 {NAV_ITEMS.shared.map(item => (
                   <NavLink key={item.href} item={item} active={pathname === item.href} />
                 ))}
@@ -98,7 +110,7 @@ export default function DashboardLayout({
               <div>
                 <p className="px-4 text-[11px] font-bold text-gray-400 uppercase tracking-[0.2em] mb-4">Gestión</p>
                 <div className="space-y-1">
-                  {NAV_ITEMS.admin.slice(1).map(item => (
+                  {NAV_ITEMS.admin.slice(1, 5).map(item => (
                     <NavLink key={item.href} item={item} active={pathname === item.href} />
                   ))}
                 </div>
