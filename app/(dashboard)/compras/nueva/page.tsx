@@ -282,7 +282,7 @@ export default function NuevaCompraPage() {
           {showSearch && search && (
             <div className="absolute top-full left-0 right-0 mt-4 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-[2rem] shadow-2xl z-50 overflow-hidden animate-in slide-in-from-top-2 duration-300">
               {filteredProducts.length === 0 ? (
-                <div className="p-10 text-center text-gray-400 italic font-bold uppercase text-[10px] tracking-widest">Sin resultados para "{search}"</div>
+                <div className="p-10 text-center text-gray-400 italic font-bold uppercase text-[10px] tracking-widest">Sin resultados para &quot;{search}&quot;</div>
               ) : (
                 <div className="divide-y divide-gray-50 dark:divide-gray-800">
                   {filteredProducts.map(p => (

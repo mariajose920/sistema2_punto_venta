@@ -305,7 +305,7 @@ export default function NuevaVentaPage() {
                 {filteredProducts.length === 0 ? (
                   <div className="p-12 text-center">
                     <p className="text-gray-300 font-black text-3xl mb-2 grayscale opacity-30">🔍</p>
-                    <p className="text-gray-400 font-bold italic">No se encontraron productos para "{search}"</p>
+                    <p className="text-gray-400 font-bold italic">No se encontraron productos para &quot;{search}&quot;</p>
                   </div>
                 ) : (
                   filteredProducts.map(p => (

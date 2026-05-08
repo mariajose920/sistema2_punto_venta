@@ -342,7 +342,7 @@ export default function ClientesPage() {
       ) : filtered.length === 0 ? (
         <div className="py-20 text-center bg-white dark:bg-gray-800 rounded-[3rem] border-4 border-dashed border-gray-100 dark:border-gray-700">
           <p className="text-6xl mb-4 grayscale opacity-20">👤</p>
-          <p className="text-gray-300 font-black uppercase tracking-widest">Sin coincidencias para "{search}"</p>
+          <p className="text-gray-300 font-black uppercase tracking-widest">Sin coincidencias para &quot;{search}&quot;</p>
         </div>
       ) : viewMode === 'grid' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
