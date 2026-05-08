@@ -432,12 +432,17 @@ export default function ClientesPage() {
                   autoFocus
                   value={montoAbono === 0 ? '' : montoAbono.toLocaleString('es-CL')} 
                   onChange={e => {
-                    const cleanValue = e.target.value.replace(/\D/g, '');
+                    // Eliminamos cualquier caracter no numérico
+                    let cleanValue = e.target.value.replace(/\D/g, '');
+                    // Eliminamos ceros iniciales si el número tiene más de un dígito o si es solo '0'
+                    if (cleanValue.startsWith('0')) {
+                      cleanValue = cleanValue.replace(/^0+/, '');
+                    }
                     const numValue = parseInt(cleanValue, 10) || 0;
                     setMontoAbono(numValue);
                   }} 
                   className="w-full p-5 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-black text-3xl text-emerald-600 focus:ring-4 focus:ring-emerald-600/10 transition-all"
-                  placeholder="0"
+                  placeholder="Escriba el monto..."
                 />
               </div>
 

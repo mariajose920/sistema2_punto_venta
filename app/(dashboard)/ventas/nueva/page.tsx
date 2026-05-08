@@ -260,16 +260,6 @@ export default function NuevaVentaPage() {
     }
   };
 
-      alert('Venta completada');
-      setCart([]);
-      router.push(role === 'admin' ? '/admin' : '/cajera');
-    } catch (err: any) {
-      alert('Error: ' + err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
     <div className="flex flex-col lg:flex-row gap-8 min-h-[calc(100vh-160px)] animate-in fade-in duration-500">
       
