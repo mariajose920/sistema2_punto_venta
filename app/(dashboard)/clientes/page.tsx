@@ -28,7 +28,6 @@ export default function ClientesPage() {
   
   // Estados de datos
   const [clientes, setClientes] = useState<Cliente[]>([]);
-  const [filtered, setFiltered] = useState<Cliente[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null); // Nuevo: para mostrar errores al usuario
   const [search, setSearch] = useState('');
