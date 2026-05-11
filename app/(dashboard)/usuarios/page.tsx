@@ -1,17 +1,13 @@
+"use client";
+
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
 import { normalizeText, formatCurrency } from '@/lib/utils';
+import { Database } from '@/types/database.types';
 
-interface Usuario {
-  id: string;
-  email: string;
-  nombre: string | null;
-  apellido: string | null;
-  rol: string;
-  activo: boolean;
-  created_at: string;
-}
+type UsuarioRow = Database['public']['Tables']['Usuario']['Row'];
+type VentaRow = Database['public']['Tables']['Venta']['Row'];
 
 interface UserMetrics {
   totalVentas: number;
@@ -19,22 +15,15 @@ interface UserMetrics {
   ticketPromedio: number;
 }
 
-interface Venta {
-  id_venta: string;
-  total_venta: number;
-  fecha_venta: string;
-  forma_pago: string;
-}
-
 export default function UsuariosPage() {
   const { role: currentRole, user: currentUser } = useAuth();
   
   // Estados
-  const [usuarios, setUsuarios] = useState<Usuario[]>([]);
+  const [usuarios, setUsuarios] = useState<UsuarioRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedUser, setSelectedUser] = useState<Usuario | null>(null);
+  const [selectedUser, setSelectedUser] = useState<UsuarioRow | null>(null);
   const [metrics, setMetrics] = useState<UserMetrics | null>(null);
-  const [historial, setHistorial] = useState<Venta[]>([]);
+  const [historial, setHistorial] = useState<VentaRow[]>([]);
   const [search, setSearch] = useState('');
   
   // Estados para Modales
@@ -45,7 +34,7 @@ export default function UsuariosPage() {
     email: '',
     nombre: '',
     apellido: '',
-    rol: 'cajera' as 'admin' | 'cajera',
+    rol: 'cajera' as UsuarioRow['rol'],
     activo: true
   });
 
@@ -56,22 +45,25 @@ export default function UsuariosPage() {
   const fetchUsuarios = useCallback(async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase.from('Usuario').select('*').order('rol');
+      const { data, error } = await supabase
+        .from('Usuario')
+        .select('*')
+        .order('rol');
       if (error) throw error;
       setUsuarios(data || []);
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Error cargando usuarios:', err);
     } finally {
       setLoading(false);
     }
   }, []);
 
-  const fetchUserStats = async (user: Usuario) => {
+  const fetchUserStats = useCallback(async (user: UsuarioRow) => {
     setSelectedUser(user);
     setLoading(true);
     
     try {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('Venta')
         .select('id_venta, total_venta, fecha_venta, forma_pago')
         .eq('id_usuario_cajera', user.id)
@@ -81,22 +73,22 @@ export default function UsuariosPage() {
 
       if (error) throw error;
 
-      const ventas = data as Venta[];
-      const total = (ventas || []).reduce((acc, v) => acc + (v.total_venta || 0), 0);
-      const cantidad = (ventas || []).length;
+      const ventas = (data as VentaRow[]) || [];
+      const total = ventas.reduce((acc, v) => acc + (v.total_venta || 0), 0);
+      const cantidad = ventas.length;
       
       setMetrics({
         totalVentas: total,
         cantidadVentas: cantidad,
         ticketPromedio: cantidad > 0 ? total / cantidad : 0
       });
-      setHistorial(ventas || []);
-    } catch (err) {
+      setHistorial(ventas);
+    } catch (err: unknown) {
       console.error('Error cargando estadísticas:', err);
     } finally {
       setLoading(false);
     }
-  };
+  }, [fechaDesde, fechaHasta]);
 
   const handleSaveUser = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -110,33 +102,34 @@ export default function UsuariosPage() {
       };
 
       if (modalMode === 'create') {
-        const { error } = await (supabase as any).from('Usuario').insert([{
+        const { error } = await supabase.from('Usuario').insert([{
           id: formData.id || undefined,
           email: formData.email.toLowerCase(),
           ...payload
         }]);
         if (error) throw error;
       } else {
-        const { error } = await (supabase as any).from('Usuario').update(payload).eq('id', formData.id);
+        const { error } = await supabase.from('Usuario').update(payload).eq('id', formData.id);
         if (error) throw error;
       }
       
       setIsModalOpen(false);
       fetchUsuarios();
-    } catch (err: any) {
-      alert('Error: ' + err.message);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Error al guardar usuario';
+      alert('Error: ' + message);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleToggleStatus = async (user: Usuario) => {
+  const handleToggleStatus = async (user: UsuarioRow) => {
     if (user.id === currentUser?.id) {
       alert('No puedes deshabilitar tu propia cuenta.');
       return;
     }
 
-    const { error } = await (supabase as any)
+    const { error } = await supabase
       .from('Usuario')
       .update({ activo: !user.activo })
       .eq('id', user.id);
@@ -157,7 +150,7 @@ export default function UsuariosPage() {
     }
 
     if (window.confirm('¿Estás seguro de eliminar este acceso? El usuario no podrá operar en el sistema.')) {
-      const { error } = await (supabase as any).from('Usuario').delete().eq('id', userId);
+      const { error } = await supabase.from('Usuario').delete().eq('id', userId);
       if (error) alert('Error: ' + error.message);
       else {
         setSelectedUser(null);
@@ -272,7 +265,7 @@ export default function UsuariosPage() {
                         email: selectedUser.email, 
                         nombre: selectedUser.nombre || '', 
                         apellido: selectedUser.apellido || '', 
-                        rol: selectedUser.rol as any, 
+                        rol: selectedUser.rol as UsuarioRow['rol'], 
                         activo: selectedUser.activo 
                       });
                       setIsModalOpen(true);
@@ -378,11 +371,11 @@ export default function UsuariosPage() {
               <div className="grid grid-cols-2 gap-6">
                 <div>
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2 px-2">Nombre</label>
-                  <input required value={formData.nombre} onChange={e => setFormData({...formData, nombre: e.target.value})} className="w-full p-5 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold uppercase italic" placeholder="Juan" />
+                  <input required value={formData.nombre || ''} onChange={e => setFormData({...formData, nombre: e.target.value})} className="w-full p-5 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold uppercase italic" placeholder="Juan" />
                 </div>
                 <div>
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2 px-2">Apellido</label>
-                  <input required value={formData.apellido} onChange={e => setFormData({...formData, apellido: e.target.value})} className="w-full p-5 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold uppercase italic" placeholder="Pérez" />
+                  <input required value={formData.apellido || ''} onChange={e => setFormData({...formData, apellido: e.target.value})} className="w-full p-5 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold uppercase italic" placeholder="Pérez" />
                 </div>
               </div>
 
@@ -392,7 +385,7 @@ export default function UsuariosPage() {
                   required 
                   disabled={modalMode === 'edit'}
                   type="email" 
-                  value={formData.email} 
+                  value={formData.email || ''} 
                   onChange={e => setFormData({...formData, email: e.target.value})} 
                   className={`w-full p-5 rounded-2xl border-none font-black text-blue-600 ${modalMode === 'edit' ? 'bg-gray-100 opacity-50 cursor-not-allowed' : 'bg-gray-50 dark:bg-gray-900'}`} 
                   placeholder="usuario@sistema.cl" 
@@ -402,7 +395,7 @@ export default function UsuariosPage() {
               <div className="grid grid-cols-2 gap-6">
                 <div>
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2 px-2">Rango Operativo</label>
-                  <select value={formData.rol} onChange={e => setFormData({...formData, rol: e.target.value as any})} className="w-full p-5 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-black text-[10px] uppercase tracking-widest appearance-none">
+                  <select value={formData.rol} onChange={e => setFormData({...formData, rol: e.target.value as UsuarioRow['rol']})} className="w-full p-5 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-black text-[10px] uppercase tracking-widest appearance-none">
                     <option value="cajera">Cajero/a</option>
                     <option value="admin">Administrador</option>
                   </select>
@@ -430,7 +423,14 @@ export default function UsuariosPage() {
   );
 }
 
-function StatCard({ title, value, icon, color }: any) {
+interface StatCardProps {
+  title: string;
+  value: string;
+  icon: string;
+  color?: string;
+}
+
+function StatCard({ title, value, icon, color }: StatCardProps) {
   return (
     <div className="bg-white dark:bg-gray-800 p-10 rounded-[3rem] border border-gray-100 dark:border-gray-700 shadow-sm transition-all hover:shadow-2xl group relative overflow-hidden">
       <div className="flex justify-between items-center mb-6 relative z-10">

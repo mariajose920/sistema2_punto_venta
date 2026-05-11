@@ -4,16 +4,12 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
 import { normalizeText, normalizeRUT, formatCurrency } from '@/lib/utils';
+import { Database } from '@/types/database.types';
 
-interface Cliente {
-  id: string;
-  nombre: string;
-  telefono: string;
-  rut: string;
-  saldo_deudado: number;
-  saldo_favor: number;
-  created_at: string;
-}
+type ClienteRow = Database['public']['Tables']['Cliente']['Row'];
+type VentaRow = Database['public']['Tables']['Venta']['Row'];
+type PagoRow = Database['public']['Tables']['Pago']['Row'];
+type CreditoRow = Database['public']['Tables']['Credito']['Row'];
 
 interface Movimiento {
   id: string;
@@ -24,12 +20,11 @@ interface Movimiento {
 }
 
 export default function ClientesPage() {
-  const { role, user } = useAuth();
+  const { role } = useAuth();
   
   // Estados de datos
-  const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [clientes, setClientes] = useState<ClienteRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null); // Nuevo: para mostrar errores al usuario
   const [search, setSearch] = useState('');
   
   // Estados de Modales
@@ -38,7 +33,7 @@ export default function ClientesPage() {
   const [isAbonoOpen, setIsAbonoOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
   
-  const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
+  const [selectedCliente, setSelectedCliente] = useState<ClienteRow | null>(null);
   const [historial, setHistorial] = useState<Movimiento[]>([]);
   
   // Formulario Abono
@@ -46,13 +41,13 @@ export default function ClientesPage() {
   const [metodoPago, setMetodoPago] = useState('efectivo');
 
   // Formulario Cliente
-  const [formData, setFormData] = useState<Partial<Cliente>>({
+  const [formData, setFormData] = useState<Partial<ClienteRow>>({
     nombre: '',
     telefono: '',
     rut: ''
   });
 
-  // Utilidades de RUT (Mantenemos validación y formato visual, pero normalizamos para búsqueda)
+  // Utilidades de RUT
   const cleanRUTInternal = (rut: string) => (rut || '').replace(/[^0-9kK]/g, '').toUpperCase();
 
   const validateRUT = (rut: string) => {
@@ -88,25 +83,27 @@ export default function ClientesPage() {
   const fetchClientes = useCallback(async () => {
     try {
       setLoading(true);
-      setErrorMsg(null);
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('Cliente')
         .select('*')
         .order('nombre', { ascending: true });
       
       if (error) throw error;
       setClientes(data || []);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error cargando clientes:', err);
-      setErrorMsg(err.message || 'Error al conectar con la base de datos');
+      const message = err instanceof Error ? err.message : 'Error desconocido';
+      alert(message);
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => { fetchClientes(); }, [fetchClientes]);
+  useEffect(() => { 
+    fetchClientes(); 
+  }, [fetchClientes]);
 
-  // Búsqueda Flexible por Nombre o RUT normalizado
+  // Búsqueda Flexible
   const filtered = useMemo(() => {
     const term = normalizeText(search);
     const termRUT = normalizeRUT(search);
@@ -114,7 +111,7 @@ export default function ClientesPage() {
     return clientes.filter(c => {
       const nombreNorm = normalizeText(c.nombre);
       const rutNorm = normalizeRUT(c.rut);
-      return nombreNorm.includes(term) || rutNorm.includes(termRUT);
+      return nombreNorm.includes(term) || (rutNorm && rutNorm.includes(termRUT));
     });
   }, [search, clientes]);
 
@@ -131,7 +128,7 @@ export default function ClientesPage() {
       setLoading(true);
 
       // Validar duplicado de NOMBRE
-      const { data: nombreExistente } = await (supabase as any)
+      const { data: nombreExistente } = await supabase
         .from('Cliente')
         .select('id')
         .eq('nombre', nombreNorm)
@@ -143,7 +140,7 @@ export default function ClientesPage() {
       }
 
       // Validar duplicado de RUT
-      const { data: existente } = await (supabase as any)
+      const { data: existente } = await supabase
         .from('Cliente')
         .select('id, nombre')
         .eq('rut', rutNormalizado)
@@ -155,60 +152,70 @@ export default function ClientesPage() {
       }
 
       const finalData = { 
-        ...formData, 
         nombre: nombreNorm,
-        rut: rutNormalizado 
+        rut: rutNormalizado,
+        telefono: formData.telefono || ''
       };
 
       if (selectedCliente?.id) {
-        const { error } = await (supabase as any).from('Cliente').update(finalData).eq('id', selectedCliente.id);
+        const { error } = await supabase
+          .from('Cliente')
+          .update(finalData)
+          .eq('id', selectedCliente.id);
         if (error) throw error;
       } else {
-        const { error } = await (supabase as any).from('Cliente').insert([finalData]);
+        const { error } = await supabase
+          .from('Cliente')
+          .insert([{
+            ...finalData,
+            saldo_deudado: 0,
+            saldo_favor: 0
+          }]);
         if (error) throw error;
       }
       
       setIsModalOpen(false);
       fetchClientes();
-    } catch (err: any) {
-      alert(err.message);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Error al guardar';
+      alert(message);
     } finally {
       setLoading(false);
     }
   };
 
-  const openStatement = async (cliente: Cliente) => {
+  const openStatement = async (cliente: ClienteRow) => {
     setSelectedCliente(cliente);
     setIsStatementOpen(true);
     
     try {
-      const [
-        { data: ventas },
-        { data: pagos }
-      ] = await Promise.all([
-        (supabase as any).from('Venta').select('id_venta, total_venta, fecha_venta').eq('id_cliente', cliente.id).eq('forma_pago', 'fiado'),
-        (supabase as any).from('Pago').select('id, monto, created_at, metodo_pago').eq('cliente_id', cliente.id)
+      const [ventasRes, pagosRes] = await Promise.all([
+        supabase.from('Venta').select('*').eq('id_cliente', cliente.id).eq('forma_pago', 'fiado'),
+        supabase.from('Pago').select('*').eq('cliente_id', cliente.id)
       ]);
 
+      const ventas = (ventasRes.data as VentaRow[]) || [];
+      const pagos = (pagosRes.data as PagoRow[]) || [];
+
       const movs: Movimiento[] = [
-        ...(ventas || []).map((v: any) => ({
+        ...ventas.map(v => ({
           id: v.id_venta,
           tipo: 'venta' as const,
-          monto: v.total_venta,
-          fecha: v.fecha_venta,
-          referencia: `Venta #${v.id_venta.slice(0, 8)}`
+          monto: v.total_venta || 0,
+          fecha: v.fecha_venta || new Date().toISOString(),
+          referencia: `Venta #${(v.id_venta || '').slice(0, 8)}`
         })),
-        ...(pagos || []).map((p: any) => ({
+        ...pagos.map(p => ({
           id: p.id,
           tipo: 'pago' as const,
-          monto: p.monto,
-          fecha: p.created_at,
-          referencia: `Abono (${p.metodo_pago})`
+          monto: p.monto || 0,
+          fecha: p.created_at || new Date().toISOString(),
+          referencia: `Abono (${p.metodo_pago || 'efectivo'})`
         }))
       ].sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
 
       setHistorial(movs);
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Error cargando historial:', err);
     }
   };
@@ -220,7 +227,7 @@ export default function ClientesPage() {
     try {
       setLoading(true);
       
-      const { data: freshCliente, error: fError } = await (supabase as any)
+      const { data: freshCliente, error: fError } = await supabase
         .from('Cliente')
         .select('saldo_deudado, saldo_favor')
         .eq('id', selectedCliente.id)
@@ -231,56 +238,60 @@ export default function ClientesPage() {
       const saldoDeudadoActual = freshCliente.saldo_deudado || 0;
       const saldoFavorActual = freshCliente.saldo_favor || 0;
 
-      // 1. Registrar el Pago en el historial
-      const { error: pError } = await (supabase as any).from('Pago').insert([{
+      // 1. Registrar el Pago
+      const { error: pError } = await supabase.from('Pago').insert([{
         cliente_id: selectedCliente.id,
         monto: montoAbono,
         metodo_pago: metodoPago
       }]);
       if (pError) throw pError;
 
-      // 2. Calcular impacto en deuda y saldo a favor
+      // 2. Calcular impacto
       let restante = montoAbono;
       let nuevaDeuda = saldoDeudadoActual;
       let nuevoSaldoFavor = saldoFavorActual;
 
-      // Si tiene deuda, pagamos primero la deuda
       if (nuevaDeuda > 0) {
         const pagoADeuda = Math.min(restante, nuevaDeuda);
         nuevaDeuda -= pagoADeuda;
         restante -= pagoADeuda;
       }
 
-      // Si sobra dinero (restante > 0), va a saldo a favor
       if (restante > 0) {
         nuevoSaldoFavor += restante;
       }
 
       // 3. Actualizar Cliente
-      const { error: cError } = await (supabase.from('Cliente') as any).update({
-        saldo_deudado: nuevaDeuda,
-        saldo_favor: nuevoSaldoFavor
-      }).eq('id', selectedCliente.id);
+      const { error: cError } = await supabase
+        .from('Cliente')
+        .update({
+          saldo_deudado: nuevaDeuda,
+          saldo_favor: nuevoSaldoFavor
+        })
+        .eq('id', selectedCliente.id);
       if (cError) throw cError;
 
       // 4. Saldar créditos individuales
-      const { data: creditos } = await (supabase as any)
+      const { data: creditos } = await supabase
         .from('Credito')
         .select('*')
         .eq('cliente_id', selectedCliente.id)
         .eq('estado', 'vigente')
         .order('created_at', { ascending: true });
 
-      if (creditos && creditos.length > 0) {
+      if (creditos && (creditos as CreditoRow[]).length > 0) {
         let montoParaCreditos = montoAbono;
-        for (const cred of creditos) {
+        for (const cred of (creditos as CreditoRow[])) {
           if (montoParaCreditos <= 0) break;
           const aPagar = Math.min(cred.saldo_pendiente, montoParaCreditos);
           const nuevoSaldoCred = cred.saldo_pendiente - aPagar;
-          await (supabase.from('Credito') as any).update({
-            saldo_pendiente: nuevoSaldoCred,
-            estado: nuevoSaldoCred <= 0 ? 'pagado' : 'vigente'
-          }).eq('id', cred.id);
+          await supabase
+            .from('Credito')
+            .update({
+              saldo_pendiente: nuevoSaldoCred,
+              estado: nuevoSaldoCred <= 0 ? 'pagado' : 'vigente'
+            })
+            .eq('id', cred.id);
           montoParaCreditos -= aPagar;
         }
       }
@@ -293,8 +304,9 @@ export default function ClientesPage() {
       if (isStatementOpen) {
         openStatement({ ...selectedCliente, saldo_deudado: nuevaDeuda, saldo_favor: nuevoSaldoFavor });
       }
-    } catch (err: any) {
-      alert('Error: ' + err.message);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Error en abono';
+      alert(message);
     } finally {
       setLoading(false);
     }
@@ -531,11 +543,11 @@ export default function ClientesPage() {
               </div>
               <div>
                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2 px-2">Nombre o Razón Social</label>
-                <input required value={formData.nombre} onChange={e => setFormData({...formData, nombre: e.target.value})} className="w-full p-5 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold text-xl uppercase italic" placeholder="Nombre completo" />
+                <input required value={formData.nombre || ''} onChange={e => setFormData({...formData, nombre: e.target.value})} className="w-full p-5 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold text-xl uppercase italic" placeholder="Nombre completo" />
               </div>
               <div>
                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2 px-2">Teléfono Movil</label>
-                <input value={formData.telefono} onChange={e => setFormData({...formData, telefono: e.target.value})} className="w-full p-5 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold text-xl" placeholder="+56 9..." />
+                <input value={formData.telefono || ''} onChange={e => setFormData({...formData, telefono: e.target.value})} className="w-full p-5 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold text-xl" placeholder="+56 9..." />
               </div>
               
               <div className="flex gap-4 pt-8">
