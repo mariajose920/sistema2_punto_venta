@@ -83,8 +83,7 @@ export default function ClientesPage() {
   const fetchClientes = useCallback(async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('Cliente')
+      const { data, error } = await (supabase.from('Cliente') as any)
         .select('*')
         .order('nombre', { ascending: true });
       
@@ -128,8 +127,7 @@ export default function ClientesPage() {
       setLoading(true);
 
       // Validar duplicado de NOMBRE
-      const { data: nombreExistente } = await supabase
-        .from('Cliente')
+      const { data: nombreExistente } = await (supabase.from('Cliente') as any)
         .select('id')
         .eq('nombre', nombreNorm)
         .neq('id', selectedCliente?.id || '00000000-0000-0000-0000-000000000000')
@@ -140,15 +138,13 @@ export default function ClientesPage() {
       }
 
       // Validar duplicado de RUT
-      const { data: existente } = await supabase
-        .from('Cliente')
+      const { data: existente } = await (supabase.from('Cliente') as any)
         .select('id, nombre')
         .eq('rut', rutNormalizado)
         .neq('id', selectedCliente?.id || '00000000-0000-0000-0000-000000000000')
         .maybeSingle();
-
-      if (existente) {
-        throw new Error(`Ya existe un cliente registrado con el RUT: ${rutNormalizado} (${existente.nombre})`);
+     if (existente) {
+        throw new Error(`Ya existe un cliente registrado con el RUT: ${rutNormalizado} (${(existente as any).nombre})`);
       }
 
       const finalData = { 
@@ -158,14 +154,12 @@ export default function ClientesPage() {
       };
 
       if (selectedCliente?.id) {
-        const { error } = await supabase
-          .from('Cliente')
+        const { error } = await (supabase.from('Cliente') as any)
           .update(finalData)
           .eq('id', selectedCliente.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase
-          .from('Cliente')
+        const { error } = await (supabase.from('Cliente') as any)
           .insert([{
             ...finalData,
             saldo_deudado: 0,
@@ -190,8 +184,8 @@ export default function ClientesPage() {
     
     try {
       const [ventasRes, pagosRes] = await Promise.all([
-        supabase.from('Venta').select('*').eq('id_cliente', cliente.id).eq('forma_pago', 'fiado'),
-        supabase.from('Pago').select('*').eq('cliente_id', cliente.id)
+        (supabase.from('Venta') as any).select('*').eq('id_cliente', cliente.id).eq('forma_pago', 'fiado'),
+        (supabase.from('Pago') as any).select('*').eq('cliente_id', cliente.id)
       ]);
 
       const ventas = (ventasRes.data as VentaRow[]) || [];
@@ -227,8 +221,7 @@ export default function ClientesPage() {
     try {
       setLoading(true);
       
-      const { data: freshCliente, error: fError } = await supabase
-        .from('Cliente')
+      const { data: freshCliente, error: fError } = await (supabase.from('Cliente') as any)
         .select('saldo_deudado, saldo_favor')
         .eq('id', selectedCliente.id)
         .single();
@@ -239,7 +232,7 @@ export default function ClientesPage() {
       const saldoFavorActual = freshCliente.saldo_favor || 0;
 
       // 1. Registrar el Pago
-      const { error: pError } = await supabase.from('Pago').insert([{
+      const { error: pError } = await (supabase.from('Pago') as any).insert([{
         cliente_id: selectedCliente.id,
         monto: montoAbono,
         metodo_pago: metodoPago
@@ -262,8 +255,7 @@ export default function ClientesPage() {
       }
 
       // 3. Actualizar Cliente
-      const { error: cError } = await supabase
-        .from('Cliente')
+      const { error: cError } = await (supabase.from('Cliente') as any)
         .update({
           saldo_deudado: nuevaDeuda,
           saldo_favor: nuevoSaldoFavor
@@ -272,8 +264,7 @@ export default function ClientesPage() {
       if (cError) throw cError;
 
       // 4. Saldar créditos individuales
-      const { data: creditos } = await supabase
-        .from('Credito')
+      const { data: creditos } = await (supabase.from('Credito') as any)
         .select('*')
         .eq('cliente_id', selectedCliente.id)
         .eq('estado', 'vigente')
@@ -285,8 +276,7 @@ export default function ClientesPage() {
           if (montoParaCreditos <= 0) break;
           const aPagar = Math.min(cred.saldo_pendiente, montoParaCreditos);
           const nuevoSaldoCred = cred.saldo_pendiente - aPagar;
-          await supabase
-            .from('Credito')
+          await (supabase.from('Credito') as any)
             .update({
               saldo_pendiente: nuevoSaldoCred,
               estado: nuevoSaldoCred <= 0 ? 'pagado' : 'vigente'

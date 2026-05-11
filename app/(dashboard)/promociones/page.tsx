@@ -27,8 +27,7 @@ export default function PromocionesPage() {
   const fetchPromos = useCallback(async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('Promocion')
+      const { data, error } = await (supabase.from('Promocion') as any)
         .select('*')
         .order('created_at', { ascending: false });
       
@@ -52,14 +51,12 @@ export default function PromocionesPage() {
     try {
       setLoading(true);
       if (selectedPromo?.id) {
-        const { error } = await supabase
-          .from('Promocion')
+        const { error } = await (supabase.from('Promocion') as any)
           .update(formData)
           .eq('id', selectedPromo.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase
-          .from('Promocion')
+        const { error } = await (supabase.from('Promocion') as any)
           .insert([formData as PromocionInsert]);
         if (error) throw error;
       }
@@ -76,8 +73,7 @@ export default function PromocionesPage() {
   const toggleStatus = async (promo: PromocionRow) => {
     if (role !== 'admin') return;
     try {
-      const { error } = await supabase
-        .from('Promocion')
+      const { error } = await (supabase.from('Promocion') as any)
         .update({ activa: !promo.activa })
         .eq('id', promo.id);
       if (error) throw error;

@@ -89,6 +89,7 @@ export interface Database {
           telefono: string
           saldo_deudado: number
           saldo_favor: number
+          rut: string
           created_at: string
         }
         Insert: {
@@ -97,6 +98,7 @@ export interface Database {
           telefono?: string
           saldo_deudado?: number
           saldo_favor?: number
+          rut: string
           created_at?: string
         }
         Update: {
@@ -105,6 +107,7 @@ export interface Database {
           telefono?: string
           saldo_deudado?: number
           saldo_favor?: number
+          rut?: string
           created_at?: string
         }
       }
@@ -118,6 +121,7 @@ export interface Database {
           total_venta: number
           iva: number
           estado: 'abierta' | 'cerrada' | 'anulada'
+          observacion: string | null
         }
         Insert: {
           id_venta?: string
@@ -128,6 +132,7 @@ export interface Database {
           total_venta: number
           iva?: number
           estado?: 'abierta' | 'cerrada' | 'anulada'
+          observacion?: string | null
         }
         Update: {
           id_venta?: string
@@ -138,6 +143,7 @@ export interface Database {
           total_venta?: number
           iva?: number
           estado?: 'abierta' | 'cerrada' | 'anulada'
+          observacion?: string | null
         }
       }
       DetalleVenta: {
@@ -329,6 +335,20 @@ export interface Database {
           fecha_inicio?: string
           fecha_fin?: string
           activa?: boolean
+        }
+      }
+      Categoria: {
+        Row: {
+          id: string
+          nombre: string
+        }
+        Insert: {
+          id?: string
+          nombre: string
+        }
+        Update: {
+          id?: string
+          nombre?: string
         }
       }
     }

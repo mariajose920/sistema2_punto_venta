@@ -45,8 +45,7 @@ export default function UsuariosPage() {
   const fetchUsuarios = useCallback(async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('Usuario')
+      const { data, error } = await (supabase.from('Usuario') as any)
         .select('*')
         .order('rol');
       if (error) throw error;
@@ -63,8 +62,7 @@ export default function UsuariosPage() {
     setLoading(true);
     
     try {
-      const { data, error } = await supabase
-        .from('Venta')
+      const { data, error } = await (supabase.from('Venta') as any)
         .select('id_venta, total_venta, fecha_venta, forma_pago')
         .eq('id_usuario_cajera', user.id)
         .gte('fecha_venta', fechaDesde)
@@ -102,14 +100,14 @@ export default function UsuariosPage() {
       };
 
       if (modalMode === 'create') {
-        const { error } = await supabase.from('Usuario').insert([{
+        const { error } = await (supabase.from('Usuario') as any).insert([{
           id: formData.id || undefined,
           email: formData.email.toLowerCase(),
           ...payload
         }]);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from('Usuario').update(payload).eq('id', formData.id);
+        const { error } = await (supabase.from('Usuario') as any).update(payload).eq('id', formData.id);
         if (error) throw error;
       }
       
@@ -129,8 +127,7 @@ export default function UsuariosPage() {
       return;
     }
 
-    const { error } = await supabase
-      .from('Usuario')
+    const { error } = await (supabase.from('Usuario') as any)
       .update({ activo: !user.activo })
       .eq('id', user.id);
 
@@ -150,7 +147,7 @@ export default function UsuariosPage() {
     }
 
     if (window.confirm('¿Estás seguro de eliminar este acceso? El usuario no podrá operar en el sistema.')) {
-      const { error } = await supabase.from('Usuario').delete().eq('id', userId);
+      const { error } = await (supabase.from('Usuario') as any).delete().eq('id', userId);
       if (error) alert('Error: ' + error.message);
       else {
         setSelectedUser(null);
