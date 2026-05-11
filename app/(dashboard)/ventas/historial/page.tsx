@@ -11,6 +11,8 @@ interface Venta {
   forma_pago: string;
   estado: string;
   observacion: string;
+  subtotal: number;
+  recargo: number;
   cliente?: { nombre: string };
   usuario?: { nombre: string };
 }
@@ -216,11 +218,21 @@ export default function HistorialVentasPage() {
                   <p className="text-xs font-bold text-emerald-600 mb-4 italic">✨ {selectedVenta.observacion}</p>
                 )}
                 <div className="flex justify-between items-center">
+                  <span className="text-xs font-black text-gray-400 uppercase tracking-widest">Subtotal</span>
+                  <span className="font-bold text-gray-900 dark:text-white">${(selectedVenta.subtotal || 0).toLocaleString()}</span>
+                </div>
+                {selectedVenta.recargo > 0 && (
+                  <div className="flex justify-between items-center text-blue-600">
+                    <span className="text-xs font-black uppercase tracking-widest">Recargo</span>
+                    <span className="font-bold">+${selectedVenta.recargo.toLocaleString()}</span>
+                  </div>
+                )}
+                <div className="flex justify-between items-center">
                   <span className="text-xs font-black text-gray-400 uppercase tracking-widest">IVA (19%)</span>
                   <span className="font-bold text-gray-900 dark:text-white">${(selectedVenta.total_venta * 0.19).toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-xl font-black text-gray-900 dark:text-white uppercase tracking-tighter">Total Final</span>
+                  <span className="text-xl font-black text-gray-900 dark:text-white uppercase tracking-tighter">Total Cobrado</span>
                   <span className="text-4xl font-black text-blue-600">${selectedVenta.total_venta.toLocaleString()}</span>
                 </div>
               </div>

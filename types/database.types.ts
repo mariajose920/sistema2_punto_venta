@@ -122,6 +122,8 @@ export interface Database {
           iva: number
           estado: 'abierta' | 'cerrada' | 'anulada'
           observacion: string | null
+          recargo: number | null
+          subtotal: number | null
         }
         Insert: {
           id_venta?: string
@@ -133,6 +135,8 @@ export interface Database {
           iva?: number
           estado?: 'abierta' | 'cerrada' | 'anulada'
           observacion?: string | null
+          recargo?: number | null
+          subtotal?: number | null
         }
         Update: {
           id_venta?: string
@@ -144,6 +148,8 @@ export interface Database {
           iva?: number
           estado?: 'abierta' | 'cerrada' | 'anulada'
           observacion?: string | null
+          recargo?: number | null
+          subtotal?: number | null
         }
       }
       DetalleVenta: {

@@ -46,6 +46,15 @@ export default function NuevaVentaPage() {
     cantidad: 1,
   });
 
+  // Estado para Nuevo Cliente
+  const [isClientModalOpen, setIsClientModalOpen] = useState(false);
+  const [newClient, setNewClient] = useState({
+    nombre: '',
+    rut: '',
+    telefono: '',
+    direccion: ''
+  });
+
   const searchRef = useRef<HTMLInputElement>(null);
 
   // Cargar datos iniciales
@@ -169,12 +178,22 @@ export default function NuevaVentaPage() {
     updateCartWithPromos(cart.filter(item => item.id !== id));
   };
 
+  // Limpiar cliente si no es Fiado (Requerimiento de ocultar y no ser obligatorio)
+  useEffect(() => {
+    if (paymentMethod !== 'fiado') {
+      setSelectedClientId('');
+    }
+  }, [paymentMethod]);
+
   const subtotalVenta = cart.reduce((acc, curr) => acc + curr.subtotal, 0);
   const selectedClient = useMemo(() => clientes.find(c => c.id === selectedClientId), [clientes, selectedClientId]);
   
+  // Cálculo de Recargo (0.15% para tarjeta)
+  const recargoTarjeta = paymentMethod === 'tarjeta' ? subtotalVenta * 0.0015 : 0;
+  
   // Cálculo de Wallet / Saldo a Favor
-  const saldoFavorAplicado = selectedClient ? Math.min(selectedClient.saldo_favor || 0, subtotalVenta) : 0;
-  const totalFinal = subtotalVenta - saldoFavorAplicado;
+  const saldoFavorAplicado = selectedClient ? Math.min(selectedClient.saldo_favor || 0, subtotalVenta + recargoTarjeta) : 0;
+  const totalFinal = subtotalVenta + recargoTarjeta - saldoFavorAplicado;
 
   const filteredProducts = useMemo(() => {
     const term = search.toLowerCase().trim();
@@ -200,15 +219,20 @@ export default function NuevaVentaPage() {
     try {
       setLoading(true);
       
-      const observacionNorm = normalizeText(saldoFavorAplicado > 0 ? `Se aplicó saldo a favor de ${formatCurrency(saldoFavorAplicado)}` : "");
+      const observacionNorm = normalizeText(
+        (saldoFavorAplicado > 0 ? `Se aplicó saldo a favor de ${formatCurrency(saldoFavorAplicado)}. ` : "") +
+        (recargoTarjeta > 0 ? `Recargo por tarjeta del 0.15% (${formatCurrency(recargoTarjeta)}).` : "")
+      );
 
       // 1. Crear la cabecera de la Venta
-      const ventaPayload: VentaInsert = {
+      const ventaPayload: any = {
         id_usuario_cajera: user.id,
         id_cliente: selectedClientId || null,
-        total_venta: subtotalVenta,
+        subtotal: subtotalVenta,
+        recargo: recargoTarjeta,
+        total_venta: totalFinal,
         forma_pago: paymentMethod,
-        iva: subtotalVenta * 0.19,
+        iva: totalFinal * 0.19,
         estado: 'cerrada',
         observacion: observacionNorm || null
       };
@@ -221,22 +245,33 @@ export default function NuevaVentaPage() {
       if (vError || !venta) throw vError || new Error('Error al crear la cabecera de venta');
 
       // 2. Insertar detalles y actualizar stock
+      const detallesPayload: DetalleVentaInsert[] = cart.map(item => ({
+        id_venta: venta.id_venta,
+        id_producto: item.isVariable ? null : item.id,
+        cantidad: item.cantidad,
+        precio_unitario_venta: item.precio_venta_publico,
+        descuento_aplicado: item.descuento,
+        subtotal: item.subtotal
+      }));
+
+      const { error: dError } = await (supabase.from('DetalleVenta') as any).insert(detallesPayload);
+      if (dError) throw dError;
+
+      // 3. Actualizar stock (Batch update)
       for (const item of cart) {
-        const detallePayload: DetalleVentaInsert = {
-          id_venta: venta.id_venta,
-          id_producto: item.isVariable ? null : item.id,
-          cantidad: item.cantidad,
-          precio_unitario_venta: item.precio_venta_publico,
-          descuento_aplicado: item.descuento,
-          subtotal: item.subtotal
-        };
-
-        const { error: dError } = await (supabase.from('DetalleVenta') as any).insert([detallePayload]);
-        if (dError) throw dError;
-
         if (!item.isVariable) {
-          const { data: prod } = await (supabase.from('Producto') as any).select('stock_actual').eq('id', item.id).single();
-          await (supabase.from('Producto') as any).update({ stock_actual: (prod?.stock_actual || 0) - item.cantidad }).eq('id', item.id);
+          // Usamos una operación atómica para evitar race conditions
+          const { data: prod, error: pError } = await (supabase.from('Producto') as any)
+            .select('stock_actual')
+            .eq('id', item.id)
+            .single();
+          
+          if (!pError && prod) {
+            const nuevoStock = (prod.stock_actual || 0) - item.cantidad;
+            await (supabase.from('Producto') as any)
+              .update({ stock_actual: nuevoStock })
+              .eq('id', item.id);
+          }
         }
       }
 
@@ -272,9 +307,40 @@ export default function NuevaVentaPage() {
       alert('Venta completada con éxito');
       setCart([]);
       router.push(role === 'admin' ? '/admin' : '/cajera');
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Error en venta';
-      alert('Error: ' + message);
+    } catch (err: any) {
+      console.error('ERROR CRÍTICO EN VENTA:', err);
+      
+      // Extraer el mensaje más descriptivo posible del error de Supabase/PostgREST
+      const message = err?.message || err?.details || err?.hint || (typeof err === 'string' ? err : 'Error desconocido en el proceso de venta');
+      
+      alert('⚠️ No se pudo completar la venta:\n\n' + message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCreateClient = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      setLoading(true);
+      const { data, error } = await (supabase.from('Cliente') as any).insert([{
+        nombre: normalizeText(newClient.nombre),
+        rut: newClient.rut.toUpperCase(),
+        telefono: newClient.telefono,
+        direccion: normalizeText(newClient.direccion),
+        saldo_favor: 0,
+        saldo_deudado: 0
+      }]).select().single();
+
+      if (error) throw error;
+      
+      setClientes([...clientes, data]);
+      setSelectedClientId(data.id);
+      setIsClientModalOpen(false);
+      setNewClient({ nombre: '', rut: '', telefono: '', direccion: '' });
+      alert('Cliente creado y seleccionado');
+    } catch (err: any) {
+      alert('Error al crear cliente: ' + err.message);
     } finally {
       setLoading(false);
     }
@@ -385,26 +451,39 @@ export default function NuevaVentaPage() {
           <h2 className="font-black text-gray-900 dark:text-white uppercase tracking-widest text-xs">Finalizar Venta</h2>
           
           <div className="space-y-6">
-            {/* Selección de Cliente Universal */}
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">Asignar Cliente (Opcional)</label>
-              <select 
-                value={selectedClientId} 
-                onChange={(e) => setSelectedClientId(e.target.value)} 
-                className={`w-full p-4 rounded-2xl font-bold text-sm border-none transition-colors ${
-                  selectedClient?.saldo_favor && selectedClient.saldo_favor > 0 
-                    ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400' 
-                    : 'bg-gray-50 dark:bg-gray-900 text-gray-500'
-                }`}
-              >
-                <option value="">-- Venta General (Sin Cliente) --</option>
-                {clientes.map(c => (
-                  <option key={c.id} value={c.id}>
-                    {c.nombre} {(c.saldo_favor || 0) > 0 ? `(Saldo: $${(c.saldo_favor || 0).toLocaleString()})` : ''}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {/* Selección de Cliente - Solo para Fiado */}
+            {paymentMethod === 'fiado' && (
+              <div className="space-y-2 animate-in slide-in-from-top-2 duration-300">
+                <div className="flex justify-between items-center">
+                  <label className="text-[10px] font-black text-gray-700 dark:text-gray-300 uppercase tracking-widest block">
+                    Cliente <span className="text-red-700 tracking-normal">*Obligatorio</span>
+                  </label>
+                  <button 
+                    onClick={() => setIsClientModalOpen(true)}
+                    className="text-[9px] font-black text-blue-600 uppercase tracking-widest hover:underline"
+                  >
+                    + Nuevo Cliente
+                  </button>
+                </div>
+                <select 
+                  value={selectedClientId} 
+                  onChange={(e) => setSelectedClientId(e.target.value)} 
+                  className={`w-full p-4 rounded-2xl font-bold text-sm border-none transition-colors ${
+                    !selectedClientId ? 'ring-2 ring-red-500 bg-red-50 text-red-900' :
+                    selectedClient?.saldo_favor && selectedClient.saldo_favor > 0 
+                      ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400' 
+                      : 'bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white'
+                  }`}
+                >
+                  <option value="">-- Seleccionar Cliente --</option>
+                  {clientes.map(c => (
+                    <option key={c.id} value={c.id}>
+                      {c.nombre} {(c.saldo_favor || 0) > 0 ? `(Saldo: $${(c.saldo_favor || 0).toLocaleString()})` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-2">
               {['efectivo', 'transferencia', 'tarjeta', 'fiado'].map(m => (
@@ -425,9 +504,16 @@ export default function NuevaVentaPage() {
             {/* Desglose de Totales */}
             <div className="bg-gray-50 dark:bg-gray-900/50 p-6 rounded-3xl space-y-3">
               <div className="flex justify-between items-center text-sm">
-                <span className="font-bold text-gray-400 uppercase text-[10px]">Subtotal</span>
+                <span className="font-bold text-gray-400 uppercase text-[10px]">Subtotal Productos</span>
                 <span className="font-black text-gray-900 dark:text-white">${subtotalVenta.toLocaleString()}</span>
               </div>
+
+              {recargoTarjeta > 0 && (
+                <div className="flex justify-between items-center text-sm text-blue-600">
+                  <span className="font-bold uppercase text-[10px]">Recargo Tarjeta (0.15%)</span>
+                  <span className="font-black">+${recargoTarjeta.toLocaleString()}</span>
+                </div>
+              )}
               
               {saldoFavorAplicado > 0 && (
                 <div className="flex justify-between items-center text-sm text-emerald-600">
@@ -525,6 +611,41 @@ export default function NuevaVentaPage() {
                 <button onClick={addVariableItem} className="flex-2 py-4 bg-blue-600 text-white font-black rounded-2xl shadow-xl shadow-blue-200 dark:shadow-none hover:bg-blue-700 transition-all">AÑADIR A VENTA</button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Nuevo Cliente */}
+      {isClientModalOpen && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white dark:bg-gray-800 w-full max-w-md rounded-[2.5rem] p-10 shadow-2xl animate-in zoom-in-95 duration-200">
+            <h2 className="text-2xl font-black text-gray-900 dark:text-white mb-6 italic">👤 Nuevo Cliente</h2>
+            <form onSubmit={handleCreateClient} className="space-y-4">
+              <div>
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Nombre Completo</label>
+                <input required value={newClient.nombre} onChange={e => setNewClient({...newClient, nombre: e.target.value})} className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl font-bold border-none" />
+              </div>
+              <div>
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">RUT / ID</label>
+                <input required value={newClient.rut} onChange={e => setNewClient({...newClient, rut: e.target.value})} className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl font-bold border-none" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Teléfono</label>
+                  <input value={newClient.telefono} onChange={e => setNewClient({...newClient, telefono: e.target.value})} className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl font-bold border-none" />
+                </div>
+                <div>
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Dirección</label>
+                  <input value={newClient.direccion} onChange={e => setNewClient({...newClient, direccion: e.target.value})} className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl font-bold border-none" />
+                </div>
+              </div>
+              <div className="flex gap-4 pt-6">
+                <button type="button" onClick={() => setIsClientModalOpen(false)} className="flex-1 font-bold text-gray-400 py-4">Cancelar</button>
+                <button type="submit" disabled={loading} className="flex-2 py-4 bg-blue-600 text-white font-black rounded-2xl shadow-xl hover:bg-blue-700 transition-all">
+                  {loading ? 'CREANDO...' : 'CREAR CLIENTE'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
