@@ -26,6 +26,9 @@ export default function UsuariosPage() {
   const [historial, setHistorial] = useState<VentaRow[]>([]);
   const [search, setSearch] = useState('');
   
+  // Estado local para notas internas (no persisten en DB según requerimiento)
+  const [userNotes, setUserNotes] = useState<Record<string, string>>({});
+  
   // Estados para Modales
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<'create' | 'edit'>('create');
@@ -205,16 +208,6 @@ export default function UsuariosPage() {
               className="w-full pl-14 pr-6 py-4 bg-gray-50 dark:bg-gray-900 border-none rounded-2xl font-bold text-sm focus:ring-4 focus:ring-blue-600/10 transition-all"
             />
           </div>
-          <button 
-            onClick={() => {
-              setModalMode('create');
-              setFormData({ id: '', email: '', nombre: '', apellido: '', rol: 'cajera', activo: true });
-              setIsModalOpen(true);
-            }}
-            className="px-8 py-4 bg-gray-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-black transition-all shadow-2xl active:scale-95"
-          >
-            + Nuevo
-          </button>
         </div>
       </div>
 
@@ -296,6 +289,18 @@ export default function UsuariosPage() {
                     🗑️ Eliminar
                   </button>
                 </div>
+              </div>
+
+              {/* Nueva Sección: Nota Interna (Estado Local) */}
+              <div className="bg-white dark:bg-gray-800 p-10 rounded-[3rem] border border-gray-100 dark:border-gray-700 shadow-sm mb-8">
+                <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] mb-4 px-2">Comentario del perfil / Nota interna</h3>
+                <textarea 
+                  value={userNotes[selectedUser.id] || ''}
+                  onChange={(e) => setUserNotes({ ...userNotes, [selectedUser.id]: e.target.value })}
+                  placeholder="Escribe una nota privada sobre este colaborador... (Solo visible en esta sesión)"
+                  className="w-full p-6 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-medium text-sm focus:ring-4 focus:ring-gray-200 transition-all min-h-[120px] resize-none"
+                />
+                <p className="text-[8px] font-bold text-gray-300 uppercase tracking-widest mt-3 px-2 italic opacity-50">Nota: Este comentario se maneja solo en memoria y no afecta la base de datos.</p>
               </div>
 
               {/* Sección de Desempeño */}
