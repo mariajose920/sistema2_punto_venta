@@ -100,12 +100,22 @@ export default function UsuariosPage() {
       };
 
       if (modalMode === 'create') {
-        const { error } = await (supabase.from('Usuario') as any).insert([{
-          id: formData.id || undefined,
-          email: formData.email.toLowerCase(),
-          ...payload
-        }]);
+        // Registro en Supabase Auth. El Trigger se encarga de crear el perfil en public.Usuario.
+        // Nota: Se usa una contraseña genérica (Temporal123!) ya que el formulario no incluye campo de clave.
+        const { error } = await supabase.auth.signUp({
+          email: formData.email.toLowerCase().trim(),
+          password: 'Temporal123!', 
+          options: {
+            data: {
+              nombre: normalizeText(formData.nombre),
+              apellido: normalizeText(formData.apellido),
+              rol: formData.rol,
+              activo: formData.activo
+            }
+          }
+        });
         if (error) throw error;
+        alert('Registro exitoso en Auth. El perfil operativo se generará automáticamente.');
       } else {
         const { error } = await (supabase.from('Usuario') as any).update(payload).eq('id', formData.id);
         if (error) throw error;
