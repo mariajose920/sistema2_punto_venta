@@ -138,8 +138,8 @@ export default function ProductosPage() {
   // 3. Acciones de CRUD
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (role !== 'admin') {
-      alert('Solo el administrador puede realizar cambios directos en el catálogo.');
+    if (role !== 'admin' && role !== 'cajera') {
+      alert('No tienes permisos para realizar cambios en el catálogo.');
       return;
     }
 
@@ -233,7 +233,7 @@ export default function ProductosPage() {
             </div>
           </div>
           
-          {role === 'admin' && (
+          {(role === 'admin' || role === 'cajera') && (
             <button 
               onClick={() => { resetForm(); setIsModalOpen(true); }}
               className="w-full lg:w-auto bg-gray-900 text-white px-8 py-4 rounded-2xl font-black shadow-2xl hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-3 uppercase text-xs tracking-widest"
