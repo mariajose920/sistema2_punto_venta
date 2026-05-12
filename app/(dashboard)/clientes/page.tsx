@@ -21,21 +21,21 @@ interface Movimiento {
 
 export default function ClientesPage() {
   const { role } = useAuth();
-  
+
   // Estados de datos
   const [clientes, setClientes] = useState<ClienteRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  
+
   // Estados de Modales
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isStatementOpen, setIsStatementOpen] = useState(false);
   const [isAbonoOpen, setIsAbonoOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
-  
+
   const [selectedCliente, setSelectedCliente] = useState<ClienteRow | null>(null);
   const [historial, setHistorial] = useState<Movimiento[]>([]);
-  
+
   // Formulario Abono
   const [montoAbono, setMontoAbono] = useState<number>(0);
   const [metodoPago, setMetodoPago] = useState('efectivo');
@@ -86,7 +86,7 @@ export default function ClientesPage() {
       const { data, error } = await (supabase.from('Cliente') as any)
         .select('*')
         .order('nombre', { ascending: true });
-      
+
       if (error) throw error;
       setClientes(data || []);
     } catch (err: unknown) {
@@ -98,8 +98,8 @@ export default function ClientesPage() {
     }
   }, []);
 
-  useEffect(() => { 
-    fetchClientes(); 
+  useEffect(() => {
+    fetchClientes();
   }, [fetchClientes]);
 
   // Búsqueda Flexible
@@ -119,7 +119,7 @@ export default function ClientesPage() {
     try {
       const nombreNorm = normalizeText(formData.nombre);
       if (!nombreNorm) throw new Error('El nombre es obligatorio');
-      
+
       if (!formData.rut) throw new Error('El RUT es obligatorio');
       const rutNormalizado = formatRUTVisual(formData.rut);
       if (!validateRUT(rutNormalizado)) throw new Error('El RUT ingresado no es válido');
@@ -143,11 +143,11 @@ export default function ClientesPage() {
         .eq('rut', rutNormalizado)
         .neq('id', selectedCliente?.id || '00000000-0000-0000-0000-000000000000')
         .maybeSingle();
-     if (existente) {
+      if (existente) {
         throw new Error(`Ya existe un cliente registrado con el RUT: ${rutNormalizado} (${(existente as any).nombre})`);
       }
 
-      const finalData = { 
+      const finalData = {
         nombre: nombreNorm,
         rut: rutNormalizado,
         telefono: formData.telefono || ''
@@ -167,7 +167,7 @@ export default function ClientesPage() {
           }]);
         if (error) throw error;
       }
-      
+
       setIsModalOpen(false);
       fetchClientes();
     } catch (err: unknown) {
@@ -181,7 +181,7 @@ export default function ClientesPage() {
   const openStatement = async (cliente: ClienteRow) => {
     setSelectedCliente(cliente);
     setIsStatementOpen(true);
-    
+
     try {
       const [ventasRes, pagosRes] = await Promise.all([
         (supabase.from('Venta') as any).select('*').eq('id_cliente', cliente.id).eq('forma_pago', 'fiado'),
@@ -214,42 +214,56 @@ export default function ClientesPage() {
     }
   };
 
+  // ============================================================================
+  // LOGICA CORREGIDA DE ABONO (Descuento de Deuda y Suma a Favor)
+  // ============================================================================
   const handleGeneralAbono = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedCliente || montoAbono <= 0) return;
 
     try {
       setLoading(true);
-      
+
       const { data: freshCliente, error: fError } = await (supabase.from('Cliente') as any)
         .select('saldo_deudado, saldo_favor')
         .eq('id', selectedCliente.id)
         .single();
       
+      console.log('Paso 0: Datos frescos del cliente:', { freshCliente, fError });
+
       if (fError || !freshCliente) throw new Error('No se pudo obtener el saldo actual del cliente');
 
-      const saldoDeudadoActual = freshCliente.saldo_deudado || 0;
-      const saldoFavorActual = freshCliente.saldo_favor || 0;
+      const saldoDeudadoActual = Number(freshCliente.saldo_deudado || 0);
+      const saldoFavorActual = Number(freshCliente.saldo_favor || 0);
 
       // 1. Registrar el Pago
       const { error: pError } = await (supabase.from('Pago') as any).insert([{
         cliente_id: selectedCliente.id,
-        monto: montoAbono,
+        monto: Number(montoAbono),
         metodo_pago: metodoPago
       }]);
+      
+      console.log('Paso 1: Registro de Pago:', { pError });
       if (pError) throw pError;
 
-      // 2. Calcular impacto
-      let restante = montoAbono;
+      // 2. Calcular impacto: Primero se paga la deuda, el resto va a favor
+      let restante = Number(montoAbono);
       let nuevaDeuda = saldoDeudadoActual;
       let nuevoSaldoFavor = saldoFavorActual;
 
       if (nuevaDeuda > 0) {
-        const pagoADeuda = Math.min(restante, nuevaDeuda);
-        nuevaDeuda -= pagoADeuda;
-        restante -= pagoADeuda;
+        if (restante >= nuevaDeuda) {
+          // El abono cubre toda la deuda y sobra (o queda justo en 0)
+          restante -= nuevaDeuda;
+          nuevaDeuda = 0;
+        } else {
+          // El abono no alcanza a cubrir toda la deuda
+          nuevaDeuda -= restante;
+          restante = 0;
+        }
       }
 
+      // Si después de pagar la deuda sobró dinero del abono, se suma al saldo a favor
       if (restante > 0) {
         nuevoSaldoFavor += restante;
       }
@@ -261,6 +275,8 @@ export default function ClientesPage() {
           saldo_favor: nuevoSaldoFavor
         })
         .eq('id', selectedCliente.id);
+      
+      console.log('Paso 3: Actualización Cliente:', { cError, nuevaDeuda, nuevoSaldoFavor });
       if (cError) throw cError;
 
       // 4. Saldar créditos individuales
@@ -290,13 +306,14 @@ export default function ClientesPage() {
       setIsAbonoOpen(false);
       setMontoAbono(0);
       fetchClientes();
-      
+
       if (isStatementOpen) {
         openStatement({ ...selectedCliente, saldo_deudado: nuevaDeuda, saldo_favor: nuevoSaldoFavor });
       }
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Error en abono';
-      alert(message);
+    } catch (err: any) {
+      console.error('ERROR DETALLADO EN ABONO:', err);
+      const message = err?.message || err?.details || JSON.stringify(err);
+      alert('⚠️ Error al registrar abono:\n\n' + message);
     } finally {
       setLoading(false);
     }
@@ -304,7 +321,7 @@ export default function ClientesPage() {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      
+
       {/* Header Premium */}
       <div className="bg-white dark:bg-gray-800 p-8 rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col md:flex-row justify-between items-center gap-6">
         <div>
@@ -320,16 +337,16 @@ export default function ClientesPage() {
 
           <div className="relative flex-1 md:w-80">
             <span className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
-            <input 
-              type="text" 
-              placeholder="Buscar por nombre o RUT..." 
+            <input
+              type="text"
+              placeholder="Buscar por nombre o RUT..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full pl-14 pr-6 py-4 bg-gray-50 dark:bg-gray-900 border-none rounded-2xl font-bold text-sm focus:ring-4 focus:ring-blue-600/10 transition-all"
             />
           </div>
           {role === 'admin' && (
-            <button 
+            <button
               onClick={() => { setSelectedCliente(null); setFormData({ nombre: '', telefono: '', rut: '' }); setIsModalOpen(true); }}
               className="bg-gray-900 text-white px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-2xl hover:scale-105 active:scale-95 transition-all"
             >
@@ -368,7 +385,7 @@ export default function ClientesPage() {
                   </p>
                 </div>
                 <div className={`p-6 rounded-[2rem] border-2 transition-colors ${c.saldo_favor > 0 ? 'bg-emerald-50 border-emerald-100 dark:bg-emerald-900/10 dark:border-emerald-900/30' : 'bg-gray-50 border-transparent dark:bg-gray-900'}`}>
-                  <p className={`text-[9px] font-black uppercase tracking-widest mb-1 ${c.saldo_favor > 0 ? 'text-emerald-600' : 'text-gray-400'}`}>A Favor</p>
+                  <p className={`text-[9px] font-black uppercase tracking-widest mb-1 ${c.saldo_favor > 0 ? 'text-emerald-600' : 'text-gray-400'}`}>Monto a favor</p>
                   <p className={`text-xl font-black tracking-tighter ${c.saldo_favor > 0 ? 'text-emerald-600' : 'text-gray-300'}`}>
                     {formatCurrency(c.saldo_favor)}
                   </p>
@@ -394,7 +411,7 @@ export default function ClientesPage() {
                   <th className="px-10 py-6">Ficha Cliente</th>
                   <th className="px-10 py-6">RUT</th>
                   <th className="px-10 py-6 text-right">Deuda</th>
-                  <th className="px-10 py-6 text-right">Saldo Favor</th>
+                  <th className="px-10 py-6 text-right">Monto a favor</th>
                   <th className="px-10 py-6 text-center">Acciones</th>
                 </tr>
               </thead>
@@ -428,16 +445,16 @@ export default function ClientesPage() {
           <div className="bg-white dark:bg-gray-800 w-full max-w-md rounded-[3rem] p-12 shadow-2xl animate-in zoom-in-95">
             <h2 className="text-3xl font-black text-gray-900 dark:text-white mb-2 italic">Registrar Pago</h2>
             <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-10">{selectedCliente.nombre}</p>
-            
+
             <form onSubmit={handleGeneralAbono} className="space-y-8">
               <div>
                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-3 px-2">Monto del Abono</label>
-                <input 
-                  type="number" 
-                  required 
+                <input
+                  type="number"
+                  required
                   autoFocus
-                  value={montoAbono || ''} 
-                  onChange={e => setMontoAbono(Number(e.target.value))} 
+                  value={montoAbono || ''}
+                  onChange={e => setMontoAbono(Number(e.target.value))}
                   className="w-full p-6 bg-gray-50 dark:bg-gray-900 rounded-[2rem] border-none font-black text-4xl text-emerald-600 text-center"
                 />
               </div>
@@ -478,7 +495,7 @@ export default function ClientesPage() {
                 <p className="text-4xl font-black text-red-600 tracking-tighter">{formatCurrency(selectedCliente.saldo_deudado)}</p>
               </div>
               <div className="p-8 bg-emerald-50 dark:bg-emerald-900/10 rounded-[2.5rem] border-2 border-emerald-100 dark:border-emerald-900/30 text-center">
-                <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-2">Billetera (Saldo a Favor)</p>
+                <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-2">Monto a favor (Billetera)</p>
                 <p className="text-4xl font-black text-emerald-600 tracking-tighter">{formatCurrency(selectedCliente.saldo_favor)}</p>
               </div>
             </div>
@@ -491,7 +508,7 @@ export default function ClientesPage() {
                       {mov.tipo === 'venta' ? '📉' : '📈'}
                     </div>
                     <div>
-                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">{new Date(mov.fecha).toLocaleDateString()} • {new Date(mov.fecha).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
+                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">{new Date(mov.fecha).toLocaleDateString()} • {new Date(mov.fecha).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
                       <p className="font-black text-gray-900 dark:text-white text-lg italic">{mov.referencia.toUpperCase()}</p>
                     </div>
                   </div>
@@ -517,29 +534,29 @@ export default function ClientesPage() {
               {selectedCliente ? 'Editar Ficha' : 'Nueva Ficha'}
             </h2>
             <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] mb-10">Información del Cliente</p>
-            
+
             <form onSubmit={handleSaveCliente} className="space-y-6">
               <div>
                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2 px-2">RUT de Identidad</label>
-                <input 
-                  required 
+                <input
+                  required
                   autoFocus
                   placeholder="12.345.678-9"
-                  value={formData.rut || ''} 
-                  onBlur={e => setFormData({...formData, rut: formatRUTVisual(e.target.value)})}
-                  onChange={e => setFormData({...formData, rut: e.target.value})} 
-                  className="w-full p-5 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-black text-2xl text-blue-600" 
+                  value={formData.rut || ''}
+                  onBlur={e => setFormData({ ...formData, rut: formatRUTVisual(e.target.value) })}
+                  onChange={e => setFormData({ ...formData, rut: e.target.value })}
+                  className="w-full p-5 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-black text-2xl text-blue-600"
                 />
               </div>
               <div>
                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2 px-2">Nombre o Razón Social</label>
-                <input required value={formData.nombre || ''} onChange={e => setFormData({...formData, nombre: e.target.value})} className="w-full p-5 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold text-xl uppercase italic" placeholder="Nombre completo" />
+                <input required value={formData.nombre || ''} onChange={e => setFormData({ ...formData, nombre: e.target.value })} className="w-full p-5 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold text-xl uppercase italic" placeholder="Nombre completo" />
               </div>
               <div>
                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2 px-2">Teléfono Movil</label>
-                <input value={formData.telefono || ''} onChange={e => setFormData({...formData, telefono: e.target.value})} className="w-full p-5 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold text-xl" placeholder="+56 9..." />
+                <input value={formData.telefono || ''} onChange={e => setFormData({ ...formData, telefono: e.target.value })} className="w-full p-5 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold text-xl" placeholder="+56 9..." />
               </div>
-              
+
               <div className="flex gap-4 pt-8">
                 <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 font-black text-gray-400 uppercase tracking-widest text-[10px]">Cancelar</button>
                 <button type="submit" disabled={loading} className="flex-[2] py-5 bg-gray-900 text-white font-black rounded-3xl shadow-2xl hover:scale-105 active:scale-95 transition-all uppercase tracking-widest text-xs">

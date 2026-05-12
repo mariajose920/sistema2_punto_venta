@@ -63,7 +63,7 @@ export default function NuevaVentaPage() {
       try {
         const today = new Date().toISOString().split('T')[0];
         const [pRes, cRes, promoRes] = await Promise.all([
-          (supabase.from('Producto') as any).select('*').gt('stock_actual', 0),
+          (supabase.from('Producto') as any).select('*'),
           (supabase.from('Cliente') as any).select('*'),
           (supabase.from('Promocion') as any)
             .select('*')
@@ -112,10 +112,6 @@ export default function NuevaVentaPage() {
     let newCart: CartItem[];
 
     if (existing) {
-      if (existing.cantidad >= (product.stock_actual || 0)) {
-        alert('Stock insuficiente.');
-        return;
-      }
       newCart = cart.map(item => 
         item.id === product.id ? { ...item, cantidad: item.cantidad + 1 } : item
       );
@@ -219,7 +215,15 @@ export default function NuevaVentaPage() {
     try {
       setLoading(true);
       
+      // Verificación de productos vendidos sin stock para añadir advertencia
+      const itemsSinStock = cart.filter(item => !item.isVariable && item.cantidad > (item.stock_actual || 0));
+      let advertenciaStock = "";
+      if (itemsSinStock.length > 0) {
+        advertenciaStock = `⚠️ Venta con sobregiro de stock en: ${itemsSinStock.map(i => i.nombre).join(', ')}. `;
+      }
+
       const observacionNorm = normalizeText(
+        advertenciaStock +
         (saldoFavorAplicado > 0 ? `Se aplicó saldo a favor de ${formatCurrency(saldoFavorAplicado)}. ` : "") +
         (recargoTarjeta > 0 ? `Recargo por tarjeta del 0.15% (${formatCurrency(recargoTarjeta)}).` : "")
       );
@@ -305,8 +309,13 @@ export default function NuevaVentaPage() {
       }
 
       alert('Venta completada con éxito');
+      
+      // Limpiar estados para la siguiente venta inmediata
       setCart([]);
-      router.push(role === 'admin' ? '/admin' : '/cajera');
+      setSelectedClientId('');
+      setSearch('');
+      setPaymentMethod('efectivo');
+      setShowProductSearch(false);
     } catch (err: any) {
       console.error('ERROR CRÍTICO EN VENTA:', err);
       
@@ -421,8 +430,22 @@ export default function NuevaVentaPage() {
                   {cart.map(item => (
                     <tr key={item.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-800/40 transition-colors">
                       <td className="px-8 py-6">
-                        <p className="font-bold text-gray-900 dark:text-white">{item.nombre}</p>
-                        <p className="text-[11px] text-gray-400 font-bold tracking-tight">${(item.precio_venta_publico || 0).toLocaleString()} c/u</p>
+                        <p className="font-bold text-gray-900 dark:text-white uppercase text-xs">{item.nombre}</p>
+                        <div className="flex items-center gap-3 mt-1">
+                          <p className="text-[10px] text-gray-400 font-bold tracking-tight">${(item.precio_venta_publico || 0).toLocaleString()} c/u</p>
+                          {!item.isVariable && (
+                            <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md ${
+                              (item.stock_actual || 0) < 1 
+                                ? 'text-red-500 bg-red-50 dark:bg-red-900/20' 
+                                : 'text-gray-400 bg-gray-50 dark:bg-gray-900'
+                            }`}>
+                              Stock: {item.stock_actual || 0}
+                              {(item.stock_actual || 0) < 1 && (
+                                <span className="ml-1">— sin stock registrado</span>
+                              )}
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-8 py-6">
                         <div className="flex items-center justify-center gap-4">

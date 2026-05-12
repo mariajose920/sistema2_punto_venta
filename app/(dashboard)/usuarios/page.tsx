@@ -113,9 +113,11 @@ export default function UsuariosPage() {
       
       setIsModalOpen(false);
       fetchUsuarios();
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Error al guardar usuario';
-      alert('Error: ' + message);
+    } catch (err: any) {
+      console.error('ERROR DETALLADO EN GESTIÓN DE USUARIOS:', err);
+      // Extraer el mensaje más descriptivo posible
+      const message = err?.message || err?.details || JSON.stringify(err);
+      alert('⚠️ Error al guardar usuario:\n\n' + message);
     } finally {
       setLoading(false);
     }
