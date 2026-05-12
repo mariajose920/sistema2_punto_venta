@@ -8,6 +8,8 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('CONFIGURACIÓN INCOMPLETA: Revisa NEXT_PUBLIC_SUPABASE_URL y NEXT_PUBLIC_SUPABASE_ANON_KEY en Vercel.');
 }
 
+console.log('[SupabaseConfig] Cliente inicializado con URL:', supabaseUrl);
+
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
   auth: {
     persistSession: true,

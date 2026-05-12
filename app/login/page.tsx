@@ -35,19 +35,23 @@ export default function LoginPage() {
       }
 
       // 2. Obtención de perfil desde tabla pública "Usuario" usando el UUID
+      console.log('[AuthDebug] Intentando cargar perfil para UID:', authData.user.id);
+
       const { data: profile, error: profileError } = await supabase
         .from('Usuario')
-        .select('rol')
+        .select('*')
         .eq('id', authData.user.id)
-        .single<{ rol: string }>();
+        .single();
+
+      console.log('[AuthDebug] Resultado de consulta public.Usuario:', { profile, profileError });
 
       if (profileError || !profile) {
-        console.error('[AuthDebug] Usuario autenticado sin fila en public.Usuario. ID:', authData.user.id);
+        console.error('[AuthDebug] Error crítico: Usuario autenticado pero sin fila en Usuario o error de RLS.', profileError);
         throw new Error('ACCESO RESTRINGIDO: Tu cuenta de autenticación es válida, pero no tienes un perfil operativo asignado. Contacta al administrador para que te asigne un rol.');
       }
 
       // 3. Redirección basada en rol
-      router.push(profile.rol === 'admin' ? '/admin' : '/cajera');
+      router.push((profile as any).rol === 'admin' ? '/admin' : '/cajera');
     } catch (err: any) {
       setError(err.message || 'Error crítico en el proceso de autenticación.');
       console.error('[LoginProcessError]', err);
