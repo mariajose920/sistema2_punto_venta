@@ -31,7 +31,6 @@ export default function UsuariosPage() {
   
   // Estados para Modales
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [modalMode, setModalMode] = useState<'create' | 'edit'>('create');
   const [formData, setFormData] = useState({
     id: '',
     email: '',
@@ -102,27 +101,7 @@ export default function UsuariosPage() {
         activo: formData.activo
       };
 
-      if (modalMode === 'create') {
-        // Registro en Supabase Auth. El Trigger se encarga de crear el perfil en public.Usuario.
-        // Nota: Se usa una contraseña genérica (Temporal123!) ya que el formulario no incluye campo de clave.
-        const { error } = await supabase.auth.signUp({
-          email: formData.email.toLowerCase().trim(),
-          password: 'Temporal123!', 
-          options: {
-            data: {
-              nombre: normalizeText(formData.nombre),
-              apellido: normalizeText(formData.apellido),
-              rol: formData.rol,
-              activo: formData.activo
-            }
-          }
-        });
-        if (error) throw error;
-        alert('Registro exitoso en Auth. El perfil operativo se generará automáticamente.');
-      } else {
-        const { error } = await (supabase.from('Usuario') as any).update(payload).eq('id', formData.id);
-        if (error) throw error;
-      }
+      await (supabase.from('Usuario') as any).update(payload).eq('id', formData.id);
       
       setIsModalOpen(false);
       fetchUsuarios();
@@ -261,7 +240,6 @@ export default function UsuariosPage() {
                 <div className="flex flex-wrap justify-center gap-3">
                   <button 
                     onClick={() => {
-                      setModalMode('edit');
                       setFormData({ 
                         id: selectedUser.id, 
                         email: selectedUser.email, 
@@ -377,9 +355,9 @@ export default function UsuariosPage() {
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md">
           <div className="bg-white dark:bg-gray-800 w-full max-w-lg rounded-[3.5rem] p-12 shadow-2xl animate-in zoom-in-95 duration-300">
             <h2 className="text-4xl font-black text-gray-900 dark:text-white mb-2 italic tracking-tighter">
-              {modalMode === 'create' ? 'Nuevo Acceso' : 'Perfil Operativo'}
+              Perfil Operativo
             </h2>
-            <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] mb-10">Credenciales del Sistema</p>
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] mb-10">Configuración de Acceso</p>
 
             <form onSubmit={handleSaveUser} className="space-y-6">
               <div className="grid grid-cols-2 gap-6">
@@ -397,11 +375,11 @@ export default function UsuariosPage() {
                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2 px-2">Identificador (Auth Email)</label>
                 <input 
                   required 
-                  disabled={modalMode === 'edit'}
+                  disabled
                   type="email" 
                   value={formData.email || ''} 
                   onChange={e => setFormData({...formData, email: e.target.value})} 
-                  className={`w-full p-5 rounded-2xl border-none font-black text-blue-600 ${modalMode === 'edit' ? 'bg-gray-100 opacity-50 cursor-not-allowed' : 'bg-gray-50 dark:bg-gray-900'}`} 
+                  className="w-full p-5 rounded-2xl border-none font-black text-blue-600 bg-gray-100 opacity-50 cursor-not-allowed"
                   placeholder="usuario@sistema.cl" 
                 />
               </div>
@@ -426,7 +404,7 @@ export default function UsuariosPage() {
               <div className="flex gap-4 pt-10">
                 <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 font-black text-gray-400 uppercase text-[10px] tracking-widest">Cancelar</button>
                 <button type="submit" disabled={loading} className="flex-[2] py-6 bg-gray-900 text-white font-black rounded-3xl shadow-2xl hover:bg-black transition-all uppercase tracking-widest text-xs active:scale-95">
-                  {loading ? 'Sincronizando...' : modalMode === 'create' ? 'Dar de Alta' : 'Actualizar'}
+                  {loading ? 'Sincronizando...' : 'Actualizar Perfil'}
                 </button>
               </div>
             </form>
