@@ -216,6 +216,9 @@ export default function ProductosPage() {
 
       if (errorNombre) {
         console.error('[handleSave] Error verificando nombre:', errorNombre);
+        if (errorNombre.code === 'PGRST116') {
+          throw new Error(`Ya existen múltiples productos con el nombre: "${nombreNorm}". Por favor, usa un nombre distinto.`);
+        }
         throw new Error(`Error de base de datos al validar nombre: ${errorNombre.message}`);
       }
       if (nombreExistente) {
@@ -231,6 +234,9 @@ export default function ProductosPage() {
 
         if (errorCodigo) {
           console.error('[handleSave] Error verificando código:', errorCodigo);
+          if (errorCodigo.code === 'PGRST116') {
+             throw new Error(`Ya existen múltiples productos con el código de barras: "${codigoStr}"`);
+          }
           throw new Error(`Error de base de datos al validar código: ${errorCodigo.message}`);
         }
         if (codigoExistente) {
@@ -299,25 +305,57 @@ export default function ProductosPage() {
 
       console.log('[handleSave] Datos finales para persistir:', finalData);
 
+      let operationError = null;
+      let returnedData = null;
+
       if (editingId) {
         console.log('[handleSave] Actualizando producto existente ID:', editingId);
-        const { error: updateError } = await (supabase.from('Producto') as any)
+        const { data: updateData, error: updateError } = await (supabase.from('Producto') as any)
           .update(finalData)
-          .eq('id', editingId);
+          .eq('id', editingId)
+          .select()
+          .maybeSingle();
         
-        if (updateError) {
-          console.error('[handleSave] ERROR EN UPDATE:', updateError);
-          throw new Error(`Error al actualizar el producto en la base de datos: ${updateError.message}`);
+        operationError = updateError;
+        returnedData = updateData;
+
+        // Fallback si la columna no existe (PGRST204)
+        if (updateError && updateError.code === 'PGRST204') {
+          console.warn('[handleSave] Columnas nuevas no existen en la BD, intentando fallback update...');
+          const { fuente_datos, imagen_url, ...basicData } = finalData;
+          const retry = await (supabase.from('Producto') as any).update(basicData).eq('id', editingId).select().maybeSingle();
+          operationError = retry.error;
+          returnedData = retry.data;
+          if (!retry.error) alert('✅ Producto guardado (Modo compatibilidad). Ejecuta los scripts SQL para habilitar imágenes.');
         }
       } else {
         console.log('[handleSave] Creando nuevo producto...');
-        const { error: insertError } = await (supabase.from('Producto') as any)
-          .insert([finalData]);
+        const { data: insertData, error: insertError } = await (supabase.from('Producto') as any)
+          .insert([finalData])
+          .select()
+          .maybeSingle();
         
-        if (insertError) {
-          console.error('[handleSave] ERROR EN INSERT:', insertError);
-          throw new Error(`Error al insertar el nuevo producto en la base de datos: ${insertError.message}`);
+        operationError = insertError;
+        returnedData = insertData;
+
+        // Fallback si la columna no existe (PGRST204)
+        if (insertError && insertError.code === 'PGRST204') {
+          console.warn('[handleSave] Columnas nuevas no existen en la BD, intentando fallback insert...');
+          const { fuente_datos, imagen_url, ...basicData } = finalData;
+          const retry = await (supabase.from('Producto') as any).insert([basicData]).select().maybeSingle();
+          operationError = retry.error;
+          returnedData = retry.data;
+          if (!retry.error) alert('✅ Producto guardado (Modo compatibilidad). Ejecuta los scripts SQL para habilitar imágenes.');
         }
+      }
+
+      if (operationError) {
+        console.error('[handleSave] ERROR EN OPERACIÓN BD:', operationError);
+        throw new Error(`Error en la base de datos: ${operationError.message}`);
+      }
+
+      if (!returnedData) {
+        throw new Error('La base de datos procesó la solicitud pero no devolvió el producto. Esto suele ocurrir si una política de seguridad (RLS) está bloqueando el guardado o si la sesión expiró.');
       }
       
       console.log('[handleSave] ¡Guardado exitoso!');
