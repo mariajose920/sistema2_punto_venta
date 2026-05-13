@@ -51,24 +51,20 @@ export default function CatalogoPublico() {
 
   const addToCart = (producto: Producto) => {
     if (producto.stock_actual <= 0) return;
-    
+
     setCart(prev => {
       const existing = prev.find(item => item.producto.id === producto.id);
       if (existing) {
-        // We do not check max stock as per instructions ("no mostrar stock exacto al cliente público")
-        // but we should logically limit it to stock_actual if we want to be safe, however
-        // we'll just increment it. We'll cap it at stock_actual.
         if (existing.cantidad >= producto.stock_actual) return prev;
-        
-        return prev.map(item => 
-          item.producto.id === producto.id 
+        return prev.map(item =>
+          item.producto.id === producto.id
             ? { ...item, cantidad: item.cantidad + 1 }
             : item
         );
       }
       return [...prev, { producto, cantidad: 1 }];
     });
-    setShowCart(true);
+    // NO se abre el carrito automáticamente: el usuario agrega y abre cuando quiera
   };
 
   const removeFromCart = (productoId: string) => {
@@ -236,22 +232,30 @@ export default function CatalogoPublico() {
         <div className="max-w-6xl mx-auto">
           <header className="mb-8 flex justify-between items-end">
             <div>
-              <h1 className="text-4xl font-black text-white tracking-tight mb-2">Catálogo</h1>
-              <p className="text-slate-400 text-lg">Selecciona los productos que planeas comprar en tienda.</p>
+              <h1 className="text-3xl md:text-4xl font-black text-white tracking-tight mb-2">Catálogo</h1>
+              <p className="text-slate-400 text-base md:text-lg">Selecciona los productos que planeas comprar en tienda.</p>
             </div>
-            <button 
-              className="md:hidden bg-blue-600 text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 border border-blue-500 shadow-lg text-lg"
+
+            {/* Botón de lista — visible siempre en el header (desktop y mobile) */}
+            <button
+              className="bg-blue-600 text-white px-4 md:px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 border border-blue-500 shadow-lg text-base md:text-lg relative"
               onClick={() => setShowCart(true)}
             >
-              <span>🛒</span> Cart ({cart.reduce((a, b) => a + b.cantidad, 0)})
+              <span>🛒</span>
+              <span className="hidden sm:inline">Mi Lista</span>
+              {cart.reduce((a, b) => a + b.cantidad, 0) > 0 && (
+                <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center">
+                  {cart.reduce((a, b) => a + b.cantidad, 0)}
+                </span>
+              )}
             </button>
           </header>
-          
+
           {/* Mensaje de advertencia obligatorio */}
-          <div className="bg-blue-900/30 border border-blue-800 text-blue-200 p-5 rounded-xl mb-8 flex gap-4 text-base md:text-lg">
-            <span className="text-2xl mt-0.5">ℹ️</span>
+          <div className="bg-blue-900/30 border border-blue-800 text-blue-200 p-4 md:p-5 rounded-xl mb-8 flex gap-3 md:gap-4 text-sm md:text-base">
+            <span className="text-xl md:text-2xl mt-0.5 shrink-0">ℹ️</span>
             <div className="leading-relaxed">
-              <strong className="text-white">Importante:</strong> Esta es una lista de compra tentativa para agilizar tu atención en tienda. 
+              <strong className="text-white">Importante:</strong> Esta es una lista de compra tentativa para agilizar tu atención en tienda.
               <strong className="text-white"> NO constituye una reserva</strong>, no garantiza stock y los productos no se guardan. La compra solo se concreta al momento de la entrega y pago en la tienda física.
             </div>
           </div>
@@ -259,25 +263,31 @@ export default function CatalogoPublico() {
           {loading ? (
             <div className="flex justify-center py-20 text-blue-600">Cargando catálogo...</div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
               {productos.map(producto => {
                 const status = getStockStatus(producto.stock_actual);
                 const isOutOfStock = producto.stock_actual <= 0;
-                
+                const inCart = cart.find(i => i.producto.id === producto.id);
+
                 return (
-                  <div key={producto.id} className="bg-slate-800 rounded-2xl p-5 border border-slate-700 hover:border-slate-500 transition-all duration-300 flex flex-col">
-                    <div className="aspect-square bg-slate-900/50 rounded-xl mb-4 flex items-center justify-center text-5xl overflow-hidden relative border border-slate-700/50">
-                      {/* Placeholder imagen */}
+                  <div key={producto.id} className="bg-slate-800 rounded-2xl p-4 md:p-5 border border-slate-700 hover:border-slate-500 transition-all duration-300 flex flex-col">
+                    <div className="aspect-square bg-slate-900/50 rounded-xl mb-3 md:mb-4 flex items-center justify-center text-4xl md:text-5xl overflow-hidden relative border border-slate-700/50">
                       📦
-                      <div className={`absolute top-2 right-2 px-2.5 py-1 rounded-md text-[11px] font-black uppercase tracking-wider ${status.color}`}>
+                      <div className={`absolute top-2 right-2 px-2 py-0.5 rounded-md text-[10px] md:text-[11px] font-black uppercase tracking-wider ${status.color}`}>
                         {status.label}
                       </div>
+                      {/* Badge cantidad en carrito */}
+                      {inCart && (
+                        <div className="absolute bottom-2 left-2 bg-blue-600 text-white text-[10px] font-black px-2 py-0.5 rounded-md">
+                          x{inCart.cantidad} en lista
+                        </div>
+                      )}
                     </div>
                     <div className="flex-1 flex flex-col">
-                      <p className="text-sm text-slate-400 font-bold uppercase tracking-wider mb-1.5">{producto.categoria}</p>
-                      <h3 className="font-bold text-white text-lg mb-2 leading-tight">{producto.nombre}</h3>
+                      <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-1">{producto.categoria}</p>
+                      <h3 className="font-bold text-white text-sm md:text-lg mb-2 leading-tight line-clamp-2">{producto.nombre}</h3>
                       <div className="mt-auto flex items-end justify-between">
-                        <span className="text-2xl font-black text-blue-400">
+                        <span className="text-xl md:text-2xl font-black text-blue-400">
                           ${producto.precio_venta_publico.toLocaleString('es-CL')}
                         </span>
                       </div>
@@ -285,13 +295,15 @@ export default function CatalogoPublico() {
                     <button
                       onClick={() => addToCart(producto)}
                       disabled={isOutOfStock}
-                      className={`mt-5 w-full py-3 rounded-xl font-bold transition-all text-base border ${
-                        isOutOfStock 
-                          ? 'bg-slate-900/50 border-slate-800 text-slate-500 cursor-not-allowed' 
+                      className={`mt-4 w-full py-2.5 md:py-3 rounded-xl font-bold transition-all text-sm md:text-base border ${
+                        isOutOfStock
+                          ? 'bg-slate-900/50 border-slate-800 text-slate-500 cursor-not-allowed'
+                          : inCart
+                          ? 'bg-blue-700 border-blue-600 text-white hover:bg-blue-600 active:scale-95 shadow-sm'
                           : 'bg-slate-700 border-slate-600 text-white hover:bg-blue-600 hover:border-blue-500 active:scale-95 shadow-sm'
                       }`}
                     >
-                      {isOutOfStock ? 'Agotado' : 'Agregar a la Lista'}
+                      {isOutOfStock ? 'Agotado' : inCart ? `+ Agregar otra` : 'Agregar a la Lista'}
                     </button>
                   </div>
                 );
@@ -300,6 +312,17 @@ export default function CatalogoPublico() {
           )}
         </div>
       </div>
+
+      {/* Botón flotante mobile — visible solo en mobile cuando hay productos en el carrito y el carrito está cerrado */}
+      {cart.length > 0 && !showCart && (
+        <button
+          onClick={() => setShowCart(true)}
+          className="fixed bottom-6 right-4 md:hidden z-40 bg-blue-600 text-white px-5 py-3.5 rounded-2xl font-black text-sm shadow-2xl shadow-blue-900/60 flex items-center gap-3 border border-blue-500 animate-bounce"
+        >
+          <span className="text-xl">🛒</span>
+          Ver lista ({cart.reduce((a, b) => a + b.cantidad, 0)} items)
+        </button>
+      )}
 
       {/* Sidebar Carrito */}
       {showCart && (
