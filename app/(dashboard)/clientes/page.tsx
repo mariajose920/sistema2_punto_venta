@@ -80,7 +80,26 @@ export default function ClientesPage() {
     return `${formatted}-${dv}`;
   };
 
+  // ============================================================================
+  // REGLA INVARIANTE: nunca saldo_deudado > 0 y saldo_favor > 0 al mismo tiempo.
+  // Si ambos son positivos, el saldo a favor descuenta la deuda primero.
+  // Ejemplo: deuda=3800, favor=500  => deuda=3300, favor=0
+  //          deuda=300,  favor=1400 => deuda=0,    favor=1100
+  // ============================================================================
+  const compensarSaldo = (deuda: number, favor: number): { deuda: number; favor: number } => {
+    const d = Math.max(0, Number(deuda || 0));
+    const f = Math.max(0, Number(favor || 0));
+    if (d > 0 && f > 0) {
+      if (f >= d) return { deuda: 0, favor: f - d };
+      return { deuda: d - f, favor: 0 };
+    }
+    return { deuda: d, favor: f };
+  };
+
   // 1. Cargar clientes
+  // Al recibir los datos de la BD se aplica compensarSaldo en memoria,
+  // garantizando que la lista siempre muestre saldos ya normalizados
+  // aunque la BD tenga valores inconsistentes cargados por otros flujos.
   const fetchClientes = useCallback(async () => {
     try {
       setLoading(true);
@@ -89,7 +108,13 @@ export default function ClientesPage() {
         .order('nombre', { ascending: true });
 
       if (error) throw error;
-      setClientes(data || []);
+
+      // Normalizar saldos en memoria antes de mostrar
+      const normalized = (data || []).map((c: ClienteRow) => {
+        const { deuda, favor } = compensarSaldo(c.saldo_deudado, c.saldo_favor);
+        return { ...c, saldo_deudado: deuda, saldo_favor: favor };
+      });
+      setClientes(normalized);
     } catch (err: unknown) {
       console.error('Error cargando clientes:', err);
       const message = err instanceof Error ? err.message : 'Error desconocido';
@@ -180,7 +205,10 @@ export default function ClientesPage() {
   };
 
   const openStatement = async (cliente: ClienteRow) => {
-    setSelectedCliente(cliente);
+    // Normalizar saldos antes de mostrar en el historial
+    const { deuda, favor } = compensarSaldo(cliente.saldo_deudado, cliente.saldo_favor);
+    const clienteNorm = { ...cliente, saldo_deudado: deuda, saldo_favor: favor };
+    setSelectedCliente(clienteNorm);
     setIsStatementOpen(true);
 
     try {
@@ -216,7 +244,7 @@ export default function ClientesPage() {
   };
 
   // ============================================================================
-  // LOGICA CORREGIDA DE ABONO (Descuento de Deuda y Suma a Favor)
+  // LOGICA DE ABONO con compensación obligatoria en ambos extremos
   // ============================================================================
   const handleGeneralAbono = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -229,13 +257,22 @@ export default function ClientesPage() {
         .select('saldo_deudado, saldo_favor')
         .eq('id', selectedCliente.id)
         .single();
-      
+
       console.log('Paso 0: Datos frescos del cliente:', { freshCliente, fError });
 
       if (fError || !freshCliente) throw new Error('No se pudo obtener el saldo actual del cliente');
 
-      const saldoDeudadoActual = Number(freshCliente.saldo_deudado || 0);
-      const saldoFavorActual = Number(freshCliente.saldo_favor || 0);
+      // PASO 0-B: Compensar saldos preexistentes antes de aplicar el abono.
+      // Garantiza que si la BD tenía deuda+favor simultáneos (inconsistencia
+      // generada por otro flujo), se resuelve primero antes de calcular el impacto.
+      const compensado = compensarSaldo(
+        Number(freshCliente.saldo_deudado || 0),
+        Number(freshCliente.saldo_favor   || 0)
+      );
+      let nuevaDeuda      = compensado.deuda;
+      let nuevoSaldoFavor = compensado.favor;
+
+      console.log('Paso 0-B: Saldos compensados antes del abono:', { nuevaDeuda, nuevoSaldoFavor });
 
       // 1. Registrar el Pago
       const { error: pError } = await (supabase.from('Pago') as any).insert([{
@@ -243,40 +280,40 @@ export default function ClientesPage() {
         monto: Number(montoAbono),
         metodo_pago: metodoPago
       }]);
-      
+
       console.log('Paso 1: Registro de Pago:', { pError });
       if (pError) throw pError;
 
-      // 2. Calcular impacto: Primero se paga la deuda, el resto va a favor
+      // 2. Aplicar el monto del abono: primero paga deuda, el resto va a favor
       let restante = Number(montoAbono);
-      let nuevaDeuda = saldoDeudadoActual;
-      let nuevoSaldoFavor = saldoFavorActual;
 
       if (nuevaDeuda > 0) {
         if (restante >= nuevaDeuda) {
-          // El abono cubre toda la deuda y sobra (o queda justo en 0)
           restante -= nuevaDeuda;
           nuevaDeuda = 0;
         } else {
-          // El abono no alcanza a cubrir toda la deuda
           nuevaDeuda -= restante;
           restante = 0;
         }
       }
 
-      // Si después de pagar la deuda sobró dinero del abono, se suma al saldo a favor
       if (restante > 0) {
         nuevoSaldoFavor += restante;
       }
+
+      // 2-B: Compensación final por seguridad (garantía de invariante)
+      const final = compensarSaldo(nuevaDeuda, nuevoSaldoFavor);
+      nuevaDeuda      = final.deuda;
+      nuevoSaldoFavor = final.favor;
 
       // 3. Actualizar Cliente
       const { error: cError } = await (supabase.from('Cliente') as any)
         .update({
           saldo_deudado: nuevaDeuda,
-          saldo_favor: nuevoSaldoFavor
+          saldo_favor:   nuevoSaldoFavor
         })
         .eq('id', selectedCliente.id);
-      
+
       console.log('Paso 3: Actualización Cliente:', { cError, nuevaDeuda, nuevoSaldoFavor });
       if (cError) throw cError;
 
