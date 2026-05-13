@@ -272,7 +272,11 @@ export default function CatalogoPublico() {
                 return (
                   <div key={producto.id} className="bg-slate-800 rounded-2xl p-4 md:p-5 border border-slate-700 hover:border-slate-500 transition-all duration-300 flex flex-col">
                     <div className="aspect-square bg-slate-900/50 rounded-xl mb-3 md:mb-4 flex items-center justify-center text-4xl md:text-5xl overflow-hidden relative border border-slate-700/50">
-                      📦
+                      {producto.imagen_url ? (
+                        <img src={producto.imagen_url} alt={producto.nombre} className="w-full h-full object-cover" />
+                      ) : (
+                        '📦'
+                      )}
                       <div className={`absolute top-2 right-2 px-2 py-0.5 rounded-md text-[10px] md:text-[11px] font-black uppercase tracking-wider ${status.color}`}>
                         {status.label}
                       </div>

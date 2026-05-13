@@ -167,6 +167,7 @@ export default function ProductosPage() {
         setFormData(prev => ({
           ...prev,
           nombre: data.product.product_name,
+          imagen_url: data.product.image_url || data.product.image_front_url || prev.imagen_url,
           fuente_datos: 'api' // Autocompletado desde API externa
         }));
         return;
@@ -228,6 +229,7 @@ export default function ProductosPage() {
       
       let finalImageUrl = formData.imagen_url || null;
 
+      // Prioridad: Archivo > URL
       if (imageFile) {
         const fileExt = imageFile.name.split('.').pop();
         const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
@@ -243,6 +245,18 @@ export default function ProductosPage() {
         
         const { data: { publicUrl } } = supabase.storage.from('productos').getPublicUrl(filePath);
         finalImageUrl = publicUrl;
+      } else if (finalImageUrl && finalImageUrl.trim() !== '') {
+        // Validación básica de URL si se ingresó manualmente y no hay archivo
+        try {
+          if (!finalImageUrl.startsWith('http')) {
+            throw new Error("La URL de la imagen debe comenzar con http:// o https://");
+          }
+          new URL(finalImageUrl);
+        } catch (e) {
+          throw new Error("La URL de la imagen no es válida.");
+        }
+      } else {
+        finalImageUrl = null;
       }
 
       const finalData = {
@@ -539,19 +553,38 @@ export default function ProductosPage() {
                 
                 <div className="col-span-2">
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Imagen del Producto (Opcional)</label>
-                  <input 
-                    type="file" 
-                    accept="image/*"
-                    onChange={e => {
-                      if (e.target.files && e.target.files[0]) {
-                        setImageFile(e.target.files[0]);
-                      }
-                    }}
-                    className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" 
-                  />
-                  {formData.imagen_url && !imageFile && (
-                    <div className="mt-2 text-xs text-blue-500 font-bold">✓ Imagen actual guardada</div>
-                  )}
+                  <div className="space-y-4">
+                    <div>
+                      <p className="text-[9px] font-bold text-gray-400 uppercase mb-1">Subir archivo (Prioridad)</p>
+                      <input 
+                        type="file" 
+                        accept="image/*"
+                        onChange={e => {
+                          if (e.target.files && e.target.files[0]) {
+                            setImageFile(e.target.files[0]);
+                          }
+                        }}
+                        className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" 
+                      />
+                    </div>
+
+                    <div>
+                      <p className="text-[9px] font-bold text-gray-400 uppercase mb-1">O ingresar URL manual</p>
+                      <input 
+                        type="url"
+                        placeholder="https://ejemplo.com/imagen.jpg"
+                        value={formData.imagen_url || ''} 
+                        onChange={e => setFormData({...formData, imagen_url: e.target.value})} 
+                        className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold text-sm" 
+                      />
+                    </div>
+
+                    {imageFile ? (
+                      <div className="mt-2 text-xs text-emerald-500 font-bold">✓ Se usará el archivo seleccionado</div>
+                    ) : formData.imagen_url ? (
+                      <div className="mt-2 text-xs text-blue-500 font-bold">✓ Se usará la URL ingresada</div>
+                    ) : null}
+                  </div>
                 </div>
               </div>
               
