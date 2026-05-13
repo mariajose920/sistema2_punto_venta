@@ -188,7 +188,10 @@ export default function ProductosPage() {
   // 3. Acciones de CRUD
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('[handleSave] Iniciando proceso de guardado...');
+
     if (role !== 'admin' && role !== 'cajera') {
+      console.warn('[handleSave] Intento de guardado sin permisos suficientes.');
       alert('No tienes permisos para realizar cambios en el catálogo.');
       return;
     }
@@ -204,24 +207,32 @@ export default function ProductosPage() {
         throw new Error("El nombre y la categoría son obligatorios.");
       }
 
-      // Validación de Nombre Único
-      const { data: nombreExistente } = await (supabase.from('Producto') as any)
+      console.log('[handleSave] Validando unicidad de nombre:', nombreNorm);
+      const { data: nombreExistente, error: errorNombre } = await (supabase.from('Producto') as any)
         .select('id')
         .eq('nombre', nombreNorm)
         .neq('id', editingId || '00000000-0000-0000-0000-000000000000')
         .maybeSingle();
 
+      if (errorNombre) {
+        console.error('[handleSave] Error verificando nombre:', errorNombre);
+        throw new Error(`Error de base de datos al validar nombre: ${errorNombre.message}`);
+      }
       if (nombreExistente) {
         throw new Error(`Ya existe un producto con el nombre: "${nombreNorm}"`);
       }
 
-      // Validación de Código de Barras Único
       if (codigoStr && !editingId) {
-        const { data: codigoExistente } = await (supabase.from('Producto') as any)
+        console.log('[handleSave] Validando unicidad de código de barras:', codigoStr);
+        const { data: codigoExistente, error: errorCodigo } = await (supabase.from('Producto') as any)
           .select('id')
           .eq('codigo_barra', codigoStr)
           .maybeSingle();
 
+        if (errorCodigo) {
+          console.error('[handleSave] Error verificando código:', errorCodigo);
+          throw new Error(`Error de base de datos al validar código: ${errorCodigo.message}`);
+        }
         if (codigoExistente) {
           throw new Error(`Ya existe un producto con el código de barras: "${codigoStr}"`);
         }
@@ -229,33 +240,48 @@ export default function ProductosPage() {
       
       let finalImageUrl = formData.imagen_url || null;
 
-      // Prioridad: Archivo > URL
+      // Lógica de Imagen: Prioridad Archivo > URL Manual
       if (imageFile) {
+        console.log('[handleSave] Subiendo archivo al bucket "productos":', imageFile.name);
         const fileExt = imageFile.name.split('.').pop();
         const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
-        const filePath = `${fileName}`;
+        const filePath = fileName; 
 
         const { error: uploadError } = await supabase.storage
           .from('productos')
-          .upload(filePath, imageFile);
+          .upload(filePath, imageFile, {
+            cacheControl: '3600',
+            upsert: false
+          });
 
         if (uploadError) {
-          throw new Error(`Error subiendo imagen: ${uploadError.message}`);
+          console.error('[handleSave] ERROR EN STORAGE (UPLOAD):', uploadError);
+          throw new Error(`No se pudo subir la imagen al servidor de archivos: ${uploadError.message}. Verifica que el bucket "productos" exista y tenga permisos.`);
         }
         
-        const { data: { publicUrl } } = supabase.storage.from('productos').getPublicUrl(filePath);
-        finalImageUrl = publicUrl;
+        console.log('[handleSave] Archivo subido. Obteniendo URL pública...');
+        const { data: publicData } = supabase.storage.from('productos').getPublicUrl(filePath);
+        
+        if (!publicData?.publicUrl) {
+           console.error('[handleSave] Error: No se pudo obtener la URL pública del archivo.');
+           throw new Error("El archivo se subió pero no pudimos obtener su dirección pública.");
+        }
+        
+        finalImageUrl = publicData.publicUrl;
+        console.log('[handleSave] URL de imagen establecida (Storage):', finalImageUrl);
       } else if (finalImageUrl && finalImageUrl.trim() !== '') {
-        // Validación básica de URL si se ingresó manualmente y no hay archivo
+        console.log('[handleSave] Validando URL de imagen externa:', finalImageUrl);
         try {
           if (!finalImageUrl.startsWith('http')) {
-            throw new Error("La URL de la imagen debe comenzar con http:// o https://");
+            throw new Error("La URL debe comenzar con http:// o https://");
           }
           new URL(finalImageUrl);
-        } catch (e) {
-          throw new Error("La URL de la imagen no es válida.");
+        } catch (e: any) {
+          console.warn('[handleSave] URL inválida:', finalImageUrl);
+          throw new Error(`La URL de la imagen ingresada no es válida: ${e.message}`);
         }
       } else {
+        console.log('[handleSave] Producto sin imagen (null).');
         finalImageUrl = null;
       }
 
@@ -271,20 +297,37 @@ export default function ProductosPage() {
         imagen_url: finalImageUrl
       };
 
+      console.log('[handleSave] Datos finales para persistir:', finalData);
+
       if (editingId) {
-        const { error } = await (supabase.from('Producto') as any).update(finalData).eq('id', editingId);
-        if (error) throw error;
+        console.log('[handleSave] Actualizando producto existente ID:', editingId);
+        const { error: updateError } = await (supabase.from('Producto') as any)
+          .update(finalData)
+          .eq('id', editingId);
+        
+        if (updateError) {
+          console.error('[handleSave] ERROR EN UPDATE:', updateError);
+          throw new Error(`Error al actualizar el producto en la base de datos: ${updateError.message}`);
+        }
       } else {
-        const { error } = await (supabase.from('Producto') as any).insert([finalData]);
-        if (error) throw error;
+        console.log('[handleSave] Creando nuevo producto...');
+        const { error: insertError } = await (supabase.from('Producto') as any)
+          .insert([finalData]);
+        
+        if (insertError) {
+          console.error('[handleSave] ERROR EN INSERT:', insertError);
+          throw new Error(`Error al insertar el nuevo producto en la base de datos: ${insertError.message}`);
+        }
       }
       
+      console.log('[handleSave] ¡Guardado exitoso!');
       setIsModalOpen(false);
       resetForm();
       fetchData();
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Error al guardar producto';
-      alert('Error: ' + message);
+      const message = err instanceof Error ? err.message : 'Error inesperado';
+      console.error('[handleSave] FALLO EN EL PROCESO:', err);
+      alert('⚠️ No se pudo guardar el producto:\n\n' + message);
     } finally {
       setLoading(false);
     }
