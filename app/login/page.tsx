@@ -132,6 +132,27 @@ export default function LoginPage() {
             )}
           </button>
         </form>
+
+        <div className="mt-6 text-center">
+          <div className="relative mb-6">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-200 dark:border-gray-700"></div>
+            </div>
+            <div className="relative flex justify-center text-sm">
+              <span className="px-4 bg-white dark:bg-gray-800 text-gray-400">Acceso para Clientes</span>
+            </div>
+          </div>
+          
+          <button
+            type="button"
+            onClick={() => router.push('/catalogo')}
+            className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-lg bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400 font-bold hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-all duration-200 border border-emerald-200 dark:border-emerald-800 shadow-sm"
+          >
+            <span className="text-xl">🛍️</span>
+            Ver Catálogo Público
+          </button>
+          <p className="mt-3 text-xs text-gray-400">No se requiere inicio de sesión</p>
+        </div>
       </div>
     </div>
   );
