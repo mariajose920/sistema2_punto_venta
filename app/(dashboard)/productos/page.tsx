@@ -147,40 +147,36 @@ export default function ProductosPage() {
     // 1. Buscar en base interna
     const localMatch = productos.find(p => p.codigo_barra === code);
     if (localMatch) {
-      alert('Este código ya está registrado localmente. Editando producto existente.');
-      openEdit(localMatch);
+      if (window.confirm('Este producto ya está registrado localmente. ¿Deseas editar el producto existente?')) {
+        openEdit(localMatch);
+      }
       return;
     }
 
-    // 2. Determinar si es código estándar (GTIN de 8, 12, 13 o 14 dígitos)
-    const isStandardBarcode = /^\d{8}$|^\d{12,14}$/.test(code);
-    
-    if (isStandardBarcode) {
-      try {
-        setIsSearchingBarcode(true);
-        // Consultar Open Food Facts
-        const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${code}.json`);
-        const data = await res.json();
-        
-        if (data.status === 1 && data.product && data.product.product_name) {
-          setFormData(prev => ({
-            ...prev,
-            nombre: data.product.product_name,
-            fuente_datos: 'api' // Autocompletado desde API externa
-          }));
-          return;
-        }
-      } catch (err) {
-        console.error('Error buscando en API externa:', err);
-      } finally {
-        setIsSearchingBarcode(false);
+    // 2. Consultar Open Food Facts siempre
+    try {
+      setIsSearchingBarcode(true);
+      const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${code}.json`);
+      const data = await res.json();
+      
+      if (data.status === 1 && data.product && data.product.product_name) {
+        setFormData(prev => ({
+          ...prev,
+          nombre: data.product.product_name,
+          fuente_datos: 'api' // Autocompletado desde API externa
+        }));
+        return;
       }
+    } catch (err) {
+      console.error('Error buscando en API externa:', err);
+    } finally {
+      setIsSearchingBarcode(false);
     }
 
-    // 3. No encontrado en API o no es estándar -> Preparar para ingreso manual
+    // 3. No encontrado en API -> Preparar para ingreso manual
     setFormData(prev => ({
       ...prev,
-      fuente_datos: isStandardBarcode ? 'manual' : 'interno' // Interno si no tiene formato estándar
+      fuente_datos: 'manual'
     }));
   };
 
@@ -404,7 +400,7 @@ export default function ProductosPage() {
                     <input 
                       placeholder="Escanear o digitar..."
                       value={formData.codigo_barra || ''} 
-                      onChange={e => setFormData({...formData, codigo_barra: e.target.value})}
+                      onChange={e => setFormData({...formData, codigo_barra: e.target.value.replace(/\D/g, '').slice(0, 13)})}
                       onKeyDown={e => {
                         if (e.key === 'Enter') {
                           e.preventDefault();
