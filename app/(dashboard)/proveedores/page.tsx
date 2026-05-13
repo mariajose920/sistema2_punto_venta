@@ -298,7 +298,7 @@ export default function ProveedoresPage() {
                 </div>
                 <div>
                   <label className="text-[9px] font-black text-gray-400 uppercase mb-2 block tracking-widest">Teléfono Directo</label>
-                  <input value={formData.telefono_ || ''} onChange={e => setFormData({ ...formData, telefono_: e.target.value })} className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold" placeholder="+56 9..." />
+                  <input value={formData.telefono_ || ''} onChange={e => setFormData({ ...formData, telefono_: e.target.value.replace(/\D/g, '').slice(0, 9) })} className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold" placeholder="+56 9..." />
                 </div>
                 <div className="col-span-2">
                   <label className="text-[9px] font-black text-gray-400 uppercase mb-2 block tracking-widest">Correo de Contacto</label>

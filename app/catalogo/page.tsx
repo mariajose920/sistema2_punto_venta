@@ -399,7 +399,7 @@ export default function CatalogoPublico() {
                   placeholder="Número de Teléfono"
                   required
                   value={telefono}
-                  onChange={e => setTelefono(e.target.value)}
+                  onChange={e => setTelefono(e.target.value.replace(/\D/g, '').slice(0, 9))}
                   className="w-full px-4 py-3.5 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all text-base"
                 />
                 <button

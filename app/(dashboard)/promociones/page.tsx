@@ -183,7 +183,7 @@ export default function PromocionesPage() {
                     type="number" 
                     disabled={formData.tipo === '2x1'} 
                     value={formData.valor || 0} 
-                    onChange={e => setFormData({...formData, valor: Number(e.target.value)})} 
+                    onChange={e => { e.target.value = e.target.value.replace(/^0+(?=\d)/, ''); setFormData({...formData, valor: Number(e.target.value)}) }} 
                     className="w-full p-3 bg-gray-50 dark:bg-gray-900 rounded-xl border-none font-bold" 
                   />
                 </div>

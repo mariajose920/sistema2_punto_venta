@@ -492,7 +492,7 @@ export default function ClientesPage() {
                   required
                   autoFocus
                   value={montoAbono || ''}
-                  onChange={e => setMontoAbono(Number(e.target.value))}
+                  onChange={e => { e.target.value = e.target.value.replace(/^0+(?=\d)/, ''); setMontoAbono(Number(e.target.value)) }}
                   className="w-full p-6 bg-gray-50 dark:bg-gray-900 rounded-[2rem] border-none font-black text-4xl text-emerald-600 text-center"
                 />
               </div>
@@ -592,7 +592,7 @@ export default function ClientesPage() {
               </div>
               <div>
                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2 px-2">Teléfono Movil</label>
-                <input value={formData.telefono || ''} onChange={e => setFormData({ ...formData, telefono: e.target.value })} className="w-full p-5 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold text-xl" placeholder="+56 9..." />
+                <input value={formData.telefono || ''} onChange={e => setFormData({ ...formData, telefono: e.target.value.replace(/\D/g, '').slice(0, 9) })} className="w-full p-5 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold text-xl" placeholder="+56 9..." />
               </div>
 
               <div className="flex gap-4 pt-8">

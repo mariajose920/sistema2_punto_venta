@@ -477,7 +477,7 @@ export default function ProductosPage() {
                     required 
                     type="number" 
                     value={formData.precio_venta_publico || 0} 
-                    onChange={e => setFormData({...formData, precio_venta_publico: Number(e.target.value)})} 
+                    onChange={e => { e.target.value = e.target.value.replace(/^0+(?=\d)/, ''); setFormData({...formData, precio_venta_publico: Number(e.target.value)}) }} 
                     className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-black text-xl text-blue-600" 
                   />
                 </div>
@@ -487,7 +487,7 @@ export default function ProductosPage() {
                     required 
                     type="number" 
                     value={formData.precio_compra || 0} 
-                    onChange={e => setFormData({...formData, precio_compra: Number(e.target.value)})} 
+                    onChange={e => { e.target.value = e.target.value.replace(/^0+(?=\d)/, ''); setFormData({...formData, precio_compra: Number(e.target.value)}) }} 
                     className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold text-xl" 
                   />
                 </div>
@@ -497,7 +497,7 @@ export default function ProductosPage() {
                     required 
                     type="number" 
                     value={formData.stock_actual || 0} 
-                    onChange={e => setFormData({...formData, stock_actual: Number(e.target.value)})} 
+                    onChange={e => { e.target.value = e.target.value.replace(/^0+(?=\d)/, ''); setFormData({...formData, stock_actual: Number(e.target.value)}) }} 
                     className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-black text-xl" 
                   />
                 </div>
@@ -507,7 +507,7 @@ export default function ProductosPage() {
                     required 
                     type="number" 
                     value={formData.stock_minimo || 0} 
-                    onChange={e => setFormData({...formData, stock_minimo: Number(e.target.value)})} 
+                    onChange={e => { e.target.value = e.target.value.replace(/^0+(?=\d)/, ''); setFormData({...formData, stock_minimo: Number(e.target.value)}) }} 
                     className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold text-xl text-red-500" 
                   />
                 </div>

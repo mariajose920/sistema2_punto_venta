@@ -328,7 +328,7 @@ export default function NuevaCompraPage() {
                         <input 
                           type="number" 
                           value={item.cantidad} 
-                          onChange={e => updateItem(item.id, Number(e.target.value), item.costo_unitario)} 
+                          onChange={e => { e.target.value = e.target.value.replace(/^0+(?=\d)/, ''); updateItem(item.id, Number(e.target.value), item.costo_unitario) }} 
                           className="w-20 p-3 bg-gray-50 dark:bg-gray-900 rounded-xl text-center font-black text-blue-600 border-none focus:ring-2 focus:ring-blue-600/20" 
                         />
                       </div>
@@ -338,7 +338,7 @@ export default function NuevaCompraPage() {
                         <input 
                           type="number" 
                           value={item.costo_unitario} 
-                          onChange={e => updateItem(item.id, item.cantidad, Number(e.target.value))} 
+                          onChange={e => { e.target.value = e.target.value.replace(/^0+(?=\d)/, ''); updateItem(item.id, item.cantidad, Number(e.target.value)) }} 
                           className="w-32 p-3 bg-gray-50 dark:bg-gray-900 rounded-xl text-right font-black text-gray-900 dark:text-white border-none focus:ring-2 focus:ring-blue-600/20" 
                         />
                       </div>
@@ -401,7 +401,7 @@ export default function NuevaCompraPage() {
                 </div>
                 <div>
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2 px-2">Teléfono</label>
-                  <input value={newProvData.telefono} onChange={e => setNewProvData({...newProvData, telefono: e.target.value})} className="w-full p-5 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold" />
+                  <input value={newProvData.telefono} onChange={e => setNewProvData({...newProvData, telefono: e.target.value.replace(/\D/g, '').slice(0, 9)})} className="w-full p-5 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold" />
                 </div>
               </div>
               <div>
@@ -444,11 +444,11 @@ export default function NuevaCompraPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2 px-2">Costo ($)</label>
-                  <input type="number" value={newProdData.costo} onChange={e => setNewProdData({...newProdData, costo: Number(e.target.value)})} className="w-full p-5 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-black text-blue-600" />
+                  <input type="number" value={newProdData.costo} onChange={e => { e.target.value = e.target.value.replace(/^0+(?=\d)/, ''); setNewProdData({...newProdData, costo: Number(e.target.value)}) }} className="w-full p-5 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-black text-blue-600" />
                 </div>
                 <div>
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2 px-2">Venta ($)</label>
-                  <input type="number" value={newProdData.venta} onChange={e => setNewProdData({...newProdData, venta: Number(e.target.value)})} className="w-full p-5 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-black text-emerald-600" />
+                  <input type="number" value={newProdData.venta} onChange={e => { e.target.value = e.target.value.replace(/^0+(?=\d)/, ''); setNewProdData({...newProdData, venta: Number(e.target.value)}) }} className="w-full p-5 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-black text-emerald-600" />
                 </div>
               </div>
               <div className="flex gap-4 pt-6">

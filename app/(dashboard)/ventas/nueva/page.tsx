@@ -617,11 +617,11 @@ export default function NuevaVentaPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Precio Unitario ($)</label>
-                  <input type="number" value={calcData.precioUnitario} onChange={e => setCalcData({...calcData, precioUnitario: Number(e.target.value)})} className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl font-bold border-none" />
+                  <input type="number" value={calcData.precioUnitario} onChange={e => { e.target.value = e.target.value.replace(/^0+(?=\d)/, ''); setCalcData({...calcData, precioUnitario: Number(e.target.value)}) }} className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl font-bold border-none" />
                 </div>
                 <div>
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Cantidad / Peso</label>
-                  <input type="number" step="0.001" value={calcData.cantidad} onChange={e => setCalcData({...calcData, cantidad: Number(e.target.value)})} className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl font-bold border-none" />
+                  <input type="number" step="0.001" value={calcData.cantidad} onChange={e => { e.target.value = e.target.value.replace(/^0+(?=\d)/, ''); setCalcData({...calcData, cantidad: Number(e.target.value)}) }} className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl font-bold border-none" />
                 </div>
               </div>
 
@@ -658,7 +658,7 @@ export default function NuevaVentaPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Teléfono</label>
-                  <input value={newClient.telefono} onChange={e => setNewClient({...newClient, telefono: e.target.value})} className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl font-bold border-none" />
+                  <input value={newClient.telefono} onChange={e => setNewClient({...newClient, telefono: e.target.value.replace(/\D/g, '').slice(0, 9)})} className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl font-bold border-none" />
                 </div>
                 <div>
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Dirección</label>

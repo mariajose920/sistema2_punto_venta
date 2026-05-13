@@ -137,7 +137,7 @@ export default function CalculadoraCostos() {
                       min="0.01" 
                       step="0.01"
                       value={c.cantidad}
-                      onChange={(e) => actualizarCantidad(c.id, parseFloat(e.target.value))}
+                      onChange={(e) => { e.target.value = e.target.value.replace(/^0+(?=\d)/, ''); actualizarCantidad(c.id, parseFloat(e.target.value)) }}
                       className="w-20 p-2 text-center rounded-lg border border-gray-200 dark:bg-gray-900"
                     />
                     <button onClick={() => eliminarComponente(c.id)} className="text-red-500 hover:scale-110 transition-transform">🗑️</button>
@@ -192,7 +192,7 @@ export default function CalculadoraCostos() {
                 type="number" 
                 className="w-full p-3 mt-1 rounded-xl border border-gray-200 dark:bg-gray-900 font-bold text-blue-600"
                 value={nuevoProducto.precio_venta}
-                onChange={(e) => setNuevoProducto({ ...nuevoProducto, precio_venta: parseFloat(e.target.value) })}
+                onChange={(e) => { e.target.value = e.target.value.replace(/^0+(?=\d)/, ''); setNuevoProducto({ ...nuevoProducto, precio_venta: parseFloat(e.target.value) }) }}
               />
             </div>
             <button 
