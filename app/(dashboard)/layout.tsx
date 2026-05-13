@@ -11,6 +11,7 @@ const NAV_ITEMS = {
   shared: [
     { href: '/productos', label: 'Lista de Productos', icon: '📦' },
     { href: '/clientes', label: 'Lista de Clientes', icon: '👥' },
+    { href: '/pedidos', label: 'Pedidos (Web)', icon: '📥' },
   ],
   admin: [
     { href: '/admin', label: 'Panel de Control', icon: '📊' },

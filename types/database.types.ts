@@ -343,6 +343,58 @@ export interface Database {
           activa?: boolean
         }
       }
+      Pedido: {
+        Row: {
+          id: string
+          nombre_cliente: string
+          rut_cliente: string
+          telefono_cliente: string
+          estado: 'pendiente' | 'entregado' | 'cancelado'
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          nombre_cliente: string
+          rut_cliente: string
+          telefono_cliente: string
+          estado?: 'pendiente' | 'entregado' | 'cancelado'
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          nombre_cliente?: string
+          rut_cliente?: string
+          telefono_cliente?: string
+          estado?: 'pendiente' | 'entregado' | 'cancelado'
+          created_at?: string
+        }
+      }
+      DetallePedido: {
+        Row: {
+          id: string
+          pedido_id: string
+          producto_id: string
+          cantidad: number
+          precio_unitario: number
+          subtotal: number
+        }
+        Insert: {
+          id?: string
+          pedido_id: string
+          producto_id: string
+          cantidad: number
+          precio_unitario: number
+          subtotal: number
+        }
+        Update: {
+          id?: string
+          pedido_id?: string
+          producto_id?: string
+          cantidad?: number
+          precio_unitario?: number
+          subtotal?: number
+        }
+      }
       Categoria: {
         Row: {
           id: string
