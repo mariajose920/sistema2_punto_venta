@@ -21,6 +21,7 @@ interface Movimiento {
 
 export default function ClientesPage() {
   const { role } = useAuth();
+  const canManageClientes = role === 'admin' || role === 'cajera';
 
   // Estados de datos
   const [clientes, setClientes] = useState<ClienteRow[]>([]);
@@ -345,7 +346,7 @@ export default function ClientesPage() {
               className="w-full pl-14 pr-6 py-4 bg-gray-50 dark:bg-gray-900 border-none rounded-2xl font-bold text-sm focus:ring-4 focus:ring-blue-600/10 transition-all"
             />
           </div>
-          {role === 'admin' && (
+          {canManageClientes && (
             <button
               onClick={() => { setSelectedCliente(null); setFormData({ nombre: '', telefono: '', rut: '' }); setIsModalOpen(true); }}
               className="bg-gray-900 text-white px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-2xl hover:scale-105 active:scale-95 transition-all"
@@ -395,7 +396,7 @@ export default function ClientesPage() {
               <div className="mt-8 pt-8 border-t border-gray-50 dark:border-gray-800 flex gap-3">
                 <button onClick={() => openStatement(c)} className="flex-1 py-4 bg-gray-100 dark:bg-gray-900 text-gray-500 dark:text-gray-400 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-gray-900 hover:text-white transition-all">Historial</button>
                 <button onClick={() => { setSelectedCliente(c); setIsAbonoOpen(true); }} className="flex-1 py-4 bg-emerald-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-500/20">Abonar</button>
-                {role === 'admin' && (
+                {canManageClientes && (
                   <button onClick={() => { setSelectedCliente(c); setFormData(c); setIsModalOpen(true); }} className="p-4 bg-gray-50 dark:bg-gray-900 text-gray-300 hover:text-blue-600 rounded-2xl transition-all">✏️</button>
                 )}
               </div>
@@ -426,7 +427,7 @@ export default function ClientesPage() {
                       <div className="flex justify-center gap-6">
                         <button onClick={() => openStatement(c)} className="text-[10px] font-black text-blue-600 uppercase tracking-widest hover:underline">Movimientos</button>
                         <button onClick={() => { setSelectedCliente(c); setIsAbonoOpen(true); }} className="text-[10px] font-black text-emerald-600 uppercase tracking-widest hover:underline">Abonar</button>
-                        {role === 'admin' && (
+                        {canManageClientes && (
                           <button onClick={() => { setSelectedCliente(c); setFormData(c); setIsModalOpen(true); }} className="text-gray-300 hover:text-blue-600">✏️</button>
                         )}
                       </div>
