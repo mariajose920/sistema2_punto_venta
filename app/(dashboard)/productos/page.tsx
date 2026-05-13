@@ -30,6 +30,7 @@ export default function ProductosPage() {
   
   // Estado para el formulario (Agregar/Editar)
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
   const [formData, setFormData] = useState<Partial<ProductoRow>>({
     codigo_barra: '',
     nombre: '',
@@ -38,7 +39,8 @@ export default function ProductosPage() {
     precio_venta_publico: 0,
     stock_actual: 0,
     stock_minimo: 5,
-    fuente_datos: 'manual'
+    fuente_datos: 'manual',
+    imagen_url: ''
   });
 
   const [isSearchingBarcode, setIsSearchingBarcode] = useState(false);
@@ -126,6 +128,7 @@ export default function ProductosPage() {
 
   const resetForm = useCallback(() => {
     setEditingId(null);
+    setImageFile(null);
     setShowNewCategoryInput(false);
     setFormData({
       codigo_barra: '',
@@ -135,7 +138,8 @@ export default function ProductosPage() {
       precio_venta_publico: 0,
       stock_actual: 0,
       stock_minimo: 5,
-      fuente_datos: 'manual'
+      fuente_datos: 'manual',
+      imagen_url: ''
     });
   }, []);
 
@@ -222,6 +226,25 @@ export default function ProductosPage() {
         }
       }
       
+      let finalImageUrl = formData.imagen_url || null;
+
+      if (imageFile) {
+        const fileExt = imageFile.name.split('.').pop();
+        const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+        const filePath = `${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('productos')
+          .upload(filePath, imageFile);
+
+        if (uploadError) {
+          throw new Error(`Error subiendo imagen: ${uploadError.message}`);
+        }
+        
+        const { data: { publicUrl } } = supabase.storage.from('productos').getPublicUrl(filePath);
+        finalImageUrl = publicUrl;
+      }
+
       const finalData = {
         nombre: nombreNorm,
         categoria: categoriaNorm,
@@ -230,7 +253,8 @@ export default function ProductosPage() {
         precio_venta_publico: Number(formData.precio_venta_publico) || 0,
         stock_actual: Number(formData.stock_actual) || 0,
         stock_minimo: Number(formData.stock_minimo) || 0,
-        fuente_datos: formData.fuente_datos || 'manual'
+        fuente_datos: formData.fuente_datos || 'manual',
+        imagen_url: finalImageUrl
       };
 
       if (editingId) {
@@ -267,6 +291,7 @@ export default function ProductosPage() {
 
   const openEdit = (p: ProductoRow) => {
     setEditingId(p.id);
+    setImageFile(null);
     setFormData(p);
     setIsModalOpen(true);
   };
@@ -345,8 +370,12 @@ export default function ProductosPage() {
           {filtrados.map(p => (
             <div key={p.id} className="bg-white dark:bg-gray-800 p-8 rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-gray-700 relative group transition-all hover:shadow-2xl hover:-translate-y-2 overflow-hidden">
               <div className="flex justify-between items-start mb-6">
-                <div className="w-14 h-14 bg-gray-50 dark:bg-gray-900 rounded-2xl flex items-center justify-center text-3xl group-hover:scale-110 transition-transform">
-                  {categorias.find(c => c.nombre === p.categoria) ? '📁' : '📦'}
+                <div className="w-14 h-14 bg-gray-50 dark:bg-gray-900 rounded-2xl flex items-center justify-center text-3xl group-hover:scale-110 transition-transform overflow-hidden">
+                  {p.imagen_url ? (
+                    <img src={p.imagen_url} alt={p.nombre} className="w-full h-full object-cover" />
+                  ) : (
+                    categorias.find(c => c.nombre === p.categoria) ? '📁' : '📦'
+                  )}
                 </div>
                 <div className="text-right">
                   <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Precio Venta</p>
@@ -506,6 +535,23 @@ export default function ProductosPage() {
                     onChange={e => { e.target.value = e.target.value.replace(/^0+(?=\d)/, ''); setFormData({...formData, stock_minimo: Number(e.target.value)}) }} 
                     className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold text-xl text-red-500" 
                   />
+                </div>
+                
+                <div className="col-span-2">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Imagen del Producto (Opcional)</label>
+                  <input 
+                    type="file" 
+                    accept="image/*"
+                    onChange={e => {
+                      if (e.target.files && e.target.files[0]) {
+                        setImageFile(e.target.files[0]);
+                      }
+                    }}
+                    className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" 
+                  />
+                  {formData.imagen_url && !imageFile && (
+                    <div className="mt-2 text-xs text-blue-500 font-bold">✓ Imagen actual guardada</div>
+                  )}
                 </div>
               </div>
               
