@@ -417,26 +417,27 @@ export default function NuevaVentaPage() {
             {cart.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center p-12 text-gray-400 opacity-40 italic font-bold">Carrito vacío.</div>
             ) : (
+              <div className="overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-gray-50 dark:bg-gray-900/30 text-[10px] font-black text-gray-400 uppercase tracking-widest sticky top-0 z-10">
                   <tr>
-                    <th className="px-8 py-5 text-left">Producto</th>
-                    <th className="px-8 py-5 text-center">Cantidad / Peso</th>
-                    <th className="px-8 py-5 text-right">Subtotal</th>
-                    <th className="px-8 py-5 text-center"></th>
+                    <th className="px-3 lg:px-8 py-5 text-left">Producto</th>
+                    <th className="px-3 lg:px-8 py-5 text-center">Cantidad / Peso</th>
+                    <th className="px-3 lg:px-8 py-5 text-right">Subtotal</th>
+                    <th className="px-3 lg:px-8 py-5 text-center"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
                   {cart.map(item => (
                     <tr key={item.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-800/40 transition-colors">
-                      <td className="px-8 py-6">
+                      <td className="px-3 lg:px-8 py-4 lg:py-6">
                         <p className="font-bold text-gray-900 dark:text-white uppercase text-xs">{item.nombre}</p>
                         <div className="flex items-center gap-3 mt-1">
                           <p className="text-[10px] text-gray-400 font-bold tracking-tight">${(item.precio_venta_publico || 0).toLocaleString()} c/u</p>
                           {!item.isVariable && (
                             <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md ${
-                              (item.stock_actual || 0) < 1 
-                                ? 'text-red-500 bg-red-50 dark:bg-red-900/20' 
+                              (item.stock_actual || 0) < 1
+                                ? 'text-red-500 bg-red-50 dark:bg-red-900/20'
                                 : 'text-gray-400 bg-gray-50 dark:bg-gray-900'
                             }`}>
                               Stock: {item.stock_actual || 0}
@@ -447,29 +448,30 @@ export default function NuevaVentaPage() {
                           )}
                         </div>
                       </td>
-                      <td className="px-8 py-6">
-                        <div className="flex items-center justify-center gap-4">
+                      <td className="px-3 lg:px-8 py-4 lg:py-6">
+                        <div className="flex items-center justify-center gap-2 lg:gap-4">
                           <button onClick={() => updateQuantity(item.id, item.cantidad - 1)} className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center font-black">-</button>
-                          <span className="font-black text-xl min-w-[2ch] text-center">{item.cantidad % 1 === 0 ? item.cantidad : item.cantidad.toFixed(3)}</span>
+                          <span className="font-black text-base lg:text-xl min-w-[2ch] text-center">{item.cantidad % 1 === 0 ? item.cantidad : item.cantidad.toFixed(3)}</span>
                           <button onClick={() => updateQuantity(item.id, item.cantidad + 1)} className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center font-black">+</button>
                         </div>
                       </td>
-                      <td className="px-8 py-6 text-right font-black text-gray-900 dark:text-white text-xl">
+                      <td className="px-3 lg:px-8 py-4 lg:py-6 text-right font-black text-gray-900 dark:text-white text-base lg:text-xl">
                         ${item.subtotal.toLocaleString()}
                       </td>
-                      <td className="px-8 py-6 text-center">
+                      <td className="px-3 lg:px-8 py-4 lg:py-6 text-center">
                         <button onClick={() => removeFromCart(item.id)} className="text-gray-300 hover:text-red-500 text-2xl transition-all">✕</button>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+              </div>
             )}
           </div>
         </div>
       </div>
 
-      <div className="w-full lg:w-96 flex flex-col gap-6 h-fit sticky top-24">
+      <div className="w-full lg:w-96 flex flex-col gap-6 h-fit lg:sticky lg:top-24">
         <div className="bg-white dark:bg-gray-800 p-8 rounded-[2.5rem] shadow-2xl border border-gray-100 dark:border-gray-700 space-y-8">
           <h2 className="font-black text-gray-900 dark:text-white uppercase tracking-widest text-xs">Finalizar Venta</h2>
           
@@ -547,7 +549,7 @@ export default function NuevaVentaPage() {
 
               <div className="pt-3 border-t border-gray-200 dark:border-gray-700">
                 <p className="text-blue-600 font-black uppercase text-[10px] tracking-widest mb-1 text-center">Total a Cobrar</p>
-                <p className="font-black text-5xl text-gray-900 dark:text-white tracking-tighter text-center">
+                <p className="font-black text-3xl lg:text-5xl text-gray-900 dark:text-white tracking-tighter text-center">
                   ${totalFinal.toLocaleString()}
                 </p>
               </div>
