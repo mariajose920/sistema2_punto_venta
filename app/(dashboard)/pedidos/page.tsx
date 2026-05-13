@@ -326,11 +326,11 @@ export default function PedidosPage() {
               </div>
               
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">Método de Pago</label>
+                <label className="block text-sm font-semibold text-gray-800 mb-2">Método de Pago</label>
                 <select 
                   value={paymentMethod}
                   onChange={(e) => setPaymentMethod(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 outline-none"
+                  className="w-full px-4 py-3 rounded-xl border border-gray-300 bg-white text-gray-900 font-medium focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all cursor-pointer"
                 >
                   <option value="efectivo">Efectivo</option>
                   <option value="tarjeta">Tarjeta</option>
@@ -341,16 +341,16 @@ export default function PedidosPage() {
 
               {paymentMethod === 'fiado' && (
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2">Seleccionar Cliente para Fiado</label>
+                  <label className="block text-sm font-semibold text-gray-800 mb-2">Seleccionar Cliente para Fiado</label>
                   <select 
                     value={selectedClientId}
                     onChange={(e) => setSelectedClientId(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 outline-none"
+                    className="w-full px-4 py-3 rounded-xl border border-gray-300 bg-white text-gray-900 font-medium focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all cursor-pointer"
                     required
                   >
-                    <option value="">-- Selecciona un cliente --</option>
+                    <option value="" className="text-gray-400">-- Selecciona un cliente --</option>
                     {clientes.map(c => (
-                      <option key={c.id} value={c.id}>{c.nombre} ({c.rut})</option>
+                      <option key={c.id} value={c.id} className="text-gray-900">{c.nombre} ({c.rut})</option>
                     ))}
                   </select>
                   <p className="text-xs text-gray-500 mt-2">Si el cliente no existe, debes crearlo primero en el módulo de clientes.</p>
