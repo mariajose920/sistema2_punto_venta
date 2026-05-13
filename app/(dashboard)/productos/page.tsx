@@ -35,7 +35,6 @@ export default function ProductosPage() {
     nombre: '',
     categoria: '',
     precio_compra: 0,
-    precio_compra: 0,
     precio_venta_publico: 0,
     stock_actual: 0,
     stock_minimo: 5,

@@ -154,7 +154,8 @@ export default function NuevaVentaPage() {
       stock_minimo: 0,
       precio_compra: 0,
       precio_venta_promocion: null,
-      id_proveedor: null
+      id_proveedor: null,
+      fuente_datos: 'manual'
     };
 
     updateCartWithPromos([...cart, newItem]);
