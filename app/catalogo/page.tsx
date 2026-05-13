@@ -89,51 +89,116 @@ export default function CatalogoPublico() {
 
   const totalCart = cart.reduce((sum, item) => sum + (item.producto.precio_venta_publico * item.cantidad), 0);
 
+  // ── Utilidades de RUT (idénticas a clientes/page.tsx) ──────────────────────
+  const cleanRUT = (rut: string) => (rut || '').replace(/[^0-9kK]/g, '').toUpperCase();
+
+  const validateRUT = (rut: string) => {
+    const clean = cleanRUT(rut);
+    if (clean.length < 2) return false;
+    const body = clean.slice(0, -1);
+    const dv = clean.slice(-1);
+    let sum = 0;
+    let mul = 2;
+    for (let i = body.length - 1; i >= 0; i--) {
+      sum += parseInt(body.charAt(i)) * mul;
+      mul = mul === 7 ? 2 : mul + 1;
+    }
+    const res = 11 - (sum % 11);
+    const calculatedDV = res === 11 ? '0' : res === 10 ? 'K' : res.toString();
+    return calculatedDV === dv;
+  };
+
+  const formatRUTVisual = (rut: string) => {
+    const clean = cleanRUT(rut);
+    if (clean.length < 2) return clean;
+    const body = clean.slice(0, -1);
+    const dv = clean.slice(-1);
+    let formatted = '';
+    for (let i = body.length - 1, j = 1; i >= 0; i--, j++) {
+      formatted = body.charAt(i) + formatted;
+      if (j % 3 === 0 && i !== 0) formatted = '.' + formatted;
+    }
+    return `${formatted}-${dv}`;
+  };
+  // ────────────────────────────────────────────────────────────────────────────
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (cart.length === 0) return;
-    
+
+    // Normalizar datos antes de persistir
+    const nombreFinal = nombre.trim().toUpperCase();
+    const rutFinal    = formatRUTVisual(rut);
+
+    if (!nombreFinal) {
+      alert('El nombre es obligatorio.');
+      return;
+    }
+    if (!validateRUT(rut)) {
+      alert(`El RUT "${rutFinal}" no es válido. Verifica el dígito verificador.`);
+      return;
+    }
+
     setSubmitting(true);
-    
+
     try {
-      // 1. Insert Pedido
+      // 1. Insertar Pedido
       const { data: pedidoData, error: pedidoError } = await (supabase as any)
         .from('Pedido')
         .insert({
-          nombre_cliente: nombre,
-          rut_cliente: rut,
-          telefono_cliente: telefono,
+          nombre_cliente:   nombreFinal,
+          rut_cliente:      rutFinal,
+          telefono_cliente: telefono.trim(),
           estado: 'pendiente'
         })
         .select()
         .single();
-        
-      if (pedidoError) throw pedidoError;
-      
-      // 2. Insert DetallePedido
+
+      if (pedidoError) {
+        console.error('[Pedido INSERT] Error detallado:', {
+          message: pedidoError.message,
+          details: pedidoError.details,
+          hint:    pedidoError.hint,
+          code:    pedidoError.code,
+          raw:     pedidoError,
+        });
+        throw new Error(`Error al guardar el pedido: ${pedidoError.message}${pedidoError.hint ? ` — ${pedidoError.hint}` : ''}`);
+      }
+
+      // 2. Insertar DetallePedido
       const detalles = cart.map(item => ({
-        pedido_id: pedidoData.id,
-        producto_id: item.producto.id,
-        cantidad: item.cantidad,
+        pedido_id:      pedidoData.id,
+        producto_id:    item.producto.id,
+        cantidad:       item.cantidad,
         precio_unitario: item.producto.precio_venta_publico,
-        subtotal: item.producto.precio_venta_publico * item.cantidad
+        subtotal:       item.producto.precio_venta_publico * item.cantidad,
       }));
-      
+
       const { error: detalleError } = await (supabase as any)
         .from('DetallePedido')
         .insert(detalles);
-        
-      if (detalleError) throw detalleError;
-      
+
+      if (detalleError) {
+        console.error('[DetallePedido INSERT] Error detallado:', {
+          message: detalleError.message,
+          details: detalleError.details,
+          hint:    detalleError.hint,
+          code:    detalleError.code,
+          raw:     detalleError,
+        });
+        throw new Error(`Error al guardar el detalle del pedido: ${detalleError.message}${detalleError.hint ? ` — ${detalleError.hint}` : ''}`);
+      }
+
       setSuccess(true);
       setCart([]);
       setNombre('');
       setRut('');
       setTelefono('');
-      
-    } catch (error) {
-      console.error('Error al enviar el pedido:', error);
-      alert('Hubo un error al enviar tu pedido. Por favor intenta de nuevo.');
+
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : JSON.stringify(err);
+      console.error('[handleSubmit] Fallo completo:', err);
+      alert(`Hubo un error al enviar tu pedido:\n\n${message}`);
     } finally {
       setSubmitting(false);
     }
@@ -294,8 +359,8 @@ export default function CatalogoPublico() {
                   placeholder="Tu Nombre Completo"
                   required
                   value={nombre}
-                  onChange={e => setNombre(e.target.value)}
-                  className="w-full px-4 py-3.5 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all text-base"
+                  onChange={e => setNombre(e.target.value.toUpperCase())}
+                  className="w-full px-4 py-3.5 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all text-base uppercase"
                 />
                 <input
                   type="text"
@@ -303,6 +368,7 @@ export default function CatalogoPublico() {
                   required
                   value={rut}
                   onChange={e => setRut(e.target.value)}
+                  onBlur={e => setRut(formatRUTVisual(e.target.value))}
                   className="w-full px-4 py-3.5 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all text-base"
                 />
                 <input
