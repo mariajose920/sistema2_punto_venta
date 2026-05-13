@@ -35,10 +35,14 @@ export default function ProductosPage() {
     nombre: '',
     categoria: '',
     precio_compra: 0,
+    precio_compra: 0,
     precio_venta_publico: 0,
     stock_actual: 0,
-    stock_minimo: 5
+    stock_minimo: 5,
+    fuente_datos: 'manual'
   });
+
+  const [isSearchingBarcode, setIsSearchingBarcode] = useState(false);
 
   // 1. Cargar datos desde Supabase
   const fetchData = useCallback(async () => {
@@ -131,9 +135,55 @@ export default function ProductosPage() {
       precio_compra: 0,
       precio_venta_publico: 0,
       stock_actual: 0,
-      stock_minimo: 5
+      stock_minimo: 5,
+      fuente_datos: 'manual'
     });
   }, []);
+
+  // Búsqueda Híbrida de Código de Barras
+  const handleBarcodeSearch = async (barcode: string) => {
+    const code = barcode.trim();
+    if (!code) return;
+
+    // 1. Buscar en base interna
+    const localMatch = productos.find(p => p.codigo_barra === code);
+    if (localMatch) {
+      alert('Este código ya está registrado localmente. Editando producto existente.');
+      openEdit(localMatch);
+      return;
+    }
+
+    // 2. Determinar si es código estándar (GTIN de 8, 12, 13 o 14 dígitos)
+    const isStandardBarcode = /^\d{8}$|^\d{12,14}$/.test(code);
+    
+    if (isStandardBarcode) {
+      try {
+        setIsSearchingBarcode(true);
+        // Consultar Open Food Facts
+        const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${code}.json`);
+        const data = await res.json();
+        
+        if (data.status === 1 && data.product && data.product.product_name) {
+          setFormData(prev => ({
+            ...prev,
+            nombre: data.product.product_name,
+            fuente_datos: 'api' // Autocompletado desde API externa
+          }));
+          return;
+        }
+      } catch (err) {
+        console.error('Error buscando en API externa:', err);
+      } finally {
+        setIsSearchingBarcode(false);
+      }
+    }
+
+    // 3. No encontrado en API o no es estándar -> Preparar para ingreso manual
+    setFormData(prev => ({
+      ...prev,
+      fuente_datos: isStandardBarcode ? 'manual' : 'interno' // Interno si no tiene formato estándar
+    }));
+  };
 
   // 3. Acciones de CRUD
   const handleSave = async (e: React.FormEvent) => {
@@ -164,6 +214,18 @@ export default function ProductosPage() {
       if (nombreExistente) {
         throw new Error(`Ya existe un producto con el nombre: "${nombreNorm}"`);
       }
+
+      // Validación de Código de Barras Único
+      if (codigoStr && !editingId) {
+        const { data: codigoExistente } = await (supabase.from('Producto') as any)
+          .select('id')
+          .eq('codigo_barra', codigoStr)
+          .maybeSingle();
+
+        if (codigoExistente) {
+          throw new Error(`Ya existe un producto con el código de barras: "${codigoStr}"`);
+        }
+      }
       
       const finalData = {
         nombre: nombreNorm,
@@ -172,7 +234,8 @@ export default function ProductosPage() {
         precio_compra: Number(formData.precio_compra) || 0,
         precio_venta_publico: Number(formData.precio_venta_publico) || 0,
         stock_actual: Number(formData.stock_actual) || 0,
-        stock_minimo: Number(formData.stock_minimo) || 0
+        stock_minimo: Number(formData.stock_minimo) || 0,
+        fuente_datos: formData.fuente_datos || 'manual'
       };
 
       if (editingId) {
@@ -338,12 +401,32 @@ export default function ProductosPage() {
               <div className="grid grid-cols-2 gap-6">
                 <div className="col-span-2 sm:col-span-1">
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Código de Barras</label>
-                  <input 
-                    placeholder="Escanear o digitar..."
-                    value={formData.codigo_barra || ''} 
-                    onChange={e => setFormData({...formData, codigo_barra: e.target.value})} 
-                    className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold text-lg" 
-                  />
+                  <div className="flex gap-2">
+                    <input 
+                      placeholder="Escanear o digitar..."
+                      value={formData.codigo_barra || ''} 
+                      onChange={e => setFormData({...formData, codigo_barra: e.target.value})}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleBarcodeSearch(formData.codigo_barra || '');
+                        }
+                      }}
+                      className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold text-lg" 
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleBarcodeSearch(formData.codigo_barra || '')}
+                      disabled={!formData.codigo_barra || isSearchingBarcode}
+                      className="px-4 bg-blue-50 dark:bg-blue-900/20 text-blue-600 rounded-2xl font-black text-xs hover:bg-blue-100 disabled:opacity-50 transition-colors"
+                      title="Buscar en base local y externa"
+                    >
+                      {isSearchingBarcode ? '...' : '🔍'}
+                    </button>
+                  </div>
+                  {formData.fuente_datos === 'api' && (
+                    <p className="text-[9px] text-emerald-500 font-bold mt-1 px-1">✓ Datos obtenidos de Open Food Facts</p>
+                  )}
                 </div>
                 
                 <div className="col-span-2 sm:col-span-1">

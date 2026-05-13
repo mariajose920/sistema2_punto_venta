@@ -53,6 +53,7 @@ export interface Database {
           stock_actual: number
           stock_minimo: number
           id_proveedor: string | null
+          fuente_datos: 'manual' | 'api' | 'interno'
           created_at: string
         }
         Insert: {
@@ -66,6 +67,7 @@ export interface Database {
           stock_actual: number
           stock_minimo?: number
           id_proveedor?: string | null
+          fuente_datos?: 'manual' | 'api' | 'interno'
           created_at?: string
         }
         Update: {
@@ -79,6 +81,7 @@ export interface Database {
           stock_actual?: number
           stock_minimo?: number
           id_proveedor?: string | null
+          fuente_datos?: 'manual' | 'api' | 'interno'
           created_at?: string
         }
       }
