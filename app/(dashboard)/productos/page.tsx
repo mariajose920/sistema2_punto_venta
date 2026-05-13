@@ -400,7 +400,7 @@ export default function ProductosPage() {
                     <input 
                       placeholder="Escanear o digitar..."
                       value={formData.codigo_barra || ''} 
-                      onChange={e => setFormData({...formData, codigo_barra: e.target.value.replace(/\D/g, '').slice(0, 13)})}
+                      onChange={e => setFormData({...formData, codigo_barra: e.target.value.replace(/\D/g, '').slice(0, 15)})}
                       onKeyDown={e => {
                         if (e.key === 'Enter') {
                           e.preventDefault();
