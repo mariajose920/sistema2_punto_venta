@@ -312,26 +312,26 @@ export default function ProductosPage() {
       console.log('=== PAYLOAD FINAL ===');
       console.log(JSON.stringify(finalData, null, 2));
 
+      // Verificar sesión antes de operar
+      const { data: { session } } = await supabase.auth.getSession();
+      console.log('=== SESIÓN ACTUAL ===', session ? `Usuario: ${session.user.email}` : 'SIN SESIÓN');
+
       let operationError = null;
       let returnedData = null;
 
       if (editingId) {
         console.log(`=== ACTUALIZANDO PRODUCTO ID: ${editingId} ===`);
-        const { data, error } = await (supabase.from('Producto') as any)
+        const { error } = await (supabase.from('Producto') as any)
           .update(finalData)
-          .eq('id', editingId)
-          .select();
+          .eq('id', editingId);
         
         operationError = error;
-        returnedData = data;
       } else {
         console.log('=== CREANDO NUEVO PRODUCTO ===');
-        const { data, error } = await (supabase.from('Producto') as any)
-          .insert([finalData])
-          .select();
+        const { error } = await (supabase.from('Producto') as any)
+          .insert([finalData]);
         
         operationError = error;
-        returnedData = data;
       }
 
       console.log('=== RESULTADO DE LA BASE DE DATOS ===');
@@ -340,16 +340,7 @@ export default function ProductosPage() {
       if (operationError) {
         console.error('=== ERROR DEL INSERT/UPDATE ===');
         console.error('Objeto Error Completo:', operationError);
-        console.error('error.message:', operationError.message);
-        console.error('error.code:', operationError.code);
-        console.error('error.details:', operationError.details);
-        console.error('error.hint:', operationError.hint);
         throw new Error(`Error BD: ${operationError.message} (Código: ${operationError.code})`);
-      }
-
-      if (!returnedData || returnedData.length === 0) {
-        console.error('=== ERROR: RLS BLOQUEÓ LA OPERACIÓN ===');
-        throw new Error('La base de datos no devolvió ninguna fila. Esto indica que una política RLS (Row Level Security) está bloqueando el INSERT o el SELECT. Verifica las políticas de la tabla "Producto".');
       }
       
       console.log('[handleSave] ¡Proceso terminado sin excepciones!');
