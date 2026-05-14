@@ -199,9 +199,15 @@ export default function ProductosPage() {
     try {
       setLoading(true);
       
+      const rawBarcode = formData.codigo_barra;
+      console.log('=== DEBUG BARCODE ===');
+      console.log('Original:', rawBarcode);
+      console.log('Tipo:', typeof rawBarcode);
+      console.log('Imagen URL:', formData.imagen_url);
+
       const nombreNorm = normalizeText(formData.nombre || '');
       const categoriaNorm = normalizeText(formData.categoria || '');
-      const codigoStr = String(formData.codigo_barra || '').trim();
+      const codigoStr = String(rawBarcode || '').trim();
 
       if (!nombreNorm || !categoriaNorm) {
         throw new Error("El nombre y la categoría son obligatorios.");
@@ -512,7 +518,7 @@ export default function ProductosPage() {
                     <input 
                       placeholder="Escanear o digitar..."
                       value={formData.codigo_barra || ''} 
-                      onChange={e => setFormData({...formData, codigo_barra: e.target.value.replace(/\D/g, '').slice(0, 15)})}
+                      onChange={e => setFormData({...formData, codigo_barra: e.target.value.replace(/\D/g, '').slice(0, 13)})}
                       onKeyDown={e => {
                         if (e.key === 'Enter') {
                           e.preventDefault();
