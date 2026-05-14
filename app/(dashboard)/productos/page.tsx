@@ -659,7 +659,7 @@ export default function ProductosPage() {
               
               <div className="pt-8 flex gap-4">
                 <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 py-5 font-black text-gray-400 uppercase tracking-widest">Cancelar</button>
-                <button type="submit" className="flex-[2] py-5 bg-gray-900 text-white font-black rounded-3xl shadow-2xl hover:scale-105 active:scale-95 transition-all uppercase tracking-[0.2em] text-xs">
+                <button type="submit" className="flex-[2] py-5 bg-gray-900 text-white font-black rounded-3xl shadow-2xl hover:scale-105 active:scale-95 active:bg-blue-600 transition-all uppercase tracking-[0.2em] text-xs">
                   {editingId ? 'Actualizar Ficha' : 'Registrar Producto'}
                 </button>
               </div>
