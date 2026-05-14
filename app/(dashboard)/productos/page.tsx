@@ -254,7 +254,12 @@ export default function ProductosPage() {
 
       // Lógica de Imagen: Prioridad Archivo > URL Manual
       if (imageFile) {
-        console.log('[handleSave] Subiendo archivo al bucket "productos":', imageFile.name);
+        // Validación de tamaño (2MB)
+        if (imageFile.size > 2 * 1024 * 1024) {
+          throw new Error("La imagen es demasiado pesada (máximo 2MB). Por favor, usa una imagen más pequeña o un enlace URL.");
+        }
+
+        console.log('[handleSave] Subiendo archivo...', imageFile.name);
         const fileExt = imageFile.name.split('.').pop();
         const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
         const filePath = fileName; 
@@ -267,8 +272,8 @@ export default function ProductosPage() {
           });
 
         if (uploadError) {
-          console.error('[handleSave] ERROR EN STORAGE (UPLOAD):', uploadError);
-          throw new Error(`No se pudo subir la imagen al servidor de archivos: ${uploadError.message}. Verifica que el bucket "productos" exista y tenga permisos.`);
+          console.error('[handleSave] Error Storage:', uploadError);
+          throw new Error(`Error al subir imagen: ${uploadError.message}`);
         }
         
         console.log('[handleSave] Archivo subido. Obteniendo URL pública...');
@@ -334,16 +339,14 @@ export default function ProductosPage() {
         operationError = error;
       }
 
-      console.log('=== RESULTADO DE LA BASE DE DATOS ===');
-      console.log('Data retornada:', returnedData);
-      
       if (operationError) {
-        console.error('=== ERROR DEL INSERT/UPDATE ===');
-        console.error('Objeto Error Completo:', operationError);
-        throw new Error(`Error BD: ${operationError.message} (Código: ${operationError.code})`);
+        console.error('=== FALLO CRÍTICO BD ===', operationError);
+        alert(`❌ ERROR DE BASE DE DATOS:\n${operationError.message}\nCódigo: ${operationError.code}`);
+        throw operationError;
       }
       
-      console.log('[handleSave] ¡Proceso terminado sin excepciones!');
+      console.log('[handleSave] Éxito total');
+      alert('✅ Producto guardado correctamente.');
       setIsModalOpen(false);
       resetForm();
       fetchData();
