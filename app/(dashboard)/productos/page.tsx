@@ -303,69 +303,59 @@ export default function ProductosPage() {
         imagen_url: finalImageUrl
       };
 
-      console.log('[handleSave] Datos finales para persistir:', finalData);
+      console.log('=== PAYLOAD FINAL ===');
+      console.log(JSON.stringify(finalData, null, 2));
 
       let operationError = null;
       let returnedData = null;
 
       if (editingId) {
-        console.log('[handleSave] Actualizando producto existente ID:', editingId);
-        const { data: updateData, error: updateError } = await (supabase.from('Producto') as any)
+        console.log(`=== ACTUALIZANDO PRODUCTO ID: ${editingId} ===`);
+        const { data, error } = await (supabase.from('Producto') as any)
           .update(finalData)
           .eq('id', editingId)
-          .select()
-          .maybeSingle();
+          .select();
         
-        operationError = updateError;
-        returnedData = updateData;
-
-        // Fallback si la columna no existe (PGRST204)
-        if (updateError && updateError.code === 'PGRST204') {
-          console.warn('[handleSave] Columnas nuevas no existen en la BD, intentando fallback update...');
-          const { fuente_datos, imagen_url, ...basicData } = finalData;
-          const retry = await (supabase.from('Producto') as any).update(basicData).eq('id', editingId).select().maybeSingle();
-          operationError = retry.error;
-          returnedData = retry.data;
-          if (!retry.error) alert('✅ Producto guardado (Modo compatibilidad). Ejecuta los scripts SQL para habilitar imágenes.');
-        }
+        operationError = error;
+        returnedData = data;
       } else {
-        console.log('[handleSave] Creando nuevo producto...');
-        const { data: insertData, error: insertError } = await (supabase.from('Producto') as any)
+        console.log('=== CREANDO NUEVO PRODUCTO ===');
+        const { data, error } = await (supabase.from('Producto') as any)
           .insert([finalData])
-          .select()
-          .maybeSingle();
+          .select();
         
-        operationError = insertError;
-        returnedData = insertData;
-
-        // Fallback si la columna no existe (PGRST204)
-        if (insertError && insertError.code === 'PGRST204') {
-          console.warn('[handleSave] Columnas nuevas no existen en la BD, intentando fallback insert...');
-          const { fuente_datos, imagen_url, ...basicData } = finalData;
-          const retry = await (supabase.from('Producto') as any).insert([basicData]).select().maybeSingle();
-          operationError = retry.error;
-          returnedData = retry.data;
-          if (!retry.error) alert('✅ Producto guardado (Modo compatibilidad). Ejecuta los scripts SQL para habilitar imágenes.');
-        }
+        operationError = error;
+        returnedData = data;
       }
 
+      console.log('=== RESULTADO DE LA BASE DE DATOS ===');
+      console.log('Data retornada:', returnedData);
+      
       if (operationError) {
-        console.error('[handleSave] ERROR EN OPERACIÓN BD:', operationError);
-        throw new Error(`Error en la base de datos: ${operationError.message}`);
+        console.error('=== ERROR DEL INSERT/UPDATE ===');
+        console.error('Objeto Error Completo:', operationError);
+        console.error('error.message:', operationError.message);
+        console.error('error.code:', operationError.code);
+        console.error('error.details:', operationError.details);
+        console.error('error.hint:', operationError.hint);
+        throw new Error(`Error BD: ${operationError.message} (Código: ${operationError.code})`);
       }
 
-      if (!returnedData) {
-        throw new Error('La base de datos procesó la solicitud pero no devolvió el producto. Esto suele ocurrir si una política de seguridad (RLS) está bloqueando el guardado o si la sesión expiró.');
+      if (!returnedData || returnedData.length === 0) {
+        console.warn('=== ADVERTENCIA: RLS BLOQUEÓ EL SELECT ===');
+        console.warn('La consulta no devolvió datos. Esto indica que el insert pudo haber fallado silenciosamente por una política RLS de INSERT, o bien la fila se insertó pero la política RLS de SELECT impide verla.');
+        // No bloquearemos el flujo aquí, dejaremos que fetchData recargue.
+        // Si el producto no aparece en la tabla, el problema es una política RLS de INSERT.
       }
       
-      console.log('[handleSave] ¡Guardado exitoso!');
+      console.log('[handleSave] ¡Proceso terminado sin excepciones!');
       setIsModalOpen(false);
       resetForm();
       fetchData();
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Error inesperado';
-      console.error('[handleSave] FALLO EN EL PROCESO:', err);
-      alert('⚠️ No se pudo guardar el producto:\n\n' + message);
+      const errorObj = err as any;
+      console.error('=== FALLO EN EL CATCH ===', errorObj);
+      alert('⚠️ No se pudo guardar el producto:\n\n' + (errorObj.message || 'Error desconocido'));
     } finally {
       setLoading(false);
     }
