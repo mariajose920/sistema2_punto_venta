@@ -342,10 +342,8 @@ export default function ProductosPage() {
       }
 
       if (!returnedData || returnedData.length === 0) {
-        console.warn('=== ADVERTENCIA: RLS BLOQUEÓ EL SELECT ===');
-        console.warn('La consulta no devolvió datos. Esto indica que el insert pudo haber fallado silenciosamente por una política RLS de INSERT, o bien la fila se insertó pero la política RLS de SELECT impide verla.');
-        // No bloquearemos el flujo aquí, dejaremos que fetchData recargue.
-        // Si el producto no aparece en la tabla, el problema es una política RLS de INSERT.
+        console.error('=== ERROR: RLS BLOQUEÓ LA OPERACIÓN ===');
+        throw new Error('La base de datos no devolvió ninguna fila. Esto indica que una política RLS (Row Level Security) está bloqueando el INSERT o el SELECT. Verifica las políticas de la tabla "Producto".');
       }
       
       console.log('[handleSave] ¡Proceso terminado sin excepciones!');
