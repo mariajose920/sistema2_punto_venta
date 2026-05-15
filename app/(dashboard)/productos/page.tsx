@@ -128,13 +128,44 @@ export default function ProductosPage() {
   };
 
   const handleDeleteCategory = async (id: string) => {
-    if (!window.confirm('¿Seguro que quieres eliminar esta categoría? Solo podrás hacerlo si no tiene productos asociados.')) return;
+    const cat = categorias.find(c => c.id === id);
+    if (!cat) return;
+
+    // Buscar productos asociados localmente para el mensaje
+    const prodsAsociados = productos.filter(p => p.categoria === cat.nombre);
+    
+    let confirmMsg = `¿Seguro que quieres eliminar la categoría "${cat.nombre.toUpperCase()}"?`;
+    
+    if (prodsAsociados.length > 0) {
+      confirmMsg = `⚠️ ADVERTENCIA CRÍTICA ⚠️\n\n` +
+                   `La categoría "${cat.nombre.toUpperCase()}" contiene ${prodsAsociados.length} productos:\n` +
+                   prodsAsociados.map(p => `• ${p.nombre.toUpperCase()}`).join('\n') +
+                   `\n\n¿DESEAS ELIMINAR LA CATEGORÍA Y TODOS ESTOS PRODUCTOS DE FORMA PERMANENTE?\n\nEsta acción no se puede deshacer.`;
+    }
+
+    if (!window.confirm(confirmMsg)) return;
+
     try {
-      const { error } = await (supabase.from('Categoria') as any).delete().eq('id', id);
-      if (error) throw error;
-      fetchData();
+      setIsSaving(true); // Reutilizamos el estado de carga para feedback visual
+
+      // 1. Eliminar productos primero (para evitar errores de FK si existieran o simplemente limpiar)
+      if (prodsAsociados.length > 0) {
+        const { error: pErr } = await (supabase.from('Producto') as any)
+          .delete()
+          .eq('categoria', cat.nombre);
+        if (pErr) throw pErr;
+      }
+
+      // 2. Eliminar la categoría
+      const { error: cErr } = await (supabase.from('Categoria') as any).delete().eq('id', id);
+      if (cErr) throw cErr;
+
+      await fetchData();
+      alert('Categoría y productos asociados eliminados con éxito.');
     } catch (err: any) {
-      alert('Error al eliminar: ' + err.message + '. Asegúrate de que no tenga productos.');
+      alert('Error en el proceso de eliminación: ' + err.message);
+    } finally {
+      setIsSaving(false);
     }
   };
 
