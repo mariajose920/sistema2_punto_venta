@@ -44,6 +44,9 @@ export default function ProductosPage() {
   });
 
   const [isSearchingBarcode, setIsSearchingBarcode] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveProgress, setSaveProgress] = useState(0);
+  const lastOpId = useRef(0);
 
   // 1. Cargar datos desde Supabase
   const fetchData = useCallback(async () => {
@@ -188,174 +191,121 @@ export default function ProductosPage() {
   // 3. Acciones de CRUD
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('[handleSave] Iniciando proceso de guardado...');
+    const currentId = ++lastOpId.current;
+    const startTime = performance.now();
+    const timeoutLimit = 30000; // 30 segundos
 
     if (role !== 'admin' && role !== 'cajera') {
-      console.warn('[handleSave] Intento de guardado sin permisos suficientes.');
       alert('No tienes permisos para realizar cambios en el catálogo.');
       return;
     }
 
     try {
-      setLoading(true);
+      setIsSaving(true);
+      setSaveProgress(10);
       
-      const rawBarcode = formData.codigo_barra;
-      console.log('=== DEBUG BARCODE ===');
-      console.log('Original:', rawBarcode);
-      console.log('Tipo:', typeof rawBarcode);
-      console.log('Imagen URL:', formData.imagen_url);
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => {
+          const err = new Error('TIMEOUT');
+          err.name = 'TimeoutError';
+          reject(err);
+        }, timeoutLimit);
+      });
 
-      const nombreNorm = normalizeText(formData.nombre || '');
-      const categoriaNorm = normalizeText(formData.categoria || '');
-      const codigoStr = String(rawBarcode || '').trim();
+      const processPromise = (async () => {
+        const rawBarcode = formData.codigo_barra;
+        const nombreNorm = normalizeText(formData.nombre || '');
+        const categoriaNorm = normalizeText(formData.categoria || '');
+        const codigoStr = String(rawBarcode || '').trim();
 
-      if (!nombreNorm || !categoriaNorm) {
-        throw new Error("El nombre y la categoría son obligatorios.");
-      }
-
-      console.log('[handleSave] Validando unicidad de nombre:', nombreNorm);
-      const { data: nombreExistente, error: errorNombre } = await (supabase.from('Producto') as any)
-        .select('id')
-        .eq('nombre', nombreNorm)
-        .neq('id', editingId || '00000000-0000-0000-0000-000000000000')
-        .maybeSingle();
-
-      if (errorNombre) {
-        console.error('[handleSave] Error verificando nombre:', errorNombre);
-        if (errorNombre.code === 'PGRST116') {
-          throw new Error(`Ya existen múltiples productos con el nombre: "${nombreNorm}". Por favor, usa un nombre distinto.`);
+        if (!nombreNorm || !categoriaNorm) {
+          throw new Error("El nombre y la categoría son obligatorios.");
         }
-        throw new Error(`Error de base de datos al validar nombre: ${errorNombre.message}`);
-      }
-      if (nombreExistente) {
-        throw new Error(`Ya existe un producto con el nombre: "${nombreNorm}"`);
-      }
 
-      if (codigoStr && !editingId) {
-        console.log('[handleSave] Validando unicidad de código de barras:', codigoStr);
-        const { data: codigoExistente, error: errorCodigo } = await (supabase.from('Producto') as any)
+        // Etapa 1: Validaciones (20%)
+        setSaveProgress(20);
+        const { data: nombreExistente } = await (supabase.from('Producto') as any)
           .select('id')
-          .eq('codigo_barra', codigoStr)
+          .eq('nombre', nombreNorm)
+          .neq('id', editingId || '00000000-0000-0000-0000-000000000000')
           .maybeSingle();
 
-        if (errorCodigo) {
-          console.error('[handleSave] Error verificando código:', errorCodigo);
-          if (errorCodigo.code === 'PGRST116') {
-             throw new Error(`Ya existen múltiples productos con el código de barras: "${codigoStr}"`);
+        if (nombreExistente) throw new Error(`Ya existe un producto con el nombre: "${nombreNorm}"`);
+
+        let finalImageUrl = formData.imagen_url || null;
+
+        // Etapa 2: Imagen/Storage (50%)
+        if (imageFile) {
+          setSaveProgress(40);
+          if (imageFile.size > 2 * 1024 * 1024) {
+            throw new Error("La imagen es demasiado pesada (máximo 2MB).");
           }
-          throw new Error(`Error de base de datos al validar código: ${errorCodigo.message}`);
+          const fileExt = imageFile.name.split('.').pop();
+          const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+          const { error: uploadError } = await supabase.storage
+            .from('productos')
+            .upload(fileName, imageFile);
+
+          if (uploadError) throw new Error(`Error al subir imagen: ${uploadError.message}`);
+          
+          const { data: publicData } = supabase.storage.from('productos').getPublicUrl(fileName);
+          finalImageUrl = publicData?.publicUrl || null;
+          setSaveProgress(60);
         }
-        if (codigoExistente) {
-          throw new Error(`Ya existe un producto con el código de barras: "${codigoStr}"`);
+
+        const finalData = {
+          nombre: nombreNorm,
+          categoria: categoriaNorm,
+          codigo_barra: codigoStr || null,
+          precio_compra: Number(formData.precio_compra) || 0,
+          precio_venta_publico: Number(formData.precio_venta_publico) || 0,
+          stock_actual: Number(formData.stock_actual) || 0,
+          stock_minimo: Number(formData.stock_minimo) || 0,
+          fuente_datos: formData.fuente_datos || 'manual',
+          imagen_url: finalImageUrl
+        };
+
+        // Etapa 3: Base de Datos (80%)
+        setSaveProgress(80);
+        let error = null;
+        if (editingId) {
+          const res = await (supabase.from('Producto') as any).update(finalData).eq('id', editingId);
+          error = res.error;
+        } else {
+          const res = await (supabase.from('Producto') as any).insert([finalData]);
+          error = res.error;
+        }
+
+        if (error) throw error;
+
+        // Etapa 4: Sincronización (100%)
+        setSaveProgress(95);
+        await fetchData(); // Esperar actualización real antes de cerrar
+        setSaveProgress(100);
+
+        // Solo actualizar UI si este intento sigue siendo el vigente
+        if (currentId === lastOpId.current) {
+          console.log(`[PERF] Éxito total en ${((performance.now() - startTime)/1000).toFixed(2)}s`);
+          setIsModalOpen(false);
+          resetForm();
+        }
+      })();
+
+      await Promise.race([processPromise, timeoutPromise]);
+
+    } catch (err: any) {
+      if (currentId === lastOpId.current) {
+        if (err.name === 'TimeoutError') {
+          alert(`El proceso tardó demasiado en responder (30s). Inténtalo de nuevo.`);
+        } else {
+          alert('⚠️ No se pudo guardar el producto:\n\n' + (err.message || 'Error desconocido'));
         }
       }
-      
-      let finalImageUrl = formData.imagen_url || null;
-
-      // Lógica de Imagen: Prioridad Archivo > URL Manual
-      if (imageFile) {
-        // Validación de tamaño (2MB)
-        if (imageFile.size > 2 * 1024 * 1024) {
-          throw new Error("La imagen es demasiado pesada (máximo 2MB). Por favor, usa una imagen más pequeña o un enlace URL.");
-        }
-
-        console.log('[handleSave] Subiendo archivo...', imageFile.name);
-        const fileExt = imageFile.name.split('.').pop();
-        const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
-        const filePath = fileName; 
-
-        const { error: uploadError } = await supabase.storage
-          .from('productos')
-          .upload(filePath, imageFile, {
-            cacheControl: '3600',
-            upsert: false
-          });
-
-        if (uploadError) {
-          console.error('[handleSave] Error Storage:', uploadError);
-          throw new Error(`Error al subir imagen: ${uploadError.message}`);
-        }
-        
-        console.log('[handleSave] Archivo subido. Obteniendo URL pública...');
-        const { data: publicData } = supabase.storage.from('productos').getPublicUrl(filePath);
-        
-        if (!publicData?.publicUrl) {
-           console.error('[handleSave] Error: No se pudo obtener la URL pública del archivo.');
-           throw new Error("El archivo se subió pero no pudimos obtener su dirección pública.");
-        }
-        
-        finalImageUrl = publicData.publicUrl;
-        console.log('[handleSave] URL de imagen establecida (Storage):', finalImageUrl);
-      } else if (finalImageUrl && finalImageUrl.trim() !== '') {
-        console.log('[handleSave] Validando URL de imagen externa:', finalImageUrl);
-        try {
-          if (!finalImageUrl.startsWith('http')) {
-            throw new Error("La URL debe comenzar con http:// o https://");
-          }
-          new URL(finalImageUrl);
-        } catch (e: any) {
-          console.warn('[handleSave] URL inválida:', finalImageUrl);
-          throw new Error(`La URL de la imagen ingresada no es válida: ${e.message}`);
-        }
-      } else {
-        console.log('[handleSave] Producto sin imagen (null).');
-        finalImageUrl = null;
-      }
-
-      const finalData = {
-        nombre: nombreNorm,
-        categoria: categoriaNorm,
-        codigo_barra: codigoStr || null,
-        precio_compra: Number(formData.precio_compra) || 0,
-        precio_venta_publico: Number(formData.precio_venta_publico) || 0,
-        stock_actual: Number(formData.stock_actual) || 0,
-        stock_minimo: Number(formData.stock_minimo) || 0,
-        fuente_datos: formData.fuente_datos || 'manual',
-        imagen_url: finalImageUrl
-      };
-
-      console.log('=== PAYLOAD FINAL ===');
-      console.log(JSON.stringify(finalData, null, 2));
-
-      // Verificar sesión antes de operar
-      const { data: { session } } = await supabase.auth.getSession();
-      console.log('=== SESIÓN ACTUAL ===', session ? `Usuario: ${session.user.email}` : 'SIN SESIÓN');
-
-      let operationError = null;
-      let returnedData = null;
-
-      if (editingId) {
-        console.log(`=== ACTUALIZANDO PRODUCTO ID: ${editingId} ===`);
-        const { error } = await (supabase.from('Producto') as any)
-          .update(finalData)
-          .eq('id', editingId);
-        
-        operationError = error;
-      } else {
-        console.log('=== CREANDO NUEVO PRODUCTO ===');
-        const { error } = await (supabase.from('Producto') as any)
-          .insert([finalData]);
-        
-        operationError = error;
-      }
-
-      if (operationError) {
-        console.error('=== FALLO CRÍTICO BD ===', operationError);
-        alert(`❌ ERROR DE BASE DE DATOS:\n${operationError.message}\nCódigo: ${operationError.code}`);
-        throw operationError;
-      }
-      
-      console.log('[handleSave] Éxito total');
-      alert('✅ Producto guardado correctamente.');
-      setIsModalOpen(false);
-      resetForm();
-      fetchData();
-    } catch (err: unknown) {
-      const errorObj = err as any;
-      console.error('=== FALLO EN EL CATCH ===', errorObj);
-      alert('⚠️ No se pudo guardar el producto:\n\n' + (errorObj.message || 'Error desconocido'));
     } finally {
-      setLoading(false);
+      if (currentId === lastOpId.current) {
+        setIsSaving(false);
+        setSaveProgress(0);
+      }
     }
   };
 
@@ -659,8 +609,19 @@ export default function ProductosPage() {
               
               <div className="pt-8 flex gap-4">
                 <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 py-5 font-black text-gray-400 uppercase tracking-widest">Cancelar</button>
-                <button type="submit" className="flex-[2] py-5 bg-gray-900 text-white font-black rounded-3xl shadow-2xl hover:scale-105 active:scale-95 active:bg-blue-600 transition-all uppercase tracking-[0.2em] text-xs">
-                  {editingId ? 'Actualizar Ficha' : 'Registrar Producto'}
+                <button 
+                  type="submit" 
+                  disabled={isSaving}
+                  style={{
+                    background: isSaving 
+                      ? `linear-gradient(to right, #111827 ${saveProgress}%, #374151 ${saveProgress}%)` 
+                      : undefined
+                  }}
+                  className={`flex-[2] py-5 bg-gray-900 text-white font-black rounded-3xl shadow-2xl transition-all uppercase tracking-[0.2em] text-xs relative overflow-hidden ${isSaving ? 'cursor-not-allowed' : 'hover:scale-105 active:scale-95 active:bg-blue-600'}`}
+                >
+                  <span className="relative z-10">
+                    {isSaving ? `GUARDANDO (${saveProgress}%)` : (editingId ? 'Actualizar Ficha' : 'Registrar Producto')}
+                  </span>
                 </button>
               </div>
             </form>
