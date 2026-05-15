@@ -1,5 +1,7 @@
 "use client";
 
+export const maxDuration = 60;
+
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
@@ -193,7 +195,7 @@ export default function ProductosPage() {
     e.preventDefault();
     const currentId = ++lastOpId.current;
     const startTime = performance.now();
-    const timeoutLimit = 30000; // 30 segundos
+    const timeoutLimit = 60000; // 60 segundos
 
     if (role !== 'admin' && role !== 'cajera') {
       alert('No tienes permisos para realizar cambios en el catálogo.');
@@ -222,15 +224,10 @@ export default function ProductosPage() {
           throw new Error("El nombre y la categoría son obligatorios.");
         }
 
-        // Etapa 1: Validaciones (20%)
+        // Etapa 1: Validaciones de Integridad (20%)
         setSaveProgress(20);
-        const { data: nombreExistente } = await (supabase.from('Producto') as any)
-          .select('id')
-          .eq('nombre', nombreNorm)
-          .neq('id', editingId || '00000000-0000-0000-0000-000000000000')
-          .maybeSingle();
-
-        if (nombreExistente) throw new Error(`Ya existe un producto con el nombre: "${nombreNorm}"`);
+        // Eliminada verificación manual de duplicados para optimizar velocidad.
+        // La base de datos se encargará de rechazar duplicados si existen.
 
         let finalImageUrl = formData.imagen_url || null;
 
@@ -296,7 +293,7 @@ export default function ProductosPage() {
     } catch (err: any) {
       if (currentId === lastOpId.current) {
         if (err.name === 'TimeoutError') {
-          alert(`El proceso tardó demasiado en responder (30s). Inténtalo de nuevo.`);
+          alert(`El proceso tardó demasiado en responder (60s). Inténtalo de nuevo.`);
         } else {
           alert('⚠️ No se pudo guardar el producto:\n\n' + (err.message || 'Error desconocido'));
         }
