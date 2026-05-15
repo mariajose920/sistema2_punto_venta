@@ -229,9 +229,9 @@ export default function ProductosPage() {
         // Eliminada verificación manual de duplicados para optimizar velocidad.
         // La base de datos se encargará de rechazar duplicados si existen.
 
-        let finalImageUrl = (formData.imagen_url || '').trim() || null;
+        let finalImageUrl = null;
 
-        // Etapa 2: Imagen/Storage (50%)
+        // Etapa 2: Imagen/Storage (50%) - El archivo tiene prioridad total sobre la URL
         if (imageFile) {
           setSaveProgress(40);
           if (imageFile.size > 2 * 1024 * 1024) {
@@ -248,6 +248,9 @@ export default function ProductosPage() {
           const { data: publicData } = supabase.storage.from('productos').getPublicUrl(fileName);
           finalImageUrl = publicData?.publicUrl || null;
           setSaveProgress(60);
+        } else {
+          // Si no hay archivo, usamos la URL (si existe)
+          finalImageUrl = (formData.imagen_url || '').trim() || null;
         }
 
         const finalData = {
