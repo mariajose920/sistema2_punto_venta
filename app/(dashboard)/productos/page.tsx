@@ -41,8 +41,7 @@ export default function ProductosPage() {
     precio_venta_publico: 0,
     stock_actual: 0,
     stock_minimo: 5,
-    fuente_datos: 'manual',
-    imagen_url: ''
+    fuente_datos: 'manual'
   });
 
   const [isSearchingBarcode, setIsSearchingBarcode] = useState(false);
@@ -143,8 +142,7 @@ export default function ProductosPage() {
       precio_venta_publico: 0,
       stock_actual: 0,
       stock_minimo: 5,
-      fuente_datos: 'manual',
-      imagen_url: ''
+      fuente_datos: 'manual'
     });
   }, []);
 
@@ -172,8 +170,7 @@ export default function ProductosPage() {
         setFormData(prev => ({
           ...prev,
           nombre: data.product.product_name,
-          imagen_url: data.product.image_url || data.product.image_front_url || prev.imagen_url,
-          fuente_datos: 'api' // Autocompletado desde API externa
+          fuente_datos: 'api'
         }));
         return;
       }
@@ -228,10 +225,9 @@ export default function ProductosPage() {
         setSaveProgress(20);
         // Eliminada verificación manual de duplicados para optimizar velocidad.
         // La base de datos se encargará de rechazar duplicados si existen.
+        let fotoFinal = null;
 
-        let finalImageUrl = null;
-
-        // Etapa 2: Imagen/Storage (50%) - El archivo tiene prioridad total sobre la URL
+        // Etapa 2: Procesamiento de Imagen (50%)
         if (imageFile) {
           setSaveProgress(40);
           if (imageFile.size > 2 * 1024 * 1024) {
@@ -246,11 +242,8 @@ export default function ProductosPage() {
           if (uploadError) throw new Error(`Error al subir imagen: ${uploadError.message}`);
           
           const { data: publicData } = supabase.storage.from('productos').getPublicUrl(fileName);
-          finalImageUrl = publicData?.publicUrl || null;
+          fotoFinal = publicData?.publicUrl || null;
           setSaveProgress(60);
-        } else {
-          // Si no hay archivo, usamos la URL (si existe)
-          finalImageUrl = (formData.imagen_url || '').trim() || null;
         }
 
         const finalData = {
@@ -262,7 +255,7 @@ export default function ProductosPage() {
           stock_actual: Number(formData.stock_actual) || 0,
           stock_minimo: Number(formData.stock_minimo) || 0,
           fuente_datos: formData.fuente_datos || 'manual',
-          imagen_url: finalImageUrl
+          imagen_url: fotoFinal
         };
 
         // Etapa 3: Base de Datos (80%)
@@ -574,7 +567,7 @@ export default function ProductosPage() {
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Imagen del Producto (Opcional)</label>
                   <div className="space-y-4">
                     <div>
-                      <p className="text-[9px] font-bold text-gray-400 uppercase mb-1">Subir archivo (Prioridad)</p>
+                      <p className="text-[9px] font-bold text-gray-400 uppercase mb-1">Subir archivo de imagen</p>
                       <input 
                         type="file" 
                         accept="image/*"
@@ -586,23 +579,6 @@ export default function ProductosPage() {
                         className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" 
                       />
                     </div>
-
-                    <div>
-                      <p className="text-[9px] font-bold text-gray-400 uppercase mb-1">O ingresar URL manual</p>
-                      <input 
-                        type="url"
-                        placeholder="https://ejemplo.com/imagen.jpg"
-                        value={formData.imagen_url || ''} 
-                        onChange={e => setFormData({...formData, imagen_url: e.target.value})} 
-                        className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold text-sm" 
-                      />
-                    </div>
-
-                    {imageFile ? (
-                      <div className="mt-2 text-xs text-emerald-500 font-bold">✓ Se usará el archivo seleccionado</div>
-                    ) : formData.imagen_url ? (
-                      <div className="mt-2 text-xs text-blue-500 font-bold">✓ Se usará la URL ingresada</div>
-                    ) : null}
                   </div>
                 </div>
               </div>
