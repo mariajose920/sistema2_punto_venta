@@ -582,16 +582,18 @@ export default function ProductosPage() {
                       </button>
                     </div>
                   ) : (
-                    <div className="flex gap-2">
+                    <div className="flex items-center gap-2 w-full">
                       <input 
                         autoFocus
                         placeholder="Nueva categoría..."
                         value={newCategoryName}
                         onChange={e => setNewCategoryName(e.target.value)}
-                        className="flex-1 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-2xl border border-blue-200 dark:border-blue-800 font-bold"
+                        className="min-w-0 flex-1 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-2xl border border-blue-200 dark:border-blue-800 font-bold text-sm"
                       />
-                      <button type="button" onClick={handleSaveCategory} className="p-4 bg-blue-600 text-white rounded-2xl">✓</button>
-                      <button type="button" onClick={() => setShowNewCategoryInput(false)} className="p-4 bg-gray-200 dark:bg-gray-700 rounded-2xl">✕</button>
+                      <div className="flex shrink-0 gap-2">
+                        <button type="button" onClick={handleSaveCategory} className="p-4 bg-blue-600 text-white rounded-2xl hover:bg-blue-700 transition-colors">✓</button>
+                        <button type="button" onClick={() => setShowNewCategoryInput(false)} className="p-4 bg-gray-200 dark:bg-gray-700 rounded-2xl hover:bg-gray-300 transition-colors">✕</button>
+                      </div>
                     </div>
                   )}
                 </div>
