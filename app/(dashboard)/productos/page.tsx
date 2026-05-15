@@ -229,7 +229,7 @@ export default function ProductosPage() {
         // Eliminada verificación manual de duplicados para optimizar velocidad.
         // La base de datos se encargará de rechazar duplicados si existen.
 
-        let finalImageUrl = formData.imagen_url || null;
+        let finalImageUrl = (formData.imagen_url || '').trim() || null;
 
         // Etapa 2: Imagen/Storage (50%)
         if (imageFile) {
