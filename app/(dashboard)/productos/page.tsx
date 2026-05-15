@@ -27,8 +27,11 @@ export default function ProductosPage() {
   const [sortBy, setSortBy] = useState<OrderType>('name_asc');
   
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isCatManagerOpen, setIsCatManagerOpen] = useState(false);
   const [showNewCategoryInput, setShowNewCategoryInput] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
+  const [editingCatId, setEditingCatId] = useState<string | null>(null);
+  const [catFormName, setCatFormName] = useState('');
   
   // Estado para el formulario (Agregar/Editar)
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -110,6 +113,43 @@ export default function ProductosPage() {
   }, [searchTerm, categoryFilter, sortBy, productos]);
 
   // Manejo de nueva categoría
+  const handleUpdateCategory = async (id: string) => {
+    if (!catFormName.trim()) return;
+    try {
+      const { error } = await (supabase.from('Categoria') as any)
+        .update({ nombre: normalizeText(catFormName) })
+        .eq('id', id);
+      if (error) throw error;
+      setEditingCatId(null);
+      fetchData();
+    } catch (err: any) {
+      alert('Error al actualizar: ' + err.message);
+    }
+  };
+
+  const handleDeleteCategory = async (id: string) => {
+    if (!window.confirm('¿Seguro que quieres eliminar esta categoría? Solo podrás hacerlo si no tiene productos asociados.')) return;
+    try {
+      const { error } = await (supabase.from('Categoria') as any).delete().eq('id', id);
+      if (error) throw error;
+      fetchData();
+    } catch (err: any) {
+      alert('Error al eliminar: ' + err.message + '. Asegúrate de que no tenga productos.');
+    }
+  };
+
+  const handleToggleCategory = async (id: string, currentStatus: boolean) => {
+    try {
+      const { error } = await (supabase.from('Categoria') as any)
+        .update({ activo: !currentStatus })
+        .eq('id', id);
+      if (error) throw error;
+      fetchData();
+    } catch (err: any) {
+      alert('Error al cambiar estado: ' + err.message);
+    }
+  };
+
   const handleSaveCategory = async () => {
     const nameLower = normalizeText(newCategoryName);
     if (!nameLower) return;
@@ -343,12 +383,20 @@ export default function ProductosPage() {
           </div>
           
           {(role === 'admin' || role === 'cajera') && (
-            <button 
-              onClick={() => { resetForm(); setIsModalOpen(true); }}
-              className="w-full lg:w-auto bg-gray-900 text-white px-8 py-4 rounded-2xl font-black shadow-2xl hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-3 uppercase text-xs tracking-widest"
-            >
-              <span>➕</span> Nuevo Producto
-            </button>
+            <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
+              <button 
+                onClick={() => setIsCatManagerOpen(true)}
+                className="bg-white text-gray-900 border-2 border-gray-900 px-8 py-4 rounded-2xl font-black shadow-sm hover:bg-gray-50 active:scale-95 transition-all flex items-center justify-center gap-3 uppercase text-xs tracking-widest"
+              >
+                <span>📁</span> Editar Categorías
+              </button>
+              <button 
+                onClick={() => { resetForm(); setIsModalOpen(true); }}
+                className="bg-gray-900 text-white px-8 py-4 rounded-2xl font-black shadow-2xl hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-3 uppercase text-xs tracking-widest"
+              >
+                <span>➕</span> Nuevo Producto
+              </button>
+            </div>
           )}
         </div>
 
@@ -601,6 +649,80 @@ export default function ProductosPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Gestión de Categorías */}
+      {isCatManagerOpen && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
+          <div className="bg-white dark:bg-gray-800 w-full max-w-2xl rounded-[3rem] p-10 shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="flex justify-between items-start mb-8">
+              <div>
+                <h2 className="text-4xl font-black text-gray-900 dark:text-white italic">Categorías</h2>
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Gestiona tus familias de productos</p>
+              </div>
+              <button onClick={() => setIsCatManagerOpen(false)} className="text-2xl">✕</button>
+            </div>
+
+            <div className="space-y-4 max-h-[50vh] overflow-y-auto pr-2">
+              {categorias.map((cat: any) => (
+                <div key={cat.id} className="flex items-center justify-between p-6 bg-gray-50 dark:bg-gray-900 rounded-[2rem] group">
+                  {editingCatId === cat.id ? (
+                    <div className="flex-1 flex gap-2 mr-4">
+                      <input 
+                        autoFocus
+                        value={catFormName}
+                        onChange={e => setCatFormName(e.target.value)}
+                        className="flex-1 p-3 bg-white dark:bg-gray-800 rounded-xl border-2 border-blue-500 font-bold"
+                      />
+                      <button onClick={() => handleUpdateCategory(cat.id)} className="px-4 py-2 bg-blue-600 text-white rounded-xl font-bold">✓</button>
+                      <button onClick={() => setEditingCatId(null)} className="px-4 py-2 bg-gray-400 text-white rounded-xl font-bold">✕</button>
+                    </div>
+                  ) : (
+                    <div className="flex-1">
+                      <h3 className={`text-xl font-black italic uppercase ${cat.activo === false ? 'line-through text-gray-400' : 'text-gray-900 dark:text-white'}`}>
+                        {cat.nombre}
+                      </h3>
+                      {cat.activo === false && <span className="text-[10px] font-black text-red-500 uppercase tracking-widest">Suspendida</span>}
+                    </div>
+                  )}
+
+                  <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-all">
+                    <button 
+                      onClick={() => { setEditingCatId(cat.id); setCatFormName(cat.nombre); }}
+                      className="p-3 bg-white dark:bg-gray-800 rounded-xl shadow-sm hover:scale-110 transition-transform"
+                      title="Editar nombre"
+                    >
+                      ✏️
+                    </button>
+                    <button 
+                      onClick={() => handleToggleCategory(cat.id, cat.activo !== false)}
+                      className={`p-3 rounded-xl shadow-sm hover:scale-110 transition-transform ${cat.activo === false ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}
+                      title={cat.activo === false ? "Activar" : "Suspender"}
+                    >
+                      {cat.activo === false ? '🔓' : '🔒'}
+                    </button>
+                    <button 
+                      onClick={() => handleDeleteCategory(cat.id)}
+                      className="p-3 bg-red-50 text-red-600 rounded-xl shadow-sm hover:scale-110 transition-transform"
+                      title="Eliminar"
+                    >
+                      🗑️
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-10 pt-8 border-t border-gray-100 dark:border-gray-700">
+              <button 
+                onClick={() => setIsCatManagerOpen(false)}
+                className="w-full py-5 bg-gray-900 text-white font-black rounded-3xl shadow-xl hover:scale-[1.02] active:scale-95 transition-all uppercase tracking-[0.2em] text-xs"
+              >
+                Cerrar Gestor
+              </button>
+            </div>
           </div>
         </div>
       )}
