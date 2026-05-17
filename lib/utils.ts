@@ -32,3 +32,24 @@ export function formatCurrency(amount: number | null | undefined): string {
     maximumFractionDigits: 0
   });
 }
+
+/**
+ * Logea mensajes en consola únicamente en entorno de desarrollo.
+ */
+export function debugLog(message?: any, ...optionalParams: any[]): void {
+  if (process.env.NODE_ENV === 'development') {
+    console.log(message, ...optionalParams);
+  }
+}
+
+/**
+ * Logea errores en consola de manera segura en producción (sin exponer detalles internos sensibles).
+ */
+export function debugError(message: string, errorObj?: any): void {
+  if (process.env.NODE_ENV === 'development') {
+    console.error(message, errorObj);
+  } else {
+    // En producción logea solo un mensaje genérico seguro sin detalles de Supabase o base de datos
+    console.error(message);
+  }
+}
