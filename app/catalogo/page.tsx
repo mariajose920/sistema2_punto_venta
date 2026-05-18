@@ -352,7 +352,7 @@ export default function CatalogoPublico() {
 
       {/* Sidebar Carrito */}
       {showCart && (
-        <div className="fixed inset-0 bg-slate-900 z-50 md:static md:w-96 md:bg-slate-800 md:border-l md:border-slate-700 flex flex-col h-screen">
+        <div className="fixed inset-0 bg-slate-900 z-50 md:static md:w-96 md:bg-slate-800 md:border-l md:border-slate-700 flex flex-col h-screen overflow-y-auto md:overflow-hidden">
           <div className="p-6 border-b border-slate-700 flex justify-between items-center bg-slate-800 sticky top-0 z-10">
             <h2 className="text-2xl font-black text-white">Tu Lista</h2>
             <button 
@@ -363,7 +363,7 @@ export default function CatalogoPublico() {
             </button>
           </div>
           
-          <div className="flex-1 overflow-y-auto p-6 bg-slate-900/50">
+          <div className="p-6 bg-slate-900/50 md:flex-1 md:overflow-y-auto">
             {cart.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-slate-500 space-y-4">
                 <span className="text-6xl">🛒</span>
@@ -396,7 +396,7 @@ export default function CatalogoPublico() {
           </div>
           
           {cart.length > 0 && (
-            <div className="p-6 bg-slate-800 border-t border-slate-700 shadow-2xl">
+            <div className="p-6 bg-slate-800 border-t border-slate-700 shadow-2xl md:shrink-0">
               <div className="flex justify-between items-center mb-5">
                 <span className="text-slate-300 font-bold text-lg">Total estimado</span>
                 <span className="text-3xl font-black text-white">${totalCart.toLocaleString('es-CL')}</span>
