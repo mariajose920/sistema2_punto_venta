@@ -24,6 +24,7 @@ export default function CatalogoPublico() {
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [errors, setErrors] = useState<{ nombre?: string; rut?: string; celular?: string }>({});
+  const [isDatosOpen, setIsDatosOpen] = useState(false);
 
   useEffect(() => {
     fetchProductos();
@@ -150,6 +151,7 @@ export default function CatalogoPublico() {
     if (cart.length === 0) return;
 
     if (!validateForm()) {
+      setIsDatosOpen(true);
       return;
     }
 
@@ -397,12 +399,30 @@ export default function CatalogoPublico() {
           
           {cart.length > 0 && (
             <div className="p-4 md:p-6 bg-slate-800 border-t border-slate-700 shadow-2xl md:shrink-0">
-              <div className="flex justify-between items-center mb-3 md:mb-5">
+              <div className="flex justify-between items-center mb-3 md:mb-4">
                 <span className="text-slate-300 font-bold text-sm md:text-lg">Total estimado</span>
                 <span className="text-xl md:text-3xl font-black text-white">${totalCart.toLocaleString('es-CL')}</span>
               </div>
+
+              {/* Botón de control de colapso en móvil (Oculto en desktop) */}
+              <button
+                type="button"
+                onClick={() => setIsDatosOpen(!isDatosOpen)}
+                aria-expanded={isDatosOpen}
+                aria-controls="formulario-datos-cliente"
+                className="w-full flex items-center justify-between py-2 px-3 bg-slate-900 border border-slate-700 rounded-xl md:hidden text-slate-300 font-bold text-xs mb-3 transition-colors hover:bg-slate-900/80 active:scale-95"
+              >
+                <span>👤 {isDatosOpen ? 'Ocultar tus datos' : 'Ingresar tus datos para enviar'}</span>
+                <span className="text-xs transition-transform duration-200">
+                  {isDatosOpen ? '▲' : '▼'}
+                </span>
+              </button>
               
-              <form onSubmit={handleSubmit} className="space-y-3 md:space-y-4">
+              <form
+                id="formulario-datos-cliente"
+                onSubmit={handleSubmit}
+                className={`space-y-3 md:space-y-4 md:block ${isDatosOpen ? 'block' : 'hidden'}`}
+              >
                 <div>
                   <input
                     type="text"
