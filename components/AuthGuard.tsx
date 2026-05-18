@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth, Role } from '@/hooks/useAuth';
 
@@ -20,10 +20,14 @@ interface AuthGuardProps {
 export default function AuthGuard({ children, requiredRole }: AuthGuardProps) {
   const { user, role, loading, isMounted } = useAuth();
   const router = useRouter();
+  const startGuardRender = useRef(performance.now());
 
   useEffect(() => {
     // 1. Si no ha montado o está cargando, esperamos
     if (!isMounted || loading) return;
+
+    const endGuardCheck = performance.now();
+    console.log(`[PERF_AUTH] Tiempo desde inicio de carga de AuthGuard hasta validación lista: ${(endGuardCheck - startGuardRender.current).toFixed(2)}ms. Usuario: ${user?.email}, Rol: ${role}`);
 
     // 2. Si NO hay usuario autenticado
     if (!user) {

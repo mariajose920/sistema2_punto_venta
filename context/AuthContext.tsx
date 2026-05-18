@@ -35,12 +35,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [state.user]);
 
   const fetchRole = async (uid: string): Promise<Role | null> => {
+    const startCacheCheck = performance.now();
     if (roleCache.has(uid)) {
       const cachedRole = roleCache.get(uid)!;
-      debugLog('[AuthContext] Usando rol desde el caché en memoria para UID:', uid, '->', cachedRole);
+      const endCacheCheck = performance.now();
+      console.log(`[PERF_AUTH] [Caché_Rol] Hit exitoso para UID: ${uid} en ${(endCacheCheck - startCacheCheck).toFixed(2)}ms. Rol: ${cachedRole}`);
       return cachedRole;
     }
 
+    const startFetch = performance.now();
     debugLog('[AuthContext] Verificando rol para UID:', uid);
     
     const { data, error } = await supabase
@@ -48,6 +51,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .select('rol')
       .eq('id', uid)
       .single();
+    const endFetch = performance.now();
+    console.log(`[PERF_AUTH] Consulta de rol a base de datos (fetchRole): ${(endFetch - startFetch).toFixed(2)}ms`);
 
     if (error) {
       debugError('[AuthContext] ERROR al obtener rol.', error);
@@ -78,8 +83,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const init = async () => {
       try {
+        const startGetSession = performance.now();
         debugLog('[AuthContext] Iniciando validación de sesión...');
         const { data, error } = await supabase.auth.getSession();
+        const endGetSession = performance.now();
+        console.log(`[PERF_AUTH] Tiempo de getSession en AuthContext: ${(endGetSession - startGetSession).toFixed(2)}ms`);
         debugLog('[AuthContext] getSession result:', { data, error });
 
         if (error || !active) {
@@ -103,7 +111,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           email: session.user.email
         });
 
+        const startInitRole = performance.now();
         const role = await fetchRole(session.user.id);
+        const endInitRole = performance.now();
+        console.log(`[PERF_AUTH] Tiempo de obtención del rol en init() de AuthContext: ${(endInitRole - startInitRole).toFixed(2)}ms`);
 
         if (!active) return;
         setState({

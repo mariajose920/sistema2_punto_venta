@@ -21,10 +21,13 @@ export default function LoginPage() {
       const cleanPassword = password.trim();
 
       // 1. Autenticación en Supabase Auth
+      const startAuth = performance.now();
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email: cleanEmail,
         password: cleanPassword,
       });
+      const endAuth = performance.now();
+      console.log(`[PERF_AUTH] Tiempo de signInWithPassword: ${(endAuth - startAuth).toFixed(2)}ms`);
 
       if (authError) {
         throw new Error(`ACCESO DENEGADO: ${authError.message}`);
@@ -37,11 +40,14 @@ export default function LoginPage() {
       // 2. Obtención de perfil desde tabla pública "Usuario" usando el UUID
       console.log('[AuthDebug] Intentando cargar perfil para UID:', authData.user.id);
 
+      const startProfile = performance.now();
       const { data: profile, error: profileError } = await supabase
         .from('Usuario')
         .select('*')
         .eq('id', authData.user.id)
         .single();
+      const endProfile = performance.now();
+      console.log(`[PERF_AUTH] Tiempo de consulta de rol a tabla Usuario en LoginPage: ${(endProfile - startProfile).toFixed(2)}ms`);
 
       console.log('[AuthDebug] Resultado de consulta public.Usuario:', { profile, profileError });
 
