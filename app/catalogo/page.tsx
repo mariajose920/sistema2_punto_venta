@@ -353,7 +353,7 @@ export default function CatalogoPublico() {
       {/* Sidebar Carrito */}
       {showCart && (
         <div className="fixed inset-0 bg-slate-900 z-50 md:static md:w-96 md:bg-slate-800 md:border-l md:border-slate-700 flex flex-col h-screen overflow-y-auto md:overflow-hidden">
-          <div className="p-6 border-b border-slate-700 flex justify-between items-center bg-slate-800 sticky top-0 z-10">
+          <div className="p-4 md:p-6 border-b border-slate-700 flex justify-between items-center bg-slate-800 sticky top-0 z-10">
             <h2 className="text-2xl font-black text-white">Tu Lista</h2>
             <button 
               className="text-slate-400 hover:text-red-400 transition-colors p-2 md:hidden"
@@ -363,7 +363,7 @@ export default function CatalogoPublico() {
             </button>
           </div>
           
-          <div className="p-6 bg-slate-900/50 md:flex-1 md:overflow-y-auto">
+          <div className="p-4 md:p-6 bg-slate-900/50 md:flex-1 md:overflow-y-auto">
             {cart.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-slate-500 space-y-4">
                 <span className="text-6xl">🛒</span>
@@ -372,19 +372,19 @@ export default function CatalogoPublico() {
             ) : (
               <div className="space-y-4">
                 {cart.map(item => (
-                  <div key={item.producto.id} className="bg-slate-800 p-4 rounded-xl border border-slate-700 flex gap-4">
+                  <div key={item.producto.id} className="bg-slate-800 p-3 md:p-4 rounded-xl border border-slate-700 flex gap-3 md:gap-4">
                     <div className="flex-1">
-                      <h4 className="font-bold text-base text-white line-clamp-2">{item.producto.nombre}</h4>
-                      <div className="text-blue-400 font-bold mt-1 text-base">
+                      <h4 className="font-bold text-sm md:text-base text-white line-clamp-2">{item.producto.nombre}</h4>
+                      <div className="text-blue-400 font-bold mt-1 text-sm md:text-base">
                         ${item.producto.precio_venta_publico.toLocaleString('es-CL')}
                       </div>
-                      <div className="flex items-center gap-4 mt-4">
+                      <div className="flex items-center gap-3 md:gap-4 mt-3 md:mt-4">
                         <div className="flex items-center bg-slate-900 rounded-lg border border-slate-700 overflow-hidden">
-                          <button onClick={() => updateQuantity(item.producto.id, -1)} className="px-3 py-1.5 text-slate-300 hover:bg-slate-700 font-bold text-lg">−</button>
-                          <span className="px-3 font-bold text-base w-10 text-center text-white">{item.cantidad}</span>
-                          <button onClick={() => updateQuantity(item.producto.id, 1)} className="px-3 py-1.5 text-slate-300 hover:bg-slate-700 font-bold text-lg">+</button>
+                          <button onClick={() => updateQuantity(item.producto.id, -1)} className="px-2 py-1 md:px-3 md:py-1.5 text-slate-300 hover:bg-slate-700 font-bold text-sm md:text-lg">−</button>
+                          <span className="px-2 md:px-3 font-bold text-sm md:text-base w-8 md:w-10 text-center text-white">{item.cantidad}</span>
+                          <button onClick={() => updateQuantity(item.producto.id, 1)} className="px-2 py-1 md:px-3 md:py-1.5 text-slate-300 hover:bg-slate-700 font-bold text-sm md:text-lg">+</button>
                         </div>
-                        <button onClick={() => removeFromCart(item.producto.id)} className="text-sm text-red-400 hover:text-red-300 hover:underline font-medium">
+                        <button onClick={() => removeFromCart(item.producto.id)} className="text-xs md:text-sm text-red-400 hover:text-red-300 hover:underline font-medium">
                           Eliminar
                         </button>
                       </div>
@@ -396,13 +396,13 @@ export default function CatalogoPublico() {
           </div>
           
           {cart.length > 0 && (
-            <div className="p-6 bg-slate-800 border-t border-slate-700 shadow-2xl md:shrink-0">
-              <div className="flex justify-between items-center mb-5">
-                <span className="text-slate-300 font-bold text-lg">Total estimado</span>
-                <span className="text-3xl font-black text-white">${totalCart.toLocaleString('es-CL')}</span>
+            <div className="p-4 md:p-6 bg-slate-800 border-t border-slate-700 shadow-2xl md:shrink-0">
+              <div className="flex justify-between items-center mb-3 md:mb-5">
+                <span className="text-slate-300 font-bold text-sm md:text-lg">Total estimado</span>
+                <span className="text-xl md:text-3xl font-black text-white">${totalCart.toLocaleString('es-CL')}</span>
               </div>
               
-              <form onSubmit={handleSubmit} className="space-y-4">
+              <form onSubmit={handleSubmit} className="space-y-3 md:space-y-4">
                 <div>
                   <input
                     type="text"
@@ -415,7 +415,7 @@ export default function CatalogoPublico() {
                         setErrors(prev => ({ ...prev, nombre: undefined }));
                       }
                     }}
-                    className={`w-full px-4 py-3.5 rounded-xl bg-slate-900 border text-white placeholder-slate-500 focus:ring-1 outline-none transition-all text-base uppercase ${
+                    className={`w-full px-3 py-2 md:px-4 md:py-3.5 rounded-xl bg-slate-900 border text-white placeholder-slate-500 focus:ring-1 outline-none transition-all text-sm md:text-base uppercase ${
                       errors.nombre
                         ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
                         : 'border-slate-700 focus:border-blue-500 focus:ring-blue-500'
@@ -439,7 +439,7 @@ export default function CatalogoPublico() {
                       }
                     }}
                     onBlur={e => setRut(formatRUTVisual(e.target.value))}
-                    className={`w-full px-4 py-3.5 rounded-xl bg-slate-900 border text-white placeholder-slate-500 focus:ring-1 outline-none transition-all text-base ${
+                    className={`w-full px-3 py-2 md:px-4 md:py-3.5 rounded-xl bg-slate-900 border text-white placeholder-slate-500 focus:ring-1 outline-none transition-all text-sm md:text-base ${
                       errors.rut
                         ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
                         : 'border-slate-700 focus:border-blue-500 focus:ring-blue-500'
@@ -462,7 +462,7 @@ export default function CatalogoPublico() {
                         setErrors(prev => ({ ...prev, celular: undefined }));
                       }
                     }}
-                    className={`w-full px-4 py-3.5 rounded-xl bg-slate-900 border text-white placeholder-slate-500 focus:ring-1 outline-none transition-all text-base ${
+                    className={`w-full px-3 py-2 md:px-4 md:py-3.5 rounded-xl bg-slate-900 border text-white placeholder-slate-500 focus:ring-1 outline-none transition-all text-sm md:text-base ${
                       errors.celular
                         ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
                         : 'border-slate-700 focus:border-blue-500 focus:ring-blue-500'
@@ -475,7 +475,7 @@ export default function CatalogoPublico() {
                 <button
                   type="submit"
                   disabled={submitting}
-                  className={`w-full py-4 rounded-xl font-black text-base uppercase tracking-wider transition-all mt-2 border ${
+                  className={`w-full py-2.5 md:py-4 rounded-xl font-black text-sm md:text-base uppercase tracking-wider transition-all mt-1 md:mt-2 border ${
                     submitting ? 'bg-slate-700 border-slate-600 text-slate-400 cursor-not-allowed' : 'bg-blue-600 border-blue-500 text-white hover:bg-blue-700'
                   }`}
                 >
@@ -487,7 +487,7 @@ export default function CatalogoPublico() {
                     setCart([]);
                     setShowCart(false);
                   }}
-                  className="w-full py-2.5 text-red-400 text-base font-bold hover:text-red-300 hover:underline"
+                  className="w-full py-1.5 md:py-2.5 text-red-400 text-xs md:text-base font-bold hover:text-red-300 hover:underline"
                 >
                   Cancelar Pedido
                 </button>
