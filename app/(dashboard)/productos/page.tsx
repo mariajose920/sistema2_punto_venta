@@ -57,14 +57,11 @@ export default function ProductosPage() {
     try {
       setLoading(true);
       
-      const startFetch = performance.now();
       // Ejecución de consultas en paralelo mediante Promise.all para eliminar la cascada de red
       const [prodResult, catResult] = await Promise.all([
         (supabase.from('Producto') as any).select('*'),
         (supabase.from('Categoria') as any).select('*').order('nombre', { ascending: true })
       ]);
-      const endFetch = performance.now();
-      console.log(`[PERF_AUTH] [DashboardData] Primera consulta de datos (Productos/Categorías) completada en: ${(endFetch - startFetch).toFixed(2)}ms. Productos cargados: ${prodResult.data?.length || 0}`);
       
       if (prodResult.error) throw prodResult.error;
       if (catResult.error) throw catResult.error;
