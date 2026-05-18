@@ -327,8 +327,10 @@ export default function ProductosPage() {
           const original = productos.find(p => p.id === editingId);
           if (original) {
             if (nombreNorm !== original.nombre) finalData.nombre = nombreNorm;
-            if (categoriaNorm !== original.categoria) finalData.categoria = categoriaNorm;
-            if (codigoStr !== (original.codigo_barra || '')) finalData.codigo_barra = codigoStr || null;
+            if (role === 'admin') {
+              if (categoriaNorm !== original.categoria) finalData.categoria = categoriaNorm;
+              if (codigoStr !== (original.codigo_barra || '')) finalData.codigo_barra = codigoStr || null;
+            }
             if (Number(formData.precio_compra) !== original.precio_compra) finalData.precio_compra = Number(formData.precio_compra);
             if (Number(formData.precio_venta_publico) !== original.precio_venta_publico) finalData.precio_venta_publico = Number(formData.precio_venta_publico);
             if (Number(formData.stock_actual) !== original.stock_actual) finalData.stock_actual = Number(formData.stock_actual);
@@ -464,11 +466,11 @@ export default function ProductosPage() {
             <select
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value)}
-              className="bg-transparent border-none font-bold text-xs focus:ring-0 cursor-pointer"
+              className="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white border-none font-bold text-xs focus:ring-0 cursor-pointer"
             >
-              <option value="todas">Todas las categorías</option>
+              <option value="todas" className="bg-white dark:bg-gray-900 text-gray-900 dark:text-white">Todas las categorías</option>
               {categorias.map(cat => (
-                <option key={cat.id} value={cat.nombre || ''}>{(cat.nombre || '').toUpperCase()}</option>
+                <option key={cat.id} value={cat.nombre || ''} className="bg-white dark:bg-gray-900 text-gray-900 dark:text-white">{(cat.nombre || '').toUpperCase()}</option>
               ))}
             </select>
           </div>
@@ -478,13 +480,13 @@ export default function ProductosPage() {
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as OrderType)}
-              className="bg-transparent border-none font-bold text-xs focus:ring-0 cursor-pointer"
+              className="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white border-none font-bold text-xs focus:ring-0 cursor-pointer"
             >
-              <option value="name_asc">Nombre (A-Z)</option>
-              <option value="stock_asc">Menor Stock</option>
-              <option value="stock_desc">Mayor Stock</option>
-              <option value="price_asc">Menor Precio</option>
-              <option value="price_desc">Mayor Precio</option>
+              <option value="name_asc" className="bg-white dark:bg-gray-900 text-gray-900 dark:text-white">Nombre (A-Z)</option>
+              <option value="stock_asc" className="bg-white dark:bg-gray-900 text-gray-900 dark:text-white">Menor Stock</option>
+              <option value="stock_desc" className="bg-white dark:bg-gray-900 text-gray-900 dark:text-white">Mayor Stock</option>
+              <option value="price_asc" className="bg-white dark:bg-gray-900 text-gray-900 dark:text-white">Menor Precio</option>
+              <option value="price_desc" className="bg-white dark:bg-gray-900 text-gray-900 dark:text-white">Mayor Precio</option>
             </select>
           </div>
         </div>
@@ -562,6 +564,7 @@ export default function ProductosPage() {
                       placeholder="Escanear o digitar..."
                       value={formData.codigo_barra || ''}
                       onChange={e => setFormData({ ...formData, codigo_barra: e.target.value.replace(/\D/g, '').slice(0, 13) })}
+                      disabled={!!editingId && role !== 'admin'}
                       onKeyDown={e => {
                         if (e.key === 'Enter') {
                           e.preventDefault();
@@ -573,7 +576,7 @@ export default function ProductosPage() {
                     <button
                       type="button"
                       onClick={() => handleBarcodeSearch(formData.codigo_barra || '')}
-                      disabled={!formData.codigo_barra || isSearchingBarcode}
+                      disabled={!formData.codigo_barra || isSearchingBarcode || (!!editingId && role !== 'admin')}
                       className="px-4 bg-blue-50 dark:bg-blue-900/20 text-blue-600 rounded-2xl font-black text-xs hover:bg-blue-100 disabled:opacity-50 transition-colors"
                       title="Buscar en base local y externa"
                     >
@@ -593,6 +596,7 @@ export default function ProductosPage() {
                         required
                         value={formData.categoria || ''}
                         onChange={e => setFormData({ ...formData, categoria: e.target.value })}
+                        disabled={!!editingId && role !== 'admin'}
                         className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold appearance-none"
                       >
                         <option value="">Seleccionar...</option>
@@ -603,7 +607,8 @@ export default function ProductosPage() {
                       <button
                         type="button"
                         onClick={() => setShowNewCategoryInput(true)}
-                        className="text-[10px] font-black text-blue-600 uppercase tracking-widest px-2"
+                        disabled={!!editingId && role !== 'admin'}
+                        className="text-[10px] font-black text-blue-600 uppercase tracking-widest px-2 disabled:opacity-50"
                       >
                         + Crear nueva categoría
                       </button>
