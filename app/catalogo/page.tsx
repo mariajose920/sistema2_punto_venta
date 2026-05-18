@@ -23,6 +23,7 @@ export default function CatalogoPublico() {
   const [telefono, setTelefono] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [errors, setErrors] = useState<{ nombre?: string; rut?: string; celular?: string }>({});
 
   useEffect(() => {
     fetchProductos();
@@ -118,22 +119,43 @@ export default function CatalogoPublico() {
   };
   // ────────────────────────────────────────────────────────────────────────────
 
+  const validateForm = () => {
+    const newErrors: { nombre?: string; rut?: string; celular?: string } = {};
+
+    const nombreFinal = nombre.trim();
+    if (!nombreFinal) {
+      newErrors.nombre = 'El nombre es obligatorio.';
+    }
+
+    const rutFinal = cleanRUT(rut);
+    if (!rutFinal || !validateRUT(rut)) {
+      newErrors.rut = 'El RUT es inválido.';
+    }
+
+    const celularFinal = telefono.trim();
+    if (!celularFinal) {
+      newErrors.celular = 'El número de celular debe tener 9 dígitos.';
+    } else if (!/^\d+$/.test(celularFinal)) {
+      newErrors.celular = 'El número de celular solo debe contener números.';
+    } else if (celularFinal.length !== 9) {
+      newErrors.celular = 'El número de celular debe tener 9 dígitos.';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (cart.length === 0) return;
 
+    if (!validateForm()) {
+      return;
+    }
+
     // Normalizar datos antes de persistir
     const nombreFinal = nombre.trim().toUpperCase();
     const rutFinal    = formatRUTVisual(rut);
-
-    if (!nombreFinal) {
-      alert('El nombre es obligatorio.');
-      return;
-    }
-    if (!validateRUT(rut)) {
-      alert(`El RUT "${rutFinal}" no es válido. Verifica el dígito verificador.`);
-      return;
-    }
 
     setSubmitting(true);
 
@@ -381,31 +403,75 @@ export default function CatalogoPublico() {
               </div>
               
               <form onSubmit={handleSubmit} className="space-y-4">
-                <input
-                  type="text"
-                  placeholder="Tu Nombre Completo"
-                  required
-                  value={nombre}
-                  onChange={e => setNombre(e.target.value.toUpperCase())}
-                  className="w-full px-4 py-3.5 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all text-base uppercase"
-                />
-                <input
-                  type="text"
-                  placeholder="RUT (Ej: 12.345.678-9)"
-                  required
-                  value={rut}
-                  onChange={e => setRut(e.target.value)}
-                  onBlur={e => setRut(formatRUTVisual(e.target.value))}
-                  className="w-full px-4 py-3.5 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all text-base"
-                />
-                <input
-                  type="tel"
-                  placeholder="Número de Teléfono"
-                  required
-                  value={telefono}
-                  onChange={e => setTelefono(e.target.value.replace(/\D/g, '').slice(0, 9))}
-                  className="w-full px-4 py-3.5 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all text-base"
-                />
+                <div>
+                  <input
+                    type="text"
+                    placeholder="Tu Nombre Completo"
+                    required
+                    value={nombre}
+                    onChange={e => {
+                      setNombre(e.target.value.toUpperCase());
+                      if (errors.nombre) {
+                        setErrors(prev => ({ ...prev, nombre: undefined }));
+                      }
+                    }}
+                    className={`w-full px-4 py-3.5 rounded-xl bg-slate-900 border text-white placeholder-slate-500 focus:ring-1 outline-none transition-all text-base uppercase ${
+                      errors.nombre
+                        ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
+                        : 'border-slate-700 focus:border-blue-500 focus:ring-blue-500'
+                    }`}
+                  />
+                  {errors.nombre && (
+                    <p className="text-red-400 text-xs font-bold mt-1 px-1">{errors.nombre}</p>
+                  )}
+                </div>
+
+                <div>
+                  <input
+                    type="text"
+                    placeholder="RUT (Ej: 12.345.678-9)"
+                    required
+                    value={rut}
+                    onChange={e => {
+                      setRut(e.target.value);
+                      if (errors.rut) {
+                        setErrors(prev => ({ ...prev, rut: undefined }));
+                      }
+                    }}
+                    onBlur={e => setRut(formatRUTVisual(e.target.value))}
+                    className={`w-full px-4 py-3.5 rounded-xl bg-slate-900 border text-white placeholder-slate-500 focus:ring-1 outline-none transition-all text-base ${
+                      errors.rut
+                        ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
+                        : 'border-slate-700 focus:border-blue-500 focus:ring-blue-500'
+                    }`}
+                  />
+                  {errors.rut && (
+                    <p className="text-red-400 text-xs font-bold mt-1 px-1">{errors.rut}</p>
+                  )}
+                </div>
+
+                <div>
+                  <input
+                    type="tel"
+                    placeholder="Número de Teléfono"
+                    required
+                    value={telefono}
+                    onChange={e => {
+                      setTelefono(e.target.value.replace(/\D/g, '').slice(0, 9));
+                      if (errors.celular) {
+                        setErrors(prev => ({ ...prev, celular: undefined }));
+                      }
+                    }}
+                    className={`w-full px-4 py-3.5 rounded-xl bg-slate-900 border text-white placeholder-slate-500 focus:ring-1 outline-none transition-all text-base ${
+                      errors.celular
+                        ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
+                        : 'border-slate-700 focus:border-blue-500 focus:ring-blue-500'
+                    }`}
+                  />
+                  {errors.celular && (
+                    <p className="text-red-400 text-xs font-bold mt-1 px-1">{errors.celular}</p>
+                  )}
+                </div>
                 <button
                   type="submit"
                   disabled={submitting}
