@@ -46,13 +46,13 @@ export default function AuthGuard({ children, requiredRole }: AuthGuardProps) {
     }
   }, [user, role, loading, isMounted, requiredRole, router]);
 
-  // Pantalla de Carga Premium (Previene parpadeos de contenido protegido)
+  // Cargador Modular Ligero e Integrado (No bloquea la pantalla completa con overlays masivos)
   if (!isMounted || loading) {
     return (
-      <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-white dark:bg-gray-950">
-        <div className="w-12 h-12 border-4 border-blue-600/20 border-t-blue-600 rounded-full animate-spin mb-4"></div>
-        <p className="text-sm font-bold text-gray-500 uppercase tracking-widest animate-pulse">
-          Autenticando Acceso
+      <div className="w-full min-h-[60vh] flex flex-col items-center justify-center p-8">
+        <div className="w-10 h-10 border-4 border-blue-600/20 border-t-blue-600 rounded-full animate-spin mb-3"></div>
+        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest animate-pulse">
+          Validando Credenciales
         </p>
       </div>
     );

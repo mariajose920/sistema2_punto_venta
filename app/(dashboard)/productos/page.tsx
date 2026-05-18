@@ -56,18 +56,18 @@ export default function ProductosPage() {
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      const { data: prodData, error: prodError } = await (supabase.from('Producto') as any)
-        .select('*');
-      if (prodError) throw prodError;
       
-      const { data: catData, error: catError } = await (supabase.from('Categoria') as any)
-        .select('*')
-        .order('nombre', { ascending: true });
+      // Ejecución de consultas en paralelo mediante Promise.all para eliminar la cascada de red
+      const [prodResult, catResult] = await Promise.all([
+        (supabase.from('Producto') as any).select('*'),
+        (supabase.from('Categoria') as any).select('*').order('nombre', { ascending: true })
+      ]);
       
-      if (catError) throw catError;
+      if (prodResult.error) throw prodResult.error;
+      if (catResult.error) throw catResult.error;
 
-      setProductos(prodData || []);
-      setCategorias(catData || []);
+      setProductos(prodResult.data || []);
+      setCategorias(catResult.data || []);
     } catch (err: unknown) {
       console.error('Error cargando datos:', err);
     } finally {
