@@ -317,24 +317,48 @@ export default function ProductosPage() {
           setSaveProgress(60);
         }
 
-        const finalData = {
-          nombre: nombreNorm,
-          categoria: categoriaNorm,
-          codigo_barra: codigoStr || null,
-          precio_compra: Number(formData.precio_compra) || 0,
-          precio_venta_publico: Number(formData.precio_venta_publico) || 0,
-          stock_actual: Number(formData.stock_actual) || 0,
-          stock_minimo: Number(formData.stock_minimo) || 0,
-          fuente_datos: formData.fuente_datos || 'manual',
-          imagen_url: fotoFinal
-        };
+        // Si estamos editando, construimos el payload únicamente con los campos modificados para optimizar velocidad y consistencia
+        let finalData: any = {};
+
+        if (editingId) {
+          const original = productos.find(p => p.id === editingId);
+          if (original) {
+            if (nombreNorm !== original.nombre) finalData.nombre = nombreNorm;
+            if (categoriaNorm !== original.categoria) finalData.categoria = categoriaNorm;
+            if (codigoStr !== (original.codigo_barra || '')) finalData.codigo_barra = codigoStr || null;
+            if (Number(formData.precio_compra) !== original.precio_compra) finalData.precio_compra = Number(formData.precio_compra);
+            if (Number(formData.precio_venta_publico) !== original.precio_venta_publico) finalData.precio_venta_publico = Number(formData.precio_venta_publico);
+            if (Number(formData.stock_actual) !== original.stock_actual) finalData.stock_actual = Number(formData.stock_actual);
+            if (Number(formData.stock_minimo) !== original.stock_minimo) finalData.stock_minimo = Number(formData.stock_minimo);
+            if (formData.fuente_datos !== original.fuente_datos) finalData.fuente_datos = formData.fuente_datos;
+            if (imageFile) {
+              finalData.imagen_url = fotoFinal;
+            }
+          }
+        } else {
+          // Modo creación: Todo el payload completo
+          finalData = {
+            nombre: nombreNorm,
+            categoria: categoriaNorm,
+            codigo_barra: codigoStr || null,
+            precio_compra: Number(formData.precio_compra) || 0,
+            precio_venta_publico: Number(formData.precio_venta_publico) || 0,
+            stock_actual: Number(formData.stock_actual) || 0,
+            stock_minimo: Number(formData.stock_minimo) || 0,
+            fuente_datos: formData.fuente_datos || 'manual',
+            imagen_url: fotoFinal
+          };
+        }
 
         // Etapa 3: Base de Datos (80%)
         setSaveProgress(80);
         let error = null;
         if (editingId) {
-          const res = await (supabase.from('Producto') as any).update(finalData).eq('id', editingId);
-          error = res.error;
+          // Si no hay campos modificados, saltar consulta a base de datos
+          if (Object.keys(finalData).length > 0) {
+            const res = await (supabase.from('Producto') as any).update(finalData).eq('id', editingId);
+            error = res.error;
+          }
         } else {
           const res = await (supabase.from('Producto') as any).insert([finalData]);
           error = res.error;
