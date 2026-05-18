@@ -2,7 +2,7 @@
 
 import React, { createContext, useEffect, useState, ReactNode, useRef } from 'react';
 import type { User } from '@supabase/supabase-js';
-import { supabase } from '@/lib/supabase';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { debugLog, debugError } from '@/lib/utils';
 
 export type Role = 'admin' | 'cajera' | 'proveedor';
@@ -68,89 +68,115 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let active = true;
 
-    const init = async () => {
-      debugLog('[AuthContext] Iniciando validación de sesión...');
-      const { data, error } = await supabase.auth.getSession();
-      debugLog('[AuthContext] getSession result:', { data, error });
-
-      if (error || !active) {
-        if (error) debugError('[AuthContext] Error en getSession.', error);
-        setState(prev => ({ ...prev, user: null, role: null, loading: false, isMounted: true }));
-        initialLoadDone.current = true;
-        return;
-      }
-
-      const session = data.session;
-
-      if (!session?.user) {
-        debugLog('[AuthContext] No hay usuario en la sesión.');
-        setState(prev => ({ ...prev, user: null, role: null, loading: false, isMounted: true }));
-        initialLoadDone.current = true;
-        return;
-      }
-
-      debugLog('[AuthContext] Sesión activa para:', {
-        id: session.user.id,
-        email: session.user.email
-      });
-
-      const role = await fetchRole(session.user.id);
-
-      if (!active) return;
-      setState({
-        user: session.user,
-        role,
-        loading: false,
-        isMounted: true,
-      });
+    // Si Supabase no está configurado, omitimos consultas y liberamos el estado inmediatamente para no colgar la aplicación
+    if (!isSupabaseConfigured) {
+      debugError('[AuthContext] Supabase no está configurado en Vercel o entorno local. Desactivando flujo para evitar pantallas en blanco.');
+      setState(prev => ({ ...prev, user: null, role: null, loading: false, isMounted: true }));
       initialLoadDone.current = true;
+      return;
+    }
+
+    const init = async () => {
+      try {
+        debugLog('[AuthContext] Iniciando validación de sesión...');
+        const { data, error } = await supabase.auth.getSession();
+        debugLog('[AuthContext] getSession result:', { data, error });
+
+        if (error || !active) {
+          if (error) debugError('[AuthContext] Error en getSession.', error);
+          setState(prev => ({ ...prev, user: null, role: null, loading: false, isMounted: true }));
+          initialLoadDone.current = true;
+          return;
+        }
+
+        const session = data.session;
+
+        if (!session?.user) {
+          debugLog('[AuthContext] No hay usuario en la sesión.');
+          setState(prev => ({ ...prev, user: null, role: null, loading: false, isMounted: true }));
+          initialLoadDone.current = true;
+          return;
+        }
+
+        debugLog('[AuthContext] Sesión activa para:', {
+          id: session.user.id,
+          email: session.user.email
+        });
+
+        const role = await fetchRole(session.user.id);
+
+        if (!active) return;
+        setState({
+          user: session.user,
+          role,
+          loading: false,
+          isMounted: true,
+        });
+        initialLoadDone.current = true;
+      } catch (err: any) {
+        debugError('[AuthContext] Excepción crítica atrapada en init(). Evitando pantalla en blanco.', err);
+        if (active) {
+          setState(prev => ({ ...prev, user: null, role: null, loading: false, isMounted: true }));
+          initialLoadDone.current = true;
+        }
+      }
     };
 
     init();
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      debugLog('[AuthContext] onAuthStateChange event:', event);
-      if (!active) return;
+    let subscription: any = null;
+    try {
+      const res = supabase.auth.onAuthStateChange(async (event, session) => {
+        try {
+          debugLog('[AuthContext] onAuthStateChange event:', event);
+          if (!active) return;
 
-      if (event === 'SIGNED_OUT') {
-        initialLoadDone.current = false;
-        roleCache.clear();
-        debugLog('[AuthContext] Sesión cerrada. Caché de roles en memoria limpiado.');
-        setState(prev => ({ ...prev, user: null, role: null, loading: false }));
-        return;
-      }
+          if (event === 'SIGNED_OUT') {
+            initialLoadDone.current = false;
+            roleCache.clear();
+            debugLog('[AuthContext] Sesión cerrada. Caché de roles en memoria limpiado.');
+            setState(prev => ({ ...prev, user: null, role: null, loading: false }));
+            return;
+          }
 
-      if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session?.user) {
-        // 1. Evitar consultas duplicadas si INITIAL_SESSION llega cuando la inicialización ya se completó
-        if (event === 'INITIAL_SESSION' && initialLoadDone.current) {
-          debugLog('[AuthContext] INITIAL_SESSION omitido: ya cargado por init().');
-          return;
+          if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session?.user) {
+            // 1. Evitar consultas duplicadas si INITIAL_SESSION llega cuando la inicialización ya se completó
+            if (event === 'INITIAL_SESSION' && initialLoadDone.current) {
+              debugLog('[AuthContext] INITIAL_SESSION omitido: ya cargado por init().');
+              return;
+            }
+
+            // 2. Solo recargar si es un inicio de sesión nuevo y el usuario ha cambiado
+            if (event === 'SIGNED_IN' && initialLoadDone.current && currentUserRef.current?.id === session.user.id) {
+              debugLog('[AuthContext] SIGNED_IN omitido: el usuario es el mismo.');
+              return;
+            }
+
+            debugLog('[AuthContext] Procesando login detectado para:', session.user.id);
+            const role = await fetchRole(session.user.id);
+            if (!active) return;
+            setState(prev => ({
+              ...prev,
+              user: session.user,
+              role,
+              loading: false,
+            }));
+            initialLoadDone.current = true;
+          }
+        } catch (innerErr) {
+          debugError('[AuthContext] Error en onAuthStateChange listener callback:', innerErr);
         }
-
-        // 2. Solo recargar si es un inicio de sesión nuevo y el usuario ha cambiado
-        if (event === 'SIGNED_IN' && initialLoadDone.current && currentUserRef.current?.id === session.user.id) {
-          debugLog('[AuthContext] SIGNED_IN omitido: el usuario es el mismo.');
-          return;
-        }
-
-        debugLog('[AuthContext] Procesando login detectado para:', session.user.id);
-        const role = await fetchRole(session.user.id);
-        if (!active) return;
-        setState(prev => ({
-          ...prev,
-          user: session.user,
-          role,
-          loading: false,
-        }));
-        initialLoadDone.current = true;
-      }
-    });
+      });
+      subscription = res.data?.subscription;
+    } catch (subErr) {
+      debugError('[AuthContext] Fallo al suscribir a onAuthStateChange:', subErr);
+    }
 
     return () => {
       active = false;
-      subscription.unsubscribe();
+      if (subscription) {
+        subscription.unsubscribe();
+      }
     };
   }, []);
 
