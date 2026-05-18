@@ -14,25 +14,25 @@ type OrderType = 'stock_asc' | 'stock_desc' | 'price_asc' | 'price_desc' | 'name
 
 export default function ProductosPage() {
   const { role } = useAuth();
-  
+
   // Estados de datos
   const [productos, setProductos] = useState<ProductoRow[]>([]);
   const [filtrados, setFiltrados] = useState<ProductoRow[]>([]);
   const [categorias, setCategorias] = useState<CategoriaRow[]>([]);
-  
+
   // Estados de UI
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('todas');
   const [sortBy, setSortBy] = useState<OrderType>('name_asc');
-  
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isCatManagerOpen, setIsCatManagerOpen] = useState(false);
   const [showNewCategoryInput, setShowNewCategoryInput] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
   const [editingCatId, setEditingCatId] = useState<string | null>(null);
   const [catFormName, setCatFormName] = useState('');
-  
+
   // Estado para el formulario (Agregar/Editar)
   const [editingId, setEditingId] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -56,13 +56,16 @@ export default function ProductosPage() {
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      
+
+      const startFetch = performance.now();
       // Ejecución de consultas en paralelo mediante Promise.all para eliminar la cascada de red
       const [prodResult, catResult] = await Promise.all([
         (supabase.from('Producto') as any).select('*'),
         (supabase.from('Categoria') as any).select('*').order('nombre', { ascending: true })
       ]);
-      
+      const endFetch = performance.now();
+      console.log(`[PERF_AUTH] [DashboardData] Primera consulta de datos (Productos/Categorías) completada en: ${(endFetch - startFetch).toFixed(2)}ms. Productos cargados: ${prodResult.data?.length || 0}`);
+
       if (prodResult.error) throw prodResult.error;
       if (catResult.error) throw catResult.error;
 
@@ -86,8 +89,8 @@ export default function ProductosPage() {
     // 1. Búsqueda parcial
     const term = normalizeText(searchTerm);
     if (term) {
-      result = result.filter(p => 
-        normalizeText(p.nombre || '').includes(term) || 
+      result = result.filter(p =>
+        normalizeText(p.nombre || '').includes(term) ||
         (p.codigo_barra || '').toString().toLowerCase().includes(term)
       );
     }
@@ -133,14 +136,14 @@ export default function ProductosPage() {
 
     // Buscar productos asociados localmente para el mensaje
     const prodsAsociados = productos.filter(p => p.categoria === cat.nombre);
-    
+
     let confirmMsg = `¿Seguro que quieres eliminar la categoría "${cat.nombre.toUpperCase()}"?`;
-    
+
     if (prodsAsociados.length > 0) {
       confirmMsg = `⚠️ ADVERTENCIA CRÍTICA ⚠️\n\n` +
-                   `La categoría "${cat.nombre.toUpperCase()}" contiene ${prodsAsociados.length} productos:\n` +
-                   prodsAsociados.map(p => `• ${p.nombre.toUpperCase()}`).join('\n') +
-                   `\n\n¿DESEAS ELIMINAR LA CATEGORÍA Y TODOS ESTOS PRODUCTOS DE FORMA PERMANENTE?\n\nEsta acción no se puede deshacer.`;
+        `La categoría "${cat.nombre.toUpperCase()}" contiene ${prodsAsociados.length} productos:\n` +
+        prodsAsociados.map(p => `• ${p.nombre.toUpperCase()}`).join('\n') +
+        `\n\n¿DESEAS ELIMINAR LA CATEGORIA Y TODOS ESTOS PRODUCTOS DE FORMA PERMANENTE?\n\nEsta acción no se puede deshacer.`;
     }
 
     if (!window.confirm(confirmMsg)) return;
@@ -189,7 +192,7 @@ export default function ProductosPage() {
         .insert([{ nombre: nameLower }])
         .select()
         .single();
-      
+
       if (error) throw error;
       setCategorias([...categorias, data]);
       setFormData(prev => ({ ...prev, categoria: data.nombre }));
@@ -236,7 +239,7 @@ export default function ProductosPage() {
       setIsSearchingBarcode(true);
       const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${code}.json`);
       const data = await res.json();
-      
+
       if (data.status === 1 && data.product && data.product.product_name) {
         setFormData(prev => ({
           ...prev,
@@ -273,7 +276,7 @@ export default function ProductosPage() {
     try {
       setIsSaving(true);
       setSaveProgress(10);
-      
+
       const timeoutPromise = new Promise((_, reject) => {
         setTimeout(() => {
           const err = new Error('TIMEOUT');
@@ -311,7 +314,7 @@ export default function ProductosPage() {
             .upload(fileName, imageFile);
 
           if (uploadError) throw new Error(`Error al subir imagen: ${uploadError.message}`);
-          
+
           const { data: publicData } = supabase.storage.from('productos').getPublicUrl(fileName);
           fotoFinal = publicData?.publicUrl || null;
           setSaveProgress(60);
@@ -373,7 +376,7 @@ export default function ProductosPage() {
 
         // Solo actualizar UI si este intento sigue siendo el vigente
         if (currentId === lastOpId.current) {
-          console.log(`[PERF] Éxito total en ${((performance.now() - startTime)/1000).toFixed(2)}s`);
+          console.log(`[PERF] Éxito total en ${((performance.now() - startTime) / 1000).toFixed(2)}s`);
           setIsModalOpen(false);
           resetForm();
         }
@@ -419,7 +422,7 @@ export default function ProductosPage() {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      
+
       {/* Encabezado y Filtros */}
       <div className="bg-white dark:bg-gray-800 p-8 rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-gray-700 space-y-6">
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
@@ -427,25 +430,25 @@ export default function ProductosPage() {
             <h1 className="text-3xl font-black text-gray-900 dark:text-white mb-4 tracking-tight">Inventario de Productos</h1>
             <div className="relative group">
               <span className="absolute left-5 top-1/2 -translate-y-1/2 text-2xl group-focus-within:scale-110 transition-transform">🔍</span>
-              <input 
-                type="text" 
-                placeholder="Buscar por nombre o código de barras..." 
+              <input
+                type="text"
+                placeholder="Buscar por nombre o código de barras..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-14 pr-6 py-4 bg-gray-50 dark:bg-gray-900 border-none rounded-2xl focus:ring-4 focus:ring-blue-600/20 transition-all font-bold text-lg"
               />
             </div>
           </div>
-          
+
           {(role === 'admin' || role === 'cajera') && (
             <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
-              <button 
+              <button
                 onClick={() => setIsCatManagerOpen(true)}
                 className="bg-white text-gray-900 border-2 border-gray-900 px-8 py-4 rounded-2xl font-black shadow-sm hover:bg-gray-50 active:scale-95 transition-all flex items-center justify-center gap-3 uppercase text-xs tracking-widest"
               >
                 <span>📁</span> Editar Categorías
               </button>
-              <button 
+              <button
                 onClick={() => { resetForm(); setIsModalOpen(true); }}
                 className="bg-gray-900 text-white px-8 py-4 rounded-2xl font-black shadow-2xl hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-3 uppercase text-xs tracking-widest"
               >
@@ -458,7 +461,7 @@ export default function ProductosPage() {
         <div className="flex flex-wrap gap-3">
           <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-900 p-2 rounded-2xl border border-gray-100 dark:border-gray-800">
             <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2">Categoría:</span>
-            <select 
+            <select
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value)}
               className="bg-transparent border-none font-bold text-xs focus:ring-0 cursor-pointer"
@@ -472,7 +475,7 @@ export default function ProductosPage() {
 
           <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-900 p-2 rounded-2xl border border-gray-100 dark:border-gray-800">
             <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2">Ordenar por:</span>
-            <select 
+            <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as OrderType)}
               className="bg-transparent border-none font-bold text-xs focus:ring-0 cursor-pointer"
@@ -549,23 +552,23 @@ export default function ProductosPage() {
               {editingId ? 'Editar Ítem' : 'Nuevo Ítem'}
             </h2>
             <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-10">Completa la ficha del producto</p>
-            
+
             <form onSubmit={handleSave} className="space-y-6 max-h-[60vh] overflow-y-auto px-2">
               <div className="grid grid-cols-2 gap-6">
                 <div className="col-span-2 sm:col-span-1">
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Código de Barras</label>
                   <div className="flex gap-2">
-                    <input 
+                    <input
                       placeholder="Escanear o digitar..."
-                      value={formData.codigo_barra || ''} 
-                      onChange={e => setFormData({...formData, codigo_barra: e.target.value.replace(/\D/g, '').slice(0, 13)})}
+                      value={formData.codigo_barra || ''}
+                      onChange={e => setFormData({ ...formData, codigo_barra: e.target.value.replace(/\D/g, '').slice(0, 13) })}
                       onKeyDown={e => {
                         if (e.key === 'Enter') {
                           e.preventDefault();
                           handleBarcodeSearch(formData.codigo_barra || '');
                         }
                       }}
-                      className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold text-lg" 
+                      className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold text-lg"
                     />
                     <button
                       type="button"
@@ -581,15 +584,15 @@ export default function ProductosPage() {
                     <p className="text-[9px] text-emerald-500 font-bold mt-1 px-1">✓ Datos obtenidos de Open Food Facts</p>
                   )}
                 </div>
-                
+
                 <div className="col-span-2 sm:col-span-1">
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Categoría</label>
                   {!showNewCategoryInput ? (
                     <div className="space-y-3">
-                      <select 
-                        required 
-                        value={formData.categoria || ''} 
-                        onChange={e => setFormData({...formData, categoria: e.target.value})} 
+                      <select
+                        required
+                        value={formData.categoria || ''}
+                        onChange={e => setFormData({ ...formData, categoria: e.target.value })}
                         className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold appearance-none"
                       >
                         <option value="">Seleccionar...</option>
@@ -597,7 +600,7 @@ export default function ProductosPage() {
                           <option key={cat.id} value={cat.nombre || ''}>{(cat.nombre || '').toUpperCase()}</option>
                         ))}
                       </select>
-                      <button 
+                      <button
                         type="button"
                         onClick={() => setShowNewCategoryInput(true)}
                         className="text-[10px] font-black text-blue-600 uppercase tracking-widest px-2"
@@ -607,7 +610,7 @@ export default function ProductosPage() {
                     </div>
                   ) : (
                     <div className="flex items-center gap-2 w-full">
-                      <input 
+                      <input
                         autoFocus
                         placeholder="Nueva categoría..."
                         value={newCategoryName}
@@ -624,78 +627,78 @@ export default function ProductosPage() {
 
                 <div className="col-span-2">
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Nombre del Producto</label>
-                  <input required value={formData.nombre || ''} onChange={e => setFormData({...formData, nombre: e.target.value})} className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold text-lg" />
+                  <input required value={formData.nombre || ''} onChange={e => setFormData({ ...formData, nombre: e.target.value })} className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold text-lg" />
                 </div>
 
                 <div>
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Precio Venta</label>
-                  <input 
-                    required 
-                    type="number" 
-                    value={formData.precio_venta_publico || 0} 
-                    onChange={e => { e.target.value = e.target.value.replace(/^0+(?=\d)/, ''); setFormData({...formData, precio_venta_publico: Number(e.target.value)}) }} 
-                    className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-black text-xl text-blue-600" 
+                  <input
+                    required
+                    type="number"
+                    value={formData.precio_venta_publico || 0}
+                    onChange={e => { e.target.value = e.target.value.replace(/^0+(?=\d)/, ''); setFormData({ ...formData, precio_venta_publico: Number(e.target.value) }) }}
+                    className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-black text-xl text-blue-600"
                   />
                 </div>
                 <div>
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Costo Compra</label>
-                  <input 
-                    required 
-                    type="number" 
-                    value={formData.precio_compra || 0} 
-                    onChange={e => { e.target.value = e.target.value.replace(/^0+(?=\d)/, ''); setFormData({...formData, precio_compra: Number(e.target.value)}) }} 
-                    className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold text-xl" 
+                  <input
+                    required
+                    type="number"
+                    value={formData.precio_compra || 0}
+                    onChange={e => { e.target.value = e.target.value.replace(/^0+(?=\d)/, ''); setFormData({ ...formData, precio_compra: Number(e.target.value) }) }}
+                    className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold text-xl"
                   />
                 </div>
                 <div>
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Stock Actual</label>
-                  <input 
-                    required 
-                    type="number" 
-                    value={formData.stock_actual || 0} 
-                    onChange={e => { e.target.value = e.target.value.replace(/^0+(?=\d)/, ''); setFormData({...formData, stock_actual: Number(e.target.value)}) }} 
-                    className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-black text-xl" 
+                  <input
+                    required
+                    type="number"
+                    value={formData.stock_actual || 0}
+                    onChange={e => { e.target.value = e.target.value.replace(/^0+(?=\d)/, ''); setFormData({ ...formData, stock_actual: Number(e.target.value) }) }}
+                    className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-black text-xl"
                   />
                 </div>
                 <div>
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Stock Mínimo</label>
-                  <input 
-                    required 
-                    type="number" 
-                    value={formData.stock_minimo || 0} 
-                    onChange={e => { e.target.value = e.target.value.replace(/^0+(?=\d)/, ''); setFormData({...formData, stock_minimo: Number(e.target.value)}) }} 
-                    className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold text-xl text-red-500" 
+                  <input
+                    required
+                    type="number"
+                    value={formData.stock_minimo || 0}
+                    onChange={e => { e.target.value = e.target.value.replace(/^0+(?=\d)/, ''); setFormData({ ...formData, stock_minimo: Number(e.target.value) }) }}
+                    className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold text-xl text-red-500"
                   />
                 </div>
-                
+
                 <div className="col-span-2">
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Imagen del Producto (Opcional)</label>
                   <div className="space-y-4">
                     <div>
                       <p className="text-[9px] font-bold text-gray-400 uppercase mb-1">Subir archivo de imagen</p>
-                      <input 
-                        type="file" 
+                      <input
+                        type="file"
                         accept="image/*"
                         onChange={e => {
                           if (e.target.files && e.target.files[0]) {
                             setImageFile(e.target.files[0]);
                           }
                         }}
-                        className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" 
+                        className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
                       />
                     </div>
                   </div>
                 </div>
               </div>
-              
+
               <div className="pt-8 flex gap-4">
                 <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 py-5 font-black text-gray-400 uppercase tracking-widest">Cancelar</button>
-                <button 
-                  type="submit" 
+                <button
+                  type="submit"
                   disabled={isSaving}
                   style={{
-                    background: isSaving 
-                      ? `linear-gradient(to right, #111827 ${saveProgress}%, #374151 ${saveProgress}%)` 
+                    background: isSaving
+                      ? `linear-gradient(to right, #111827 ${saveProgress}%, #374151 ${saveProgress}%)`
                       : undefined
                   }}
                   className={`flex-[2] py-5 bg-gray-900 text-white font-black rounded-3xl shadow-2xl transition-all uppercase tracking-[0.2em] text-xs relative overflow-hidden ${isSaving ? 'cursor-not-allowed' : 'hover:scale-105 active:scale-95 active:bg-blue-600'}`}
@@ -727,7 +730,7 @@ export default function ProductosPage() {
                 <div key={cat.id} className="flex items-center justify-between p-6 bg-gray-50 dark:bg-gray-900 rounded-[2rem] group">
                   {editingCatId === cat.id ? (
                     <div className="flex-1 flex gap-2 mr-4">
-                      <input 
+                      <input
                         autoFocus
                         value={catFormName}
                         onChange={e => setCatFormName(e.target.value)}
@@ -746,21 +749,21 @@ export default function ProductosPage() {
                   )}
 
                   <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-all">
-                    <button 
+                    <button
                       onClick={() => { setEditingCatId(cat.id); setCatFormName(cat.nombre); }}
                       className="p-3 bg-white dark:bg-gray-800 rounded-xl shadow-sm hover:scale-110 transition-transform"
                       title="Editar nombre"
                     >
                       ✏️
                     </button>
-                    <button 
+                    <button
                       onClick={() => handleToggleCategory(cat.id, cat.activo !== false)}
                       className={`p-3 rounded-xl shadow-sm hover:scale-110 transition-transform ${cat.activo === false ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}
                       title={cat.activo === false ? "Activar" : "Suspender"}
                     >
                       {cat.activo === false ? '🔓' : '🔒'}
                     </button>
-                    <button 
+                    <button
                       onClick={() => handleDeleteCategory(cat.id)}
                       className="p-3 bg-red-50 text-red-600 rounded-xl shadow-sm hover:scale-110 transition-transform"
                       title="Eliminar"
@@ -773,7 +776,7 @@ export default function ProductosPage() {
             </div>
 
             <div className="mt-10 pt-8 border-t border-gray-100 dark:border-gray-700">
-              <button 
+              <button
                 onClick={() => setIsCatManagerOpen(false)}
                 className="w-full py-5 bg-gray-900 text-white font-black rounded-3xl shadow-xl hover:scale-[1.02] active:scale-95 transition-all uppercase tracking-[0.2em] text-xs"
               >
