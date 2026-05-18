@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/hooks/useAuth';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -10,6 +11,24 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const { user, role } = useAuth();
+
+  // 1. Auto-redirección si el usuario ya está autenticado y tiene un rol asignado
+  useEffect(() => {
+    if (user && role) {
+      router.push(role === 'admin' ? '/admin' : '/cajera');
+    }
+  }, [user, role, router]);
+
+  // 2. Capturar errores de redirección de seguridad (por ejemplo, usuario sin rol en AuthGuard)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('error') === 'no_role') {
+        setError('⚠️ Acceso restringido: Tu cuenta es válida, pero no tienes un perfil operativo asignado. Contacta al administrador para que te asigne un rol.');
+      }
+    }
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -20,7 +39,7 @@ export default function LoginPage() {
       const cleanEmail = email.trim().toLowerCase();
       const cleanPassword = password.trim();
 
-      // 1. Autenticación en Supabase Auth
+      // 1. Autenticación directa en Supabase Auth
       const startAuth = performance.now();
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email: cleanEmail,
@@ -37,31 +56,13 @@ export default function LoginPage() {
         throw new Error('No se pudo recuperar el usuario autenticado.');
       }
 
-      // 2. Obtención de perfil desde tabla pública "Usuario" usando el UUID
-      console.log('[AuthDebug] Intentando cargar perfil para UID:', authData.user.id);
-
-      const startProfile = performance.now();
-      const { data: profile, error: profileError } = await supabase
-        .from('Usuario')
-        .select('*')
-        .eq('id', authData.user.id)
-        .single();
-      const endProfile = performance.now();
-      console.log(`[PERF_AUTH] Tiempo de consulta de rol a tabla Usuario en LoginPage: ${(endProfile - startProfile).toFixed(2)}ms`);
-
-      console.log('[AuthDebug] Resultado de consulta public.Usuario:', { profile, profileError });
-
-      if (profileError || !profile) {
-        console.error('[AuthDebug] Error crítico: Usuario autenticado pero sin fila en Usuario o error de RLS.', profileError);
-        throw new Error('ACCESO RESTRINGIDO: Tu cuenta de autenticación es válida, pero no tienes un perfil operativo asignado. Contacta al administrador para que te asigne un rol.');
-      }
-
-      // 3. Redirección basada en rol
-      router.push((profile as any).rol === 'admin' ? '/admin' : '/cajera');
+      // NO hacemos consultas manuales del perfil aquí.
+      // onAuthStateChange en el AuthContext global detectará el login del usuario,
+      // buscará el rol de forma asíncrona, y nuestro useEffect redireccionará
+      // de manera instantánea y reactiva en cuanto el estado global esté listo.
     } catch (err: any) {
       setError(err.message || 'Error crítico en el proceso de autenticación.');
       console.error('[LoginProcessError]', err);
-    } finally {
       setLoading(false);
     }
   };
