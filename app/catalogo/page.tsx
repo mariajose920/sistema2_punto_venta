@@ -410,9 +410,13 @@ export default function CatalogoPublico() {
                 onClick={() => setIsDatosOpen(!isDatosOpen)}
                 aria-expanded={isDatosOpen}
                 aria-controls="formulario-datos-cliente"
-                className="w-full flex items-center justify-between py-2 px-3 bg-slate-900 border border-slate-700 rounded-xl md:hidden text-slate-300 font-bold text-xs mb-3 transition-colors hover:bg-slate-900/80 active:scale-95"
+                className={`w-full flex items-center justify-between py-2.5 px-3 rounded-xl md:hidden font-black text-xs mb-1 transition-all active:scale-95 ${
+                  isDatosOpen
+                    ? 'bg-slate-900 border border-slate-700 text-slate-300'
+                    : 'bg-blue-600 border border-blue-500 text-white shadow-lg shadow-blue-900/30'
+                }`}
               >
-                <span>👤 {isDatosOpen ? 'Ocultar tus datos' : 'Ingresar tus datos para enviar'}</span>
+                <span>👤 {isDatosOpen ? 'Ocultar tus datos' : 'Ingresar tus datos'}</span>
                 <span className="text-xs transition-transform duration-200">
                   {isDatosOpen ? '▲' : '▼'}
                 </span>
@@ -421,7 +425,7 @@ export default function CatalogoPublico() {
               <form
                 id="formulario-datos-cliente"
                 onSubmit={handleSubmit}
-                className={`space-y-3 md:space-y-4 md:block ${isDatosOpen ? 'block' : 'hidden'}`}
+                className={`space-y-3 md:space-y-4 md:block ${isDatosOpen ? 'block animate-fadeIn' : 'hidden'}`}
               >
                 <div>
                   <input
