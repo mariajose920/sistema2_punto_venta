@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import AuthGuard from '@/components/AuthGuard';
 import Sidebar from '@/components/Sidebar';
@@ -39,6 +39,10 @@ export default function DashboardLayout({
   const { role, user } = useAuth();
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  useEffect(() => {
+    console.log(`[PERF_AUTH] [DashboardLayout] Primer render útil del Dashboard layout completado. Usuario: ${user?.email}, Rol: ${role}`);
+  }, [user, role]);
 
   // Determinar el mensaje de contexto según el rol
   const contextMessage = role === 'admin'
