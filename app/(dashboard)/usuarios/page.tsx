@@ -297,31 +297,31 @@ export default function UsuariosPage() {
     <div className="space-y-6 animate-in fade-in duration-500">
       
       {/* Header Administrativo */}
-      <div className="bg-white dark:bg-gray-800 p-10 rounded-[3rem] shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col md:flex-row justify-between items-center gap-6">
-        <div>
-          <h1 className="text-4xl font-black text-gray-900 dark:text-white tracking-tighter italic">Personal & Roles</h1>
-          <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] mt-2 opacity-60 italic">Gestión Centralizada de Operaciones</p>
-        </div>
-        <div className="flex gap-4 w-full md:w-auto">
-          <div className="relative flex-1">
-            <span className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
-            <input 
-              type="text" 
-              placeholder="Buscar por nombre o correo..." 
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="w-full pl-14 pr-6 py-4 bg-gray-50 dark:bg-gray-900 border-none rounded-2xl font-bold text-sm focus:ring-4 focus:ring-blue-600/10 transition-all"
-            />
+      <div className="bg-white dark:bg-gray-800 p-4 sm:p-10 rounded-[2rem] sm:rounded-[3rem] shadow-sm border border-gray-100 dark:border-gray-700 space-y-4">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <h1 className="text-2xl sm:text-4xl font-black text-gray-900 dark:text-white tracking-tighter italic">Personal & Roles</h1>
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] mt-1 sm:mt-2 opacity-60 italic">Gestión Centralizada de Operaciones</p>
           </div>
+        </div>
+        <div className="relative">
+          <span className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
+          <input 
+            type="text" 
+            placeholder="Buscar por nombre o correo..." 
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="w-full pl-14 pr-6 py-4 bg-gray-50 dark:bg-gray-900 border-none rounded-2xl font-bold text-sm focus:ring-4 focus:ring-blue-600/10 transition-all"
+          />
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         
         {/* Lado Izquierdo: Lista de Usuarios */}
-        <div className="lg:col-span-1 space-y-4">
-          <h2 className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-4">Equipo Operativo</h2>
-          <div className="space-y-3 max-h-[700px] overflow-auto pr-2 custom-scrollbar">
+        <div className="lg:col-span-1 space-y-3">
+          <h2 className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2">Equipo Operativo</h2>
+          <div className="space-y-2 max-h-[50vh] lg:max-h-[700px] overflow-auto pr-1 custom-scrollbar">
             {loading && !selectedUser ? (
               <p className="p-10 text-center animate-pulse text-gray-400 font-black text-xs uppercase tracking-widest">Sincronizando...</p>
             ) : filteredUsers.map(u => (
@@ -349,21 +349,21 @@ export default function UsuariosPage() {
         </div>
 
         {/* Lado Derecho: Gestión y Analítica */}
-        <div className="lg:col-span-3 space-y-8">
+        <div className="lg:col-span-3 space-y-6">
           {selectedUser ? (
             <div className="animate-in slide-in-from-right-10 duration-500">
               {/* Acciones de Gestión de Perfil */}
-              <div className="bg-white dark:bg-gray-800 p-10 rounded-[3rem] border border-gray-100 dark:border-gray-700 shadow-sm flex flex-col lg:flex-row justify-between items-center gap-8 mb-8">
-                <div className="flex items-center gap-8">
-                   <div className={`w-24 h-24 rounded-[2rem] flex items-center justify-center text-4xl font-black text-white shadow-2xl ${selectedUser.rol === 'admin' ? 'bg-indigo-600' : 'bg-emerald-600'}`}>
+              <div className="bg-white dark:bg-gray-800 p-6 sm:p-10 rounded-[2rem] sm:rounded-[3rem] border border-gray-100 dark:border-gray-700 shadow-sm space-y-6">
+                <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-8">
+                   <div className={`w-16 h-16 sm:w-24 sm:h-24 rounded-[1.5rem] sm:rounded-[2rem] flex items-center justify-center text-2xl sm:text-4xl font-black text-white shadow-2xl shrink-0 ${selectedUser.rol === 'admin' ? 'bg-indigo-600' : 'bg-emerald-600'}`}>
                     {selectedUser.email.charAt(0).toUpperCase()}
                   </div>
-                  <div>
-                    <h3 className="text-3xl font-black text-gray-900 dark:text-white uppercase italic tracking-tighter">{selectedUser.nombre ? `${selectedUser.nombre} ${selectedUser.apellido || ''}` : 'Usuario Genérico'}</h3>
-                    <p className="text-sm text-gray-400 font-bold uppercase tracking-[0.2em] mt-1">{selectedUser.email} • <span className="text-blue-600">{selectedUser.rol.toUpperCase()}</span></p>
+                  <div className="text-center sm:text-left">
+                    <h3 className="text-xl sm:text-3xl font-black text-gray-900 dark:text-white uppercase italic tracking-tighter">{selectedUser.nombre ? `${selectedUser.nombre} ${selectedUser.apellido || ''}` : 'Usuario Genérico'}</h3>
+                    <p className="text-xs sm:text-sm text-gray-400 font-bold uppercase tracking-[0.2em] mt-1">{selectedUser.email} • <span className="text-blue-600">{selectedUser.rol.toUpperCase()}</span></p>
                   </div>
                 </div>
-                <div className="flex flex-wrap justify-center gap-3">
+                <div className="flex flex-wrap justify-center sm:justify-start gap-2">
                   <button 
                     onClick={() => {
                       setFormData({ 
@@ -396,15 +396,15 @@ export default function UsuariosPage() {
               </div>
 
               {/* Nota Interna */}
-              <div className="bg-white dark:bg-gray-800 p-10 rounded-[3rem] border border-gray-100 dark:border-gray-700 shadow-sm mb-8">
-                <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] mb-4 px-2">Comentario del perfil / Nota interna</h3>
+              <div className="bg-white dark:bg-gray-800 p-4 sm:p-10 rounded-[2rem] sm:rounded-[3rem] border border-gray-100 dark:border-gray-700 shadow-sm mb-6">
+                <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] mb-3 sm:mb-4 px-2">Comentario del perfil / Nota interna</h3>
                 <textarea 
                   value={userNotes[selectedUser.id] || ''}
                   onChange={(e) => setUserNotes({ ...userNotes, [selectedUser.id]: e.target.value })}
                   placeholder="Escribe una nota privada sobre este colaborador... (Solo visible en esta sesión)"
-                  className="w-full p-6 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-medium text-sm focus:ring-4 focus:ring-gray-200 transition-all min-h-[120px] resize-none"
+                  className="w-full p-4 sm:p-6 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-medium text-sm focus:ring-4 focus:ring-gray-200 transition-all min-h-[100px] sm:min-h-[120px] resize-none"
                 />
-                <p className="text-[8px] font-bold text-gray-300 uppercase tracking-widest mt-3 px-2 italic opacity-50">Nota: Este comentario se maneja solo en memoria y no afecta la base de datos.</p>
+                <p className="text-[8px] font-bold text-gray-300 uppercase tracking-widest mt-2 sm:mt-3 px-2 italic opacity-50">Nota: Este comentario se maneja solo en memoria y no afecta la base de datos.</p>
               </div>
 
               {/* Selector de Pestañas (Ventas vs Auditoría) */}
@@ -426,14 +426,14 @@ export default function UsuariosPage() {
               {activeTab === 'metrics' ? (
                 /* SECCIÓN ORIGINAL DE VENTAS & RENDIMIENTO */
                 <div className="space-y-8">
-                  <div className="flex flex-col md:flex-row items-center justify-between gap-4 px-4">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 px-0 sm:px-4">
                     <h3 className="text-xs font-black text-gray-400 uppercase tracking-[0.3em]">Rendimiento Operativo</h3>
-                    <div className="flex items-center gap-3 bg-white dark:bg-gray-800 p-3 rounded-2xl shadow-sm border border-gray-50 dark:border-gray-700">
-                      <span className="text-[9px] font-black text-gray-300 uppercase tracking-widest">Desde</span>
-                      <input type="date" value={fechaDesde} onChange={e => setFechaDesde(e.target.value)} className="bg-transparent border-none p-0 text-[10px] font-black text-blue-600 focus:ring-0 cursor-pointer" />
-                      <span className="text-gray-300 mx-2">→</span>
-                      <span className="text-[9px] font-black text-gray-300 uppercase tracking-widest">Hasta</span>
-                      <input type="date" value={fechaHasta} onChange={e => setFechaHasta(e.target.value)} className="bg-transparent border-none p-0 text-[10px] font-black text-blue-600 focus:ring-0 cursor-pointer" />
+                    <div className="flex items-center gap-2 sm:gap-3 bg-white dark:bg-gray-800 p-2 sm:p-3 rounded-2xl shadow-sm border border-gray-50 dark:border-gray-700 w-full sm:w-auto">
+                      <span className="text-[9px] font-black text-gray-300 uppercase tracking-widest hidden sm:inline">Desde</span>
+                      <input type="date" value={fechaDesde} onChange={e => setFechaDesde(e.target.value)} className="bg-transparent border-none p-0 text-[10px] font-black text-blue-600 focus:ring-0 cursor-pointer min-h-[44px]" />
+                      <span className="text-gray-300 mx-1">→</span>
+                      <span className="text-[9px] font-black text-gray-300 uppercase tracking-widest hidden sm:inline">Hasta</span>
+                      <input type="date" value={fechaHasta} onChange={e => setFechaHasta(e.target.value)} className="bg-transparent border-none p-0 text-[10px] font-black text-blue-600 focus:ring-0 cursor-pointer min-h-[44px]" />
                     </div>
                   </div>
 
@@ -509,8 +509,8 @@ export default function UsuariosPage() {
                 <div className="space-y-6">
                   
                   {/* Panel de Filtros Rápidos */}
-                  <div className="bg-white dark:bg-gray-800 p-8 rounded-[2.5rem] border border-gray-100 dark:border-gray-700 shadow-sm space-y-6">
-                    <div className="flex flex-col lg:flex-row gap-4">
+                  <div className="bg-white dark:bg-gray-800 p-4 sm:p-8 rounded-[2rem] sm:rounded-[2.5rem] border border-gray-100 dark:border-gray-700 shadow-sm space-y-4 sm:space-y-6">
+                    <div className="flex flex-col sm:flex-row gap-3">
                       {/* Búsqueda por texto */}
                       <div className="relative flex-1">
                         <span className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
@@ -522,13 +522,15 @@ export default function UsuariosPage() {
                           className="w-full pl-14 pr-6 py-4 bg-gray-50 dark:bg-gray-900 border-none rounded-2xl font-bold text-xs focus:ring-4 focus:ring-blue-600/10 transition-all"
                         />
                       </div>
-                      
+                    </div>
+
+                    <div className="flex flex-wrap gap-2 sm:gap-3">
                       {/* Filtro por Módulo */}
-                      <div className="w-full lg:w-48">
+                      <div className="flex-1 min-w-[140px]">
                         <select
                           value={auditModulo}
                           onChange={e => handleFilterChange({ modulo: e.target.value })}
-                          className="w-full p-4 bg-gray-50 dark:bg-gray-900 border-none rounded-2xl font-black text-[10px] uppercase tracking-widest appearance-none"
+                          className="w-full p-3 sm:p-4 bg-gray-50 dark:bg-gray-900 border-none rounded-2xl font-black text-[10px] uppercase tracking-widest appearance-none"
                         >
                           <option value="todos">🗂️ Todos los Módulos</option>
                           <option value="productos">📦 Productos</option>
@@ -539,11 +541,11 @@ export default function UsuariosPage() {
                       </div>
 
                       {/* Filtro por Acción */}
-                      <div className="w-full lg:w-48">
+                      <div className="flex-1 min-w-[140px]">
                         <select
                           value={auditAccion}
                           onChange={e => handleFilterChange({ accion: e.target.value })}
-                          className="w-full p-4 bg-gray-50 dark:bg-gray-900 border-none rounded-2xl font-black text-[10px] uppercase tracking-widest appearance-none"
+                          className="w-full p-3 sm:p-4 bg-gray-50 dark:bg-gray-900 border-none rounded-2xl font-black text-[10px] uppercase tracking-widest appearance-none"
                         >
                           <option value="todas">⚙️ Todas las Acciones</option>
                           <option value="creacion">➕ Creaciones</option>
@@ -556,11 +558,11 @@ export default function UsuariosPage() {
                       </div>
 
                       {/* Ordenación */}
-                      <div className="w-full lg:w-44">
+                      <div className="flex-1 min-w-[140px]">
                         <select
                           value={auditOrder}
                           onChange={e => handleFilterChange({ order: e.target.value as 'desc' | 'asc' })}
-                          className="w-full p-4 bg-gray-50 dark:bg-gray-900 border-none rounded-2xl font-black text-[10px] uppercase tracking-widest appearance-none"
+                          className="w-full p-3 sm:p-4 bg-gray-50 dark:bg-gray-900 border-none rounded-2xl font-black text-[10px] uppercase tracking-widest appearance-none"
                         >
                           <option value="desc">🕒 Más Recientes</option>
                           <option value="asc">⏳ Más Antiguos</option>
@@ -569,37 +571,37 @@ export default function UsuariosPage() {
                     </div>
 
                     {/* Filtros Rápidos Semánticos */}
-                    <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-100 dark:border-gray-700/50">
-                      <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest self-center mr-2">Filtros Express:</span>
+                    <div className="flex flex-wrap gap-2 pt-2 sm:pt-3 border-t border-gray-100 dark:border-gray-700/50">
+                      <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest self-center mr-1">Filtros:</span>
                       <button
                         onClick={() => handleFilterChange({ modulo: 'todos', accion: 'todas', search: '' })}
-                        className={`px-3 py-1.5 rounded-xl text-[8px] font-black uppercase tracking-widest transition-all ${auditModulo === 'todos' && auditAccion === 'todas' && auditSearch === '' ? 'bg-blue-600 text-white shadow-sm' : 'bg-gray-100 dark:bg-gray-900 text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-800'}`}
+                        className={`px-3 py-2 rounded-xl text-[8px] font-black uppercase tracking-widest transition-all min-h-[36px] ${auditModulo === 'todos' && auditAccion === 'todas' && auditSearch === '' ? 'bg-blue-600 text-white shadow-sm' : 'bg-gray-100 dark:bg-gray-900 text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-800'}`}
                       >
-                        Resetear
+                        Reset
                       </button>
                       <button
                         onClick={() => handleFilterChange({ modulo: 'productos', accion: 'todas' })}
-                        className={`px-3 py-1.5 rounded-xl text-[8px] font-black uppercase tracking-widest transition-all ${auditModulo === 'productos' ? 'bg-blue-600 text-white shadow-sm' : 'bg-gray-100 dark:bg-gray-900 text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-800'}`}
+                        className={`px-3 py-2 rounded-xl text-[8px] font-black uppercase tracking-widest transition-all min-h-[36px] ${auditModulo === 'productos' ? 'bg-blue-600 text-white shadow-sm' : 'bg-gray-100 dark:bg-gray-900 text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-800'}`}
                       >
-                        📦 Sólo Productos
+                        📦 Productos
                       </button>
                       <button
                         onClick={() => handleFilterChange({ modulo: 'ventas', accion: 'todas' })}
-                        className={`px-3 py-1.5 rounded-xl text-[8px] font-black uppercase tracking-widest transition-all ${auditModulo === 'ventas' ? 'bg-blue-600 text-white shadow-sm' : 'bg-gray-100 dark:bg-gray-900 text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-800'}`}
+                        className={`px-3 py-2 rounded-xl text-[8px] font-black uppercase tracking-widest transition-all min-h-[36px] ${auditModulo === 'ventas' ? 'bg-blue-600 text-white shadow-sm' : 'bg-gray-100 dark:bg-gray-900 text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-800'}`}
                       >
-                        💰 Sólo Ventas
+                        💰 Ventas
                       </button>
                       <button
                         onClick={() => handleFilterChange({ accion: 'edicion', modulo: 'todos' })}
-                        className={`px-3 py-1.5 rounded-xl text-[8px] font-black uppercase tracking-widest transition-all ${auditAccion === 'edicion' ? 'bg-blue-600 text-white shadow-sm' : 'bg-gray-100 dark:bg-gray-900 text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-800'}`}
+                        className={`px-3 py-2 rounded-xl text-[8px] font-black uppercase tracking-widest transition-all min-h-[36px] ${auditAccion === 'edicion' ? 'bg-blue-600 text-white shadow-sm' : 'bg-gray-100 dark:bg-gray-900 text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-800'}`}
                       >
-                        ✏️ Sólo Ediciones
+                        ✏️ Ediciones
                       </button>
                     </div>
                   </div>
 
                   {/* Línea de Tiempo (Timeline) */}
-                  <div className="bg-white dark:bg-gray-800 p-10 rounded-[3rem] border border-gray-100 dark:border-gray-700 shadow-sm">
+                  <div className="bg-white dark:bg-gray-800 p-4 sm:p-10 rounded-[2rem] sm:rounded-[3rem] border border-gray-100 dark:border-gray-700 shadow-sm">
                     {auditLoading ? (
                       <p className="p-32 text-center animate-pulse text-gray-400 font-black text-xs uppercase tracking-widest">Buscando en historial de auditoría...</p>
                     ) : auditLogs.length === 0 ? (
@@ -609,36 +611,36 @@ export default function UsuariosPage() {
                         <p className="text-[10px] text-gray-400 mt-2">Intenta cambiar los filtros o expandir los parámetros de búsqueda.</p>
                       </div>
                     ) : (
-                      <div className="relative border-l-2 border-gray-100 dark:border-gray-700 ml-4 pl-8 space-y-8">
+                      <div className="relative border-l-2 border-gray-100 dark:border-gray-700 ml-3 sm:ml-4 pl-5 sm:pl-8 space-y-6 sm:space-y-8">
                         {auditLogs.map(log => {
                           const badge = getActionBadgeStyles(log.accion);
                           return (
                             <div key={log.id} className="relative group">
                               {/* Punto en el Timeline */}
-                              <div className={`absolute -left-[45px] top-1 w-8 h-8 rounded-full flex items-center justify-center text-sm shadow-md transition-transform group-hover:scale-110 ${badge.bg}`}>
+                              <div className={`absolute -left-[37px] sm:-left-[45px] top-1 w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-[10px] sm:text-sm shadow-md transition-transform group-hover:scale-110 ${badge.bg}`}>
                                 {badge.icon}
                               </div>
 
                               {/* Bloque del Evento */}
-                              <div className="space-y-2">
-                                <div className="flex flex-wrap items-center gap-2">
+                              <div className="space-y-1 sm:space-y-2">
+                                <div className="flex flex-wrap items-center gap-1 sm:gap-2">
                                   <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md ${badge.bg}`}>
                                     {log.accion}
                                   </span>
                                   <span className="text-[8px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest bg-blue-50 dark:bg-blue-950/20 px-2 py-0.5 rounded-md">
                                     {log.modulo}
                                   </span>
-                                  <span className="text-[9px] text-gray-300 font-black uppercase tracking-widest ml-auto">
+                                  <span className="text-[8px] sm:text-[9px] text-gray-300 font-black uppercase tracking-widest ml-auto">
                                     {new Date(log.fecha_hora).toLocaleDateString()} {new Date(log.fecha_hora).toLocaleTimeString()}
                                   </span>
                                 </div>
 
-                                <h4 className="font-bold text-gray-900 dark:text-white text-sm">
+                                <h4 className="font-bold text-gray-900 dark:text-white text-xs sm:text-sm">
                                   {log.descripcion}
                                 </h4>
 
-                                <p className="text-[10px] text-gray-400 font-medium">
-                                  Entidad: <span className="font-bold text-gray-600 dark:text-gray-300">{log.entidad_afectada}</span> • ID: <span className="font-mono bg-gray-50 dark:bg-gray-900 px-1.5 py-0.5 rounded text-gray-500">{log.id_entidad}</span>
+                                <p className="text-[9px] sm:text-[10px] text-gray-400 font-medium">
+                                  Entidad: <span className="font-bold text-gray-600 dark:text-gray-300">{log.entidad_afectada}</span> • ID: <span className="font-mono bg-gray-50 dark:bg-gray-900 px-1 py-0.5 rounded text-gray-500">{log.id_entidad}</span>
                                 </p>
 
                                 {/* Botón para ver diferencias JSON */}
@@ -792,12 +794,12 @@ interface StatCardProps {
 
 function StatCard({ title, value, icon, color }: StatCardProps) {
   return (
-    <div className="bg-white dark:bg-gray-800 p-10 rounded-[3rem] border border-gray-100 dark:border-gray-700 shadow-sm transition-all hover:shadow-2xl group relative overflow-hidden">
-      <div className="flex justify-between items-center mb-6 relative z-10">
+    <div className="bg-white dark:bg-gray-800 p-6 sm:p-10 rounded-[2rem] sm:rounded-[3rem] border border-gray-100 dark:border-gray-700 shadow-sm transition-all hover:shadow-2xl group relative overflow-hidden">
+      <div className="flex justify-between items-center mb-4 sm:mb-6 relative z-10">
         <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">{title}</p>
-        <div className="w-10 h-10 bg-gray-50 dark:bg-gray-900 rounded-xl flex items-center justify-center text-xl group-hover:scale-110 transition-transform">{icon}</div>
+        <div className="w-10 h-10 bg-gray-50 dark:bg-gray-900 rounded-xl flex items-center justify-center text-xl group-hover:scale-110 transition-transform shrink-0">{icon}</div>
       </div>
-      <p className={`text-3xl font-black ${color || 'text-gray-900 dark:text-white'} tracking-tighter relative z-10`}>{value}</p>
+      <p className={`text-2xl sm:text-3xl font-black ${color || 'text-gray-900 dark:text-white'} tracking-tighter relative z-10 break-all`}>{value}</p>
       <div className="absolute -right-4 -bottom-4 text-7xl opacity-5 group-hover:opacity-10 transition-opacity grayscale">{icon}</div>
     </div>
   );

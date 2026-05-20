@@ -48,17 +48,19 @@ export default function ComprasPage() {
     <div className="space-y-6 animate-in fade-in duration-500">
       
       {/* Header */}
-      <div className="flex justify-between items-center bg-white dark:bg-gray-800 p-8 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700">
-        <div>
-          <h1 className="text-2xl font-black text-gray-900 dark:text-white">Gestión de Compras</h1>
-          <p className="text-sm text-gray-400 font-bold uppercase tracking-widest mt-1">Abastecimiento y Costos</p>
+      <div className="bg-white dark:bg-gray-800 p-4 sm:p-8 rounded-[2rem] sm:rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 space-y-4">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+          <div>
+            <h1 className="text-2xl font-black text-gray-900 dark:text-white">Gestión de Compras</h1>
+            <p className="text-sm text-gray-400 font-bold uppercase tracking-widest mt-1">Abastecimiento y Costos</p>
+          </div>
+          <Link 
+            href="/compras/nueva"
+            className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-2xl font-black shadow-xl shadow-emerald-100 dark:shadow-none transition-all transform active:scale-95 flex items-center justify-center gap-2 text-center"
+          >
+            <span>📦</span> Registrar Nueva Compra
+          </Link>
         </div>
-        <Link 
-          href="/compras/nueva"
-          className="bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-4 rounded-2xl font-black shadow-xl shadow-emerald-100 dark:shadow-none transition-all transform active:scale-95 flex items-center gap-2"
-        >
-          <span>📦</span> Registrar Nueva Compra
-        </Link>
       </div>
 
       {/* Historial de Compras */}

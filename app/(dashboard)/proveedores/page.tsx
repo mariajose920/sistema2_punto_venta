@@ -214,30 +214,30 @@ export default function ProveedoresPage() {
     <div className="space-y-6 animate-in fade-in duration-500">
 
       {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white dark:bg-gray-800 p-8 rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-gray-700">
-        <div className="flex-1 w-full">
-          <h1 className="text-3xl font-black text-gray-900 dark:text-white tracking-tighter">Directorio Proveedores</h1>
-          <div className="relative mt-4">
-            <span className="absolute left-4 top-1/2 -translate-y-1/2 grayscale opacity-50 text-xl">🔍</span>
-            <input
-              type="text"
-              placeholder="Buscar por nombre de empresa o RUT/NIT..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-14 pr-4 py-4 bg-gray-50 dark:bg-gray-900 border-none rounded-2xl font-bold text-sm focus:ring-4 focus:ring-blue-600/10 transition-all"
-            />
-          </div>
+      <div className="bg-white dark:bg-gray-800 p-4 sm:p-8 rounded-[2rem] sm:rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-gray-700 space-y-4">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <h1 className="text-2xl sm:text-3xl font-black text-gray-900 dark:text-white tracking-tighter">Directorio Proveedores</h1>
+          <button
+            onClick={() => { 
+              setSelectedProveedor(null); 
+              setFormData({ nombre_empresa: '', rut_empresa: '', telefono_: '', correo_: '', direccion: '' }); 
+              setIsModalOpen(true); 
+            }}
+            className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white px-6 sm:px-10 py-3 sm:py-5 rounded-2xl font-black shadow-2xl shadow-blue-200 dark:shadow-none transition-all transform hover:scale-105 active:scale-95 text-center"
+          >
+            Nuevo Proveedor
+          </button>
         </div>
-        <button
-          onClick={() => { 
-            setSelectedProveedor(null); 
-            setFormData({ nombre_empresa: '', rut_empresa: '', telefono_: '', correo_: '', direccion: '' }); 
-            setIsModalOpen(true); 
-          }}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-10 py-5 rounded-2xl font-black shadow-2xl shadow-blue-200 dark:shadow-none transition-all transform hover:scale-105 active:scale-95"
-        >
-          Nuevo Proveedor
-        </button>
+        <div className="relative">
+          <span className="absolute left-4 top-1/2 -translate-y-1/2 grayscale opacity-50 text-xl">🔍</span>
+          <input
+            type="text"
+            placeholder="Buscar por nombre de empresa o RUT/NIT..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full pl-14 pr-4 py-4 bg-gray-50 dark:bg-gray-900 border-none rounded-2xl font-bold text-sm focus:ring-4 focus:ring-blue-600/10 transition-all"
+          />
+        </div>
       </div>
 
       {/* Grid de Proveedores */}

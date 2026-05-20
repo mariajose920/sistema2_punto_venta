@@ -202,25 +202,26 @@ export default function ReportesPage() {
     <div className="space-y-10 animate-in fade-in duration-700">
       
       {/* Header con Filtros */}
-      <div className="bg-white dark:bg-gray-900 p-10 rounded-[3rem] shadow-2xl border border-gray-50 dark:border-gray-800 flex flex-col lg:flex-row justify-between items-center gap-8">
-        <div>
-          <h1 className="text-4xl font-black text-gray-900 dark:text-white tracking-tighter italic">Reportes & Análisis</h1>
-          <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] mt-2 opacity-60">Auditoría Financiera y Operativa</p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-4">
-          <div className="flex items-center gap-3 bg-gray-50 dark:bg-gray-800 p-4 rounded-2xl border border-gray-100 dark:border-gray-700">
-            <input type="date" value={fechaDesde} onChange={e => setFechaDesde(e.target.value)} className="bg-transparent border-none p-0 text-xs font-black text-blue-600 focus:ring-0 cursor-pointer" />
-            <span className="text-gray-300 font-black">→</span>
-            <input type="date" value={fechaHasta} onChange={e => setFechaHasta(e.target.value)} className="bg-transparent border-none p-0 text-xs font-black text-blue-600 focus:ring-0 cursor-pointer" />
+      <div className="bg-white dark:bg-gray-900 p-4 sm:p-10 rounded-[2rem] sm:rounded-[3rem] shadow-2xl border border-gray-50 dark:border-gray-800 space-y-4">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <h1 className="text-2xl sm:text-4xl font-black text-gray-900 dark:text-white tracking-tighter italic">Reportes & Análisis</h1>
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] mt-1 sm:mt-2 opacity-60">Auditoría Financiera y Operativa</p>
           </div>
-          
           <button 
             onClick={exportCSV}
-            className="px-8 py-4 bg-emerald-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-lg active:scale-95"
+            className="w-full sm:w-auto px-6 sm:px-8 py-3 sm:py-4 bg-emerald-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-lg active:scale-95 text-center"
           >
             📥 Exportar CSV
           </button>
+        </div>
+
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+          <div className="flex items-center gap-3 bg-gray-50 dark:bg-gray-800 p-3 sm:p-4 rounded-2xl border border-gray-100 dark:border-gray-700">
+            <input type="date" value={fechaDesde} onChange={e => setFechaDesde(e.target.value)} className="bg-transparent border-none p-0 text-xs font-black text-blue-600 focus:ring-0 cursor-pointer min-h-[44px]" />
+            <span className="text-gray-300 font-black">→</span>
+            <input type="date" value={fechaHasta} onChange={e => setFechaHasta(e.target.value)} className="bg-transparent border-none p-0 text-xs font-black text-blue-600 focus:ring-0 cursor-pointer min-h-[44px]" />
+          </div>
         </div>
       </div>
 
@@ -234,8 +235,8 @@ export default function ReportesPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Métodos de Pago */}
-        <div className="bg-white dark:bg-gray-800 p-10 rounded-[3rem] border border-gray-100 dark:border-gray-700 shadow-sm">
-          <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-8">Flujo por Método de Pago</h3>
+        <div className="bg-white dark:bg-gray-800 p-5 sm:p-10 rounded-[2rem] sm:rounded-[3rem] border border-gray-100 dark:border-gray-700 shadow-sm">
+          <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-5 sm:mb-8">Flujo por Método de Pago</h3>
           <div className="space-y-6">
             <PaymentRow label="Efectivo" value={stats?.porMetodo.efectivo || 0} total={stats?.totalVentas || 1} color="bg-emerald-500" />
             <PaymentRow label="Tarjeta" value={stats?.porMetodo.tarjeta || 0} total={stats?.totalVentas || 1} color="bg-blue-500" />
@@ -245,10 +246,10 @@ export default function ReportesPage() {
         </div>
 
         {/* Productos Top */}
-        <div className="lg:col-span-2 bg-white dark:bg-gray-800 p-10 rounded-[3rem] border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden">
-          <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-8">Análisis de Productos</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="p-6 bg-blue-50 dark:bg-blue-900/10 rounded-2xl border border-blue-100 dark:border-blue-900/30">
+        <div className="lg:col-span-2 bg-white dark:bg-gray-800 p-5 sm:p-10 rounded-[2rem] sm:rounded-[3rem] border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden">
+          <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-5 sm:mb-8">Análisis de Productos</h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
+            <div className="p-4 sm:p-6 bg-blue-50 dark:bg-blue-900/10 rounded-2xl border border-blue-100 dark:border-blue-900/30">
               <p className="text-[9px] font-black text-blue-600 uppercase tracking-widest mb-2">Más Vendido (Cantidad)</p>
               <p className="text-lg font-black text-gray-900 dark:text-white uppercase truncate">{stats?.masVendido?.nombre || 'N/A'}</p>
               <p className="text-2xl font-black text-blue-600 mt-1">{stats?.masVendido?.cant || 0} <span className="text-[10px] uppercase opacity-50">Unidades</span></p>
@@ -265,13 +266,13 @@ export default function ReportesPage() {
             </div>
           </div>
 
-          <div className="mt-8">
-             <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Alertas de Inventario</h4>
-             <div className="flex gap-4">
-                <div className="flex-1 p-4 bg-amber-50 dark:bg-amber-900/10 rounded-xl border border-amber-100 dark:border-amber-900/30">
+          <div className="mt-6 sm:mt-8">
+             <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 sm:mb-4">Alertas de Inventario</h4>
+             <div className="flex gap-3 sm:gap-4">
+                <div className="flex-1 p-3 sm:p-4 bg-amber-50 dark:bg-amber-900/10 rounded-xl border border-amber-100 dark:border-amber-900/30">
                   <p className="text-[10px] font-black text-amber-600 uppercase tracking-widest">{stats?.stockBajo.length || 0} Stock Bajo</p>
                 </div>
-                <div className="flex-1 p-4 bg-red-50 dark:bg-red-900/10 rounded-xl border border-red-100 dark:border-red-900/30">
+                <div className="flex-1 p-3 sm:p-4 bg-red-50 dark:bg-red-900/10 rounded-xl border border-red-100 dark:border-red-900/30">
                   <p className="text-[10px] font-black text-red-600 uppercase tracking-widest">{stats?.sinStock.length || 0} Sin Stock</p>
                 </div>
              </div>
@@ -280,8 +281,8 @@ export default function ReportesPage() {
       </div>
 
       {/* C. Rendimiento Cajeras */}
-      <div className="bg-white dark:bg-gray-800 rounded-[3rem] border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden">
-        <div className="p-10 border-b border-gray-50 dark:border-gray-700 flex justify-between items-center bg-gray-50/20 dark:bg-gray-900/10">
+      <div className="bg-white dark:bg-gray-800 rounded-[2rem] sm:rounded-[3rem] border border-gray-100 dark:border-gray-700 shadow-sm overflow-hidden">
+        <div className="p-4 sm:p-10 border-b border-gray-50 dark:border-gray-700 flex justify-between items-center bg-gray-50/20 dark:bg-gray-900/10">
           <h3 className="text-[10px] font-black text-gray-900 dark:text-white uppercase tracking-widest">Rendimiento Comparativo Cajeras</h3>
         </div>
         {/* Desktop table */}
@@ -352,12 +353,12 @@ export default function ReportesPage() {
 
 function ReportCard({ title, value, icon, color }: any) {
   return (
-    <div className="bg-white dark:bg-gray-800 p-8 rounded-[2.5rem] border border-gray-100 dark:border-gray-700 shadow-sm transition-all hover:shadow-2xl group">
-      <div className="flex justify-between items-center mb-6">
+    <div className="bg-white dark:bg-gray-800 p-5 sm:p-8 rounded-[2rem] sm:rounded-[2.5rem] border border-gray-100 dark:border-gray-700 shadow-sm transition-all hover:shadow-2xl group">
+      <div className="flex justify-between items-center mb-4 sm:mb-6">
         <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{title}</p>
-        <span className="text-2xl group-hover:scale-125 transition-transform">{icon}</span>
+        <span className="text-2xl group-hover:scale-125 transition-transform shrink-0">{icon}</span>
       </div>
-      <p className={`text-3xl font-black ${color} tracking-tighter`}>{value}</p>
+      <p className={`text-2xl sm:text-3xl font-black ${color} tracking-tighter break-all`}>{value}</p>
     </div>
   );
 }
