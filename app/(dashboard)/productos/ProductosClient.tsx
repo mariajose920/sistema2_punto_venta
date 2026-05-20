@@ -443,10 +443,10 @@ export default function ProductosClient({
     <div className="space-y-6 animate-in fade-in duration-500">
 
       {/* Encabezado y Filtros */}
-      <div className="bg-white dark:bg-gray-800 p-8 rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-gray-700 space-y-6">
-        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
+      <div className="bg-white dark:bg-gray-800 p-4 sm:p-8 rounded-[2rem] sm:rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-gray-700 space-y-4 sm:space-y-6">
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 sm:gap-6">
           <div className="flex-1 w-full">
-            <h1 className="text-3xl font-black text-gray-900 dark:text-white mb-4 tracking-tight">Inventario de Productos</h1>
+            <h1 className="text-2xl sm:text-3xl font-black text-gray-900 dark:text-white mb-3 sm:mb-4 tracking-tight">Inventario de Productos</h1>
             <div className="relative group">
               <span className="absolute left-5 top-1/2 -translate-y-1/2 text-2xl group-focus-within:scale-110 transition-transform">🔍</span>
               <input
@@ -460,32 +460,32 @@ export default function ProductosClient({
           </div>
 
           {(role === 'admin' || role === 'cajera') && (
-            <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
+            <div className="flex flex-row sm:flex-row gap-2 sm:gap-3 w-full lg:w-auto">
               <button
                 onClick={() => setIsCatManagerOpen(true)}
-                className="bg-white text-gray-900 border-2 border-gray-900 px-8 py-4 rounded-2xl font-black shadow-sm hover:bg-gray-50 active:scale-95 transition-all flex items-center justify-center gap-3 uppercase text-xs tracking-widest"
+                className="flex-1 sm:flex-none bg-white text-gray-900 border-2 border-gray-900 px-4 sm:px-8 py-3 sm:py-4 rounded-2xl font-black shadow-sm hover:bg-gray-50 active:scale-95 transition-all flex items-center justify-center gap-2 sm:gap-3 uppercase text-[10px] sm:text-xs tracking-widest"
               >
-                <span>📁</span> Editar Categorías
+                <span>📁</span> <span className="hidden sm:inline">Editar</span> Categorías
               </button>
               <button
                 onClick={() => { resetForm(); setIsModalOpen(true); }}
-                className="bg-gray-900 text-white px-8 py-4 rounded-2xl font-black shadow-2xl hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-3 uppercase text-xs tracking-widest"
+                className="flex-1 sm:flex-none bg-gray-900 text-white px-4 sm:px-8 py-3 sm:py-4 rounded-2xl font-black shadow-2xl hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2 sm:gap-3 uppercase text-[10px] sm:text-xs tracking-widest"
               >
-                <span>➕</span> Nuevo Producto
+                <span>➕</span> <span className="hidden sm:inline">Nuevo</span> Producto
               </button>
             </div>
           )}
         </div>
 
-        <div className="flex flex-wrap gap-3">
+        <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
           <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-900 p-2 rounded-2xl border border-gray-100 dark:border-gray-800">
-            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2">Categoría:</span>
+            <span className="text-[9px] sm:text-[10px] font-black text-gray-400 uppercase tracking-widest px-1 sm:px-2 shrink-0">Categoría:</span>
             <select
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value)}
-              className="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white border-none font-bold text-xs focus:ring-0 cursor-pointer"
+              className="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white border-none font-bold text-[11px] sm:text-xs focus:ring-0 cursor-pointer"
             >
-              <option value="todas" className="bg-white dark:bg-gray-900 text-gray-900 dark:text-white">Todas las categorías</option>
+              <option value="todas" className="bg-white dark:bg-gray-900 text-gray-900 dark:text-white">Todas</option>
               {categorias.map(cat => (
                 <option key={cat.id} value={cat.nombre || ''} className="bg-white dark:bg-gray-900 text-gray-900 dark:text-white">{(cat.nombre || '').toUpperCase()}</option>
               ))}
@@ -493,17 +493,17 @@ export default function ProductosClient({
           </div>
 
           <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-900 p-2 rounded-2xl border border-gray-100 dark:border-gray-800">
-            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2">Ordenar por:</span>
+            <span className="text-[9px] sm:text-[10px] font-black text-gray-400 uppercase tracking-widest px-1 sm:px-2 shrink-0">Orden:</span>
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as OrderType)}
-              className="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white border-none font-bold text-xs focus:ring-0 cursor-pointer"
+              className="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white border-none font-bold text-[11px] sm:text-xs focus:ring-0 cursor-pointer"
             >
-              <option value="name_asc" className="bg-white dark:bg-gray-900 text-gray-900 dark:text-white">Nombre (A-Z)</option>
-              <option value="stock_asc" className="bg-white dark:bg-gray-900 text-gray-900 dark:text-white">Menor Stock</option>
-              <option value="stock_desc" className="bg-white dark:bg-gray-900 text-gray-900 dark:text-white">Mayor Stock</option>
-              <option value="price_asc" className="bg-white dark:bg-gray-900 text-gray-900 dark:text-white">Menor Precio</option>
-              <option value="price_desc" className="bg-white dark:bg-gray-900 text-gray-900 dark:text-white">Mayor Precio</option>
+              <option value="name_asc" className="bg-white dark:bg-gray-900 text-gray-900 dark:text-white">A-Z</option>
+              <option value="stock_asc" className="bg-white dark:bg-gray-900 text-gray-900 dark:text-white">Stock ↑</option>
+              <option value="stock_desc" className="bg-white dark:bg-gray-900 text-gray-900 dark:text-white">Stock ↓</option>
+              <option value="price_asc" className="bg-white dark:bg-gray-900 text-gray-900 dark:text-white">Precio ↑</option>
+              <option value="price_desc" className="bg-white dark:bg-gray-900 text-gray-900 dark:text-white">Precio ↓</option>
             </select>
           </div>
         </div>
@@ -511,9 +511,9 @@ export default function ProductosClient({
 
       {/* Lista de Productos */}
       {filtrados.length === 0 ? (
-        <div className="bg-white dark:bg-gray-800 p-20 rounded-[3.5rem] text-center border-4 border-dashed border-gray-100 dark:border-gray-800">
-          <div className="text-8xl mb-6 opacity-20 grayscale">📦</div>
-          <h3 className="text-2xl font-black text-gray-300 uppercase tracking-[0.2em]">Sin resultados</h3>
+        <div className="bg-white dark:bg-gray-800 p-8 sm:p-20 rounded-[2rem] sm:rounded-[3.5rem] text-center border-4 border-dashed border-gray-100 dark:border-gray-800">
+          <div className="text-5xl sm:text-8xl mb-4 sm:mb-6 opacity-20 grayscale">📦</div>
+          <h3 className="text-lg sm:text-2xl font-black text-gray-300 uppercase tracking-[0.2em]">Sin resultados</h3>
           <p className="text-gray-400 font-bold mt-2">Prueba ajustando los filtros o el término de búsqueda.</p>
         </div>
       ) : (
@@ -566,11 +566,11 @@ export default function ProductosClient({
       {/* Modal de Producto */}
       {isModalOpen && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
-          <div className="bg-white dark:bg-gray-800 w-full max-w-2xl rounded-[3rem] p-10 shadow-2xl animate-in zoom-in-95 duration-200">
-            <h2 className="text-4xl font-black text-gray-900 dark:text-white mb-2 italic">
+          <div className="bg-white dark:bg-gray-800 w-full max-w-2xl rounded-[2rem] sm:rounded-[3rem] p-5 sm:p-10 shadow-2xl animate-in zoom-in-95 duration-200">
+            <h2 className="text-2xl sm:text-4xl font-black text-gray-900 dark:text-white mb-1 sm:mb-2 italic">
               {editingId ? 'Editar Ítem' : 'Nuevo Ítem'}
             </h2>
-            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-10">Completa la ficha del producto</p>
+            <p className="text-[10px] sm:text-xs font-bold text-gray-400 uppercase tracking-widest mb-6 sm:mb-10">Completa la ficha del producto</p>
 
             <form onSubmit={handleSave} className="space-y-6 max-h-[60vh] overflow-y-auto px-2">
               <div className="grid grid-cols-2 gap-6">
@@ -738,11 +738,11 @@ export default function ProductosClient({
       {/* Modal de Gestión de Categorías */}
       {isCatManagerOpen && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
-          <div className="bg-white dark:bg-gray-800 w-full max-w-2xl rounded-[3rem] p-10 shadow-2xl animate-in zoom-in-95 duration-200">
-            <div className="flex justify-between items-start mb-8">
+          <div className="bg-white dark:bg-gray-800 w-full max-w-2xl rounded-[2rem] sm:rounded-[3rem] p-5 sm:p-10 shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="flex justify-between items-start mb-4 sm:mb-8">
               <div>
-                <h2 className="text-4xl font-black text-gray-900 dark:text-white italic">Categorías</h2>
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Gestiona tus familias de productos</p>
+                <h2 className="text-2xl sm:text-4xl font-black text-gray-900 dark:text-white italic">Categorías</h2>
+                <p className="text-[10px] sm:text-xs font-bold text-gray-400 uppercase tracking-widest">Gestiona tus familias de productos</p>
               </div>
               <button onClick={() => setIsCatManagerOpen(false)} className="text-2xl">✕</button>
             </div>

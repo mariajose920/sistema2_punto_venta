@@ -88,16 +88,16 @@ export default function CajeraDashboardPage() {
     <div className="space-y-8 animate-in fade-in duration-700">
       
       {/* Bienvenida y Acciones Rápidas */}
-      <header className="bg-white dark:bg-gray-900 p-10 rounded-[3rem] shadow-xl border border-gray-100 dark:border-gray-800 flex flex-col md:flex-row justify-between items-center gap-8 relative overflow-hidden">
+      <header className="bg-white dark:bg-gray-900 p-5 sm:p-10 rounded-[2rem] sm:rounded-[3rem] shadow-xl border border-gray-100 dark:border-gray-800 flex flex-col md:flex-row justify-between items-center gap-5 sm:gap-8 relative overflow-hidden">
         <div className="absolute top-0 left-0 w-64 h-64 bg-blue-600/5 rounded-full -ml-32 -mt-32 blur-3xl"></div>
-        <div className="relative z-10">
-          <h1 className="text-4xl font-black text-gray-900 dark:text-white tracking-tighter mb-2 italic">Terminal de Caja</h1>
-          <p className="text-gray-400 font-bold uppercase text-xs tracking-[0.3em]">Operador: {user?.email}</p>
+        <div className="relative z-10 text-center md:text-left">
+          <h1 className="text-2xl sm:text-4xl font-black text-gray-900 dark:text-white tracking-tighter mb-1 sm:mb-2 italic">Terminal de Caja</h1>
+          <p className="text-gray-400 font-bold uppercase text-[10px] sm:text-xs tracking-[0.3em]">Operador: {user?.email}</p>
         </div>
         
         <Link 
           href="/ventas/nueva" 
-          className="relative z-10 bg-blue-600 hover:bg-blue-700 text-white px-10 py-5 rounded-[2rem] font-black text-xl shadow-2xl shadow-blue-200 dark:shadow-none transition-all transform hover:scale-105 active:scale-95 flex items-center gap-4"
+          className="relative z-10 bg-blue-600 hover:bg-blue-700 text-white px-6 sm:px-10 py-3 sm:py-5 rounded-[2rem] font-black text-base sm:text-xl shadow-2xl shadow-blue-200 dark:shadow-none transition-all transform hover:scale-105 active:scale-95 flex items-center gap-3 sm:gap-4 w-full sm:w-auto justify-center"
         >
           <span>🛒</span> NUEVA VENTA (F1)
         </Link>
@@ -109,9 +109,9 @@ export default function CajeraDashboardPage() {
         <div className="lg:col-span-2 space-y-8">
           
           {/* Consulta Rápida de Inventario */}
-          <section className="bg-white dark:bg-gray-800 rounded-[2.5rem] p-8 border border-gray-100 dark:border-gray-700 shadow-sm">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-lg font-black text-gray-900 dark:text-white uppercase tracking-widest flex items-center gap-3">
+          <section className="bg-white dark:bg-gray-800 rounded-[2.5rem] p-4 sm:p-8 border border-gray-100 dark:border-gray-700 shadow-sm">
+            <div className="flex flex-wrap justify-between items-center gap-3 mb-4 sm:mb-6">
+              <h2 className="text-sm sm:text-lg font-black text-gray-900 dark:text-white uppercase tracking-widest flex items-center gap-3">
                 <span className="w-2 h-6 bg-blue-600 rounded-full"></span>
                 Stock Disponible
               </h2>
@@ -134,35 +134,35 @@ export default function CajeraDashboardPage() {
 
           {/* Registro de Actividad Personal */}
           <section className="bg-white dark:bg-gray-800 rounded-[2.5rem] border border-gray-100 dark:border-gray-700 overflow-hidden shadow-sm">
-            <div className="p-8 border-b border-gray-50 dark:border-gray-700">
-              <h2 className="text-lg font-black text-gray-900 dark:text-white uppercase tracking-widest">Mis Últimas Ventas</h2>
+            <div className="p-4 sm:p-8 border-b border-gray-50 dark:border-gray-700">
+              <h2 className="text-sm sm:text-lg font-black text-gray-900 dark:text-white uppercase tracking-widest">Mis Últimas Ventas</h2>
             </div>
             <div className="overflow-x-auto">
               {actividadReciente.length > 0 ? (
-                <table className="w-full text-left">
-                  <thead className="bg-gray-50 dark:bg-gray-900/50 text-[10px] font-black text-gray-400 uppercase tracking-widest">
-                    <tr>
-                      <th className="px-8 py-5">Hora</th>
-                      <th className="px-8 py-5">Tipo Pago</th>
-                      <th className="px-8 py-5 text-right">Total Cobrado</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
-                    {actividadReciente.map(venta => (
-                      <tr key={venta.id_venta} className="hover:bg-gray-50/50 dark:hover:bg-gray-700/20 transition-colors">
-                        <td className="px-8 py-6 font-bold text-gray-900 dark:text-white">
-                          {new Date(venta.fecha_venta).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </td>
-                        <td className="px-8 py-6">
-                          <span className="text-[9px] font-black px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 uppercase">
-                            {venta.forma_pago}
-                          </span>
-                        </td>
-                        <td className="px-8 py-6 text-right font-black text-gray-900 dark:text-white text-lg">
-                          ${venta.total_venta.toLocaleString()}
-                        </td>
+                  <table className="w-full text-left">
+                    <thead className="bg-gray-50 dark:bg-gray-900/50 text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                      <tr>
+                        <th className="px-4 sm:px-8 py-3 sm:py-5">Hora</th>
+                        <th className="px-4 sm:px-8 py-3 sm:py-5">Tipo Pago</th>
+                        <th className="px-4 sm:px-8 py-3 sm:py-5 text-right">Total Cobrado</th>
                       </tr>
-                    ))}
+                    </thead>
+                    <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
+                      {actividadReciente.map(venta => (
+                        <tr key={venta.id_venta} className="hover:bg-gray-50/50 dark:hover:bg-gray-700/20 transition-colors">
+                          <td className="px-4 sm:px-8 py-4 sm:py-6 font-bold text-gray-900 dark:text-white">
+                            {new Date(venta.fecha_venta).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </td>
+                          <td className="px-4 sm:px-8 py-4 sm:py-6">
+                            <span className="text-[9px] font-black px-2 sm:px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 uppercase">
+                              {venta.forma_pago}
+                            </span>
+                          </td>
+                          <td className="px-4 sm:px-8 py-4 sm:py-6 text-right font-black text-gray-900 dark:text-white text-sm sm:text-lg">
+                            ${venta.total_venta.toLocaleString()}
+                          </td>
+                        </tr>
+                      ))}
                   </tbody>
                 </table>
               ) : (
@@ -176,9 +176,9 @@ export default function CajeraDashboardPage() {
         <div className="space-y-8">
           
           {/* Monitor de Créditos / Fiados */}
-          <section className="bg-amber-50 dark:bg-amber-900/10 p-8 rounded-[2.5rem] border border-amber-100 dark:border-amber-900/30">
-            <h2 className="text-xs font-black text-amber-700 uppercase tracking-widest mb-6">Pendientes de Pago</h2>
-            <div className="space-y-4">
+          <section className="bg-amber-50 dark:bg-amber-900/10 p-5 sm:p-8 rounded-[2rem] sm:rounded-[2.5rem] border border-amber-100 dark:border-amber-900/30">
+            <h2 className="text-[10px] sm:text-xs font-black text-amber-700 uppercase tracking-widest mb-4 sm:mb-6">Pendientes de Pago</h2>
+            <div className="space-y-3 sm:space-y-4">
               {clientesFiado.length > 0 ? (
                 clientesFiado.map(c => (
                   <div key={c.id} className="p-4 bg-white dark:bg-gray-800 rounded-2xl shadow-sm">
@@ -194,10 +194,10 @@ export default function CajeraDashboardPage() {
           </section>
 
           {/* Tablero de Ofertas */}
-          <section className="bg-indigo-600 p-8 rounded-[2.5rem] shadow-2xl relative overflow-hidden">
+          <section className="bg-indigo-600 p-5 sm:p-8 rounded-[2rem] sm:rounded-[2.5rem] shadow-2xl relative overflow-hidden">
             <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16 blur-2xl"></div>
-            <h2 className="text-xs font-black text-indigo-100 uppercase tracking-widest mb-6 relative z-10">Promociones Activas</h2>
-            <div className="space-y-4 relative z-10">
+            <h2 className="text-[10px] sm:text-xs font-black text-indigo-100 uppercase tracking-widest mb-4 sm:mb-6 relative z-10">Promociones Activas</h2>
+            <div className="space-y-3 sm:space-y-4 relative z-10">
               {promociones.length > 0 ? (
                 promociones.map(p => (
                   <div key={p.id} className="p-4 bg-white/10 backdrop-blur-md rounded-2xl border border-white/20">

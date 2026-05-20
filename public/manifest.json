@@ -48,7 +48,7 @@
       "name": "Nueva Venta",
       "short_name": "Venta",
       "description": "Registrar venta",
-      "url": "/dashboard/cajera",
+      "url": "/cajera",
       "icons": [
         {
           "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'><text x='50%' y='50%' font-size='60' text-anchor='middle' dominant-baseline='middle'>💰</text></svg>",
@@ -61,7 +61,7 @@
       "name": "Inventario",
       "short_name": "Productos",
       "description": "Ver productos",
-      "url": "/dashboard/productos",
+      "url": "/productos",
       "icons": [
         {
           "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'><text x='50%' y='50%' font-size='60' text-anchor='middle' dominant-baseline='middle'>📦</text></svg>",
@@ -74,7 +74,7 @@
       "name": "Clientes",
       "short_name": "Clientes",
       "description": "Gestionar clientes",
-      "url": "/dashboard/clientes",
+      "url": "/clientes",
       "icons": [
         {
           "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'><text x='50%' y='50%' font-size='60' text-anchor='middle' dominant-baseline='middle'>👥</text></svg>",

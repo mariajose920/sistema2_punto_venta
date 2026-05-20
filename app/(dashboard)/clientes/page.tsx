@@ -361,9 +361,9 @@ export default function ClientesPage() {
     <div className="space-y-6 animate-in fade-in duration-500">
 
       {/* Header Premium */}
-      <div className="bg-white dark:bg-gray-800 p-8 rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col md:flex-row justify-between items-center gap-6">
+      <div className="bg-white dark:bg-gray-800 p-4 sm:p-8 rounded-[2rem] sm:rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col md:flex-row justify-between items-center gap-4 sm:gap-6">
         <div>
-          <h1 className="text-3xl font-black text-gray-900 dark:text-white tracking-tighter">Cuentas por Cobrar</h1>
+          <h1 className="text-2xl sm:text-3xl font-black text-gray-900 dark:text-white tracking-tighter">Cuentas por Cobrar</h1>
           <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-1 italic opacity-60">Gestión de Billeteras y Fiados</p>
         </div>
 
@@ -402,9 +402,9 @@ export default function ClientesPage() {
           <p className="text-gray-300 font-black uppercase tracking-widest">Sin coincidencias para &quot;{search}&quot;</p>
         </div>
       ) : viewMode === 'grid' ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-8">
           {filtered.map(c => (
-            <div key={c.id} className="bg-white dark:bg-gray-800 p-10 rounded-[3rem] border border-gray-100 dark:border-gray-700 shadow-sm group hover:shadow-2xl hover:-translate-y-2 transition-all">
+            <div key={c.id} className="bg-white dark:bg-gray-800 p-5 sm:p-10 rounded-[2rem] sm:rounded-[3rem] border border-gray-100 dark:border-gray-700 shadow-sm group hover:shadow-2xl hover:-translate-y-2 transition-all">
               <div className="flex justify-between items-start mb-8">
                 <div>
                   <h3 className="text-2xl font-black text-gray-900 dark:text-white uppercase italic truncate max-w-[200px]">{c.nombre}</h3>
