@@ -65,7 +65,8 @@ export default function DashboardLayout({
       ];
 
   return (
-    <AuthGuard>
+    <>
+      <AuthGuard />
       <div className="flex min-h-screen bg-[#F8FAFC] dark:bg-gray-950 font-sans selection:bg-blue-100 selection:text-blue-700">
 
         {/* ── Overlay mobile backdrop ── */}
@@ -225,7 +226,7 @@ export default function DashboardLayout({
         </nav>
 
       </div>
-    </AuthGuard>
+    </>
   );
 }
 

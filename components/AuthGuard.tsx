@@ -4,20 +4,7 @@ import { useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth, Role } from '@/hooks/useAuth';
 
-interface AuthGuardProps {
-  children: React.ReactNode;
-  /**
-   * Rol requerido para acceder a la ruta. 
-   * Si es null, solo requiere estar logueado.
-   */
-  requiredRole?: Role;
-}
-
-/**
- * AuthGuard: Protector de rutas de alta seguridad.
- * Gestiona redirecciones automáticas, protección por roles y estados de carga.
- */
-export default function AuthGuard({ children, requiredRole }: AuthGuardProps) {
+export default function AuthGuard({ requiredRole }: { requiredRole?: Role }) {
   const { user, role, loading, isMounted } = useAuth();
   const router = useRouter();
   const startGuardRender = useRef(performance.now());
@@ -50,22 +37,14 @@ export default function AuthGuard({ children, requiredRole }: AuthGuardProps) {
     }
   }, [user, role, loading, isMounted, requiredRole, router]);
 
-  // REFACTOR ARQUITECTURA: 
-  // 1. NUNCA bloqueamos el DOM.
-  // 2. Devolvemos los children INMEDIATAMENTE para que React hidrate el shell de forma instantánea.
-  // 3. Añadimos un sutil indicador superior para informar al usuario que la validación está en background.
+  // No bloqueamos el DOM. Solo mostramos la barrita de progreso
+  if (loading || !isMounted) {
+    return (
+      <div className="fixed top-0 left-0 w-full h-1 z-[9999] bg-blue-500/20 overflow-hidden">
+        <div className="h-full bg-blue-600 animate-pulse w-1/2 translate-x-1/2"></div>
+      </div>
+    );
+  }
 
-  return (
-    <>
-      {(loading || (!isMounted)) && (
-        <div className="fixed top-0 left-0 w-full h-1 z-[9999] bg-blue-500/20 overflow-hidden">
-          <div className="h-full bg-blue-600 animate-pulse w-1/2 translate-x-1/2"></div>
-        </div>
-      )}
-      
-      {/* El dashboard siempre está presente, permitiendo First Contentful Paint instantáneo */}
-      {children}
-    </>
-  );
-
+  return null;
 }

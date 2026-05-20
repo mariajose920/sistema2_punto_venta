@@ -85,125 +85,66 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let active = true;
+    setState(s => ({ ...s, isMounted: true }));
 
-    // Si Supabase no está configurado, omitimos consultas y liberamos el estado inmediatamente para no colgar la aplicación
     if (!isSupabaseConfigured) {
-      debugError('[AuthContext] Supabase no está configurado en Vercel o entorno local. Desactivando flujo para evitar pantallas en blanco.');
-      setState(prev => ({ ...prev, user: null, role: null, loading: false, isMounted: true }));
-      initialLoadDone.current = true;
+      debugError('[AuthContext] Supabase no configurado.');
+      setState(prev => ({ ...prev, loading: false }));
       return;
     }
 
-    const init = async () => {
+    const loadSession = async () => {
       try {
         const startGetSession = performance.now();
-        debugLog('[AuthContext] Iniciando validación de sesión...');
-        const { data, error } = await supabase.auth.getSession();
+        const { data: { session }, error } = await supabase.auth.getSession();
         const endGetSession = performance.now();
-        console.log(`[PERF_AUTH] Tiempo de getSession en AuthContext: ${(endGetSession - startGetSession).toFixed(2)}ms`);
-        debugLog('[AuthContext] getSession result:', { data, error });
+        console.log(`[PERF_WATERFALL] getSession completado en ${(endGetSession - startGetSession).toFixed(2)}ms`);
 
-        if (error || !active) {
-          if (error) debugError('[AuthContext] Error en getSession.', error);
-          setState(prev => ({ ...prev, user: null, role: null, loading: false, isMounted: true }));
-          initialLoadDone.current = true;
+        if (error || !session?.user) {
+          if (active) setState(prev => ({ ...prev, user: null, loading: false }));
           return;
         }
-
-        const session = data.session;
-
-        if (!session?.user) {
-          debugLog('[AuthContext] No hay usuario en la sesión.');
-          setState(prev => ({ ...prev, user: null, role: null, loading: false, isMounted: true }));
-          initialLoadDone.current = true;
-          return;
-        }
-
-        debugLog('[AuthContext] Sesión activa para:', {
-          id: session.user.id,
-          email: session.user.email
-        });
 
         const startInitRole = performance.now();
         const fetchedRole = await fetchRole(session.user.id);
         const endInitRole = performance.now();
-        console.log(`[PERF_WATERFALL] Tiempo de obtención del rol en AuthContext: ${(endInitRole - startInitRole).toFixed(2)}ms`);
+        console.log(`[PERF_WATERFALL] fetchRole completado en ${(endInitRole - startInitRole).toFixed(2)}ms`);
 
-        if (!active) return;
-        setState({
-          user: session.user,
-          role: fetchedRole,
-          loading: false,
-          isMounted: true,
-        });
-        initialLoadDone.current = true;
-      } catch (err: any) {
-        debugError('[AuthContext] Excepción crítica atrapada en init(). Evitando pantalla en blanco.', err);
         if (active) {
-          setState(prev => ({ ...prev, user: null, role: null, loading: false, isMounted: true }));
-          initialLoadDone.current = true;
+          setState(prev => ({ ...prev, user: session.user, role: fetchedRole, loading: false }));
         }
+      } catch (err) {
+        debugError('[AuthContext] Error en loadSession:', err);
+        if (active) setState(prev => ({ ...prev, user: null, loading: false }));
       }
     };
 
-    init();
+    loadSession();
 
-    let subscription: any = null;
-    try {
-      const res = supabase.auth.onAuthStateChange(async (event, session) => {
-        try {
-          debugLog('[AuthContext] onAuthStateChange event:', event);
-          if (!active) return;
-
-          if (event === 'SIGNED_OUT') {
-            initialLoadDone.current = false;
-            roleCache.clear();
-            if (typeof window !== 'undefined') {
-              localStorage.removeItem('pos_cached_role');
-            }
-            debugLog('[AuthContext] Sesión cerrada. Caché de roles en memoria limpiado.');
-            setState(prev => ({ ...prev, user: null, role: null, loading: false }));
-            return;
-          }
-
-          if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session?.user) {
-            // 1. Evitar consultas duplicadas si INITIAL_SESSION llega cuando la inicialización ya se completó
-            if (event === 'INITIAL_SESSION' && initialLoadDone.current) {
-              debugLog('[AuthContext] INITIAL_SESSION omitido: ya cargado por init().');
-              return;
-            }
-
-            // 2. Solo recargar si es un inicio de sesión nuevo y el usuario ha cambiado
-            if (event === 'SIGNED_IN' && initialLoadDone.current && currentUserRef.current?.id === session.user.id) {
-              debugLog('[AuthContext] SIGNED_IN omitido: el usuario es el mismo.');
-              return;
-            }
-
-            debugLog('[AuthContext] Procesando login detectado para:', session.user.id);
-            const role = await fetchRole(session.user.id);
-            if (!active) return;
-            setState(prev => ({
-              ...prev,
-              user: session.user,
-              role,
-              loading: false,
-            }));
-            initialLoadDone.current = true;
-          }
-        } catch (innerErr) {
-          debugError('[AuthContext] Error en onAuthStateChange listener callback:', innerErr);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!active) return;
+      
+      // IGNORAMOS INITIAL_SESSION porque ya lo manejamos con getSession() arriba.
+      // Esto evita el doble fetch de rol al inicio.
+      
+      if (event === 'SIGNED_OUT') {
+        roleCache.clear();
+        if (typeof window !== 'undefined') localStorage.removeItem('pos_cached_role');
+        setState(prev => ({ ...prev, user: null, role: null, loading: false }));
+      } else if (event === 'SIGNED_IN' && session?.user) {
+        // Evitamos refetch si el usuario es el mismo que ya cargamos
+        if (currentUserRef.current?.id === session.user.id) return;
+        
+        const fetchedRole = await fetchRole(session.user.id);
+        if (active) {
+          setState(prev => ({ ...prev, user: session.user, role: fetchedRole, loading: false }));
         }
-      });
-      subscription = res.data?.subscription;
-    } catch (subErr) {
-      debugError('[AuthContext] Fallo al suscribir a onAuthStateChange:', subErr);
-    }
+      }
+    });
 
     return () => {
       active = false;
-      if (subscription) {
-        subscription.unsubscribe();
-      }
+      subscription.unsubscribe();
     };
   }, []);
 
