@@ -50,32 +50,21 @@ export default function AuthGuard({ children, requiredRole }: AuthGuardProps) {
     }
   }, [user, role, loading, isMounted, requiredRole, router]);
 
-  // REFACTOR PERF: En lugar de hacer 'return <Spinner />' (lo cual desmonta el árbol y crea un Waterfall),
-  // renderizamos el children SIEMPRE, pero le ponemos un Overlay encima si está cargando.
-  // Esto permite que React reciba el HTML del SSR, lo parsee, descargue imágenes y prepare el DOM en paralelo.
-  
-  if (!isMounted || (!user && !loading && !role)) {
-    // Si definitivamente no hay auth tras cargar, no renderizar layout privado (evita FOUC)
-    return null;
-  }
-
-  const isGuarding = loading || (!user && isMounted);
+  // REFACTOR ARQUITECTURA: 
+  // 1. NUNCA bloqueamos el DOM.
+  // 2. Devolvemos los children INMEDIATAMENTE para que React hidrate el shell de forma instantánea.
+  // 3. Añadimos un sutil indicador superior para informar al usuario que la validación está en background.
 
   return (
     <>
-      {isGuarding && (
-        <div className="fixed inset-0 z-[999] flex flex-col items-center justify-center bg-gray-50/90 dark:bg-gray-900/90 backdrop-blur-md">
-          <div className="w-10 h-10 border-4 border-blue-600/20 border-t-blue-600 rounded-full animate-spin mb-3"></div>
-          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest animate-pulse">
-            Validando Accesos
-          </p>
+      {(loading || (!isMounted)) && (
+        <div className="fixed top-0 left-0 w-full h-1 z-[9999] bg-blue-500/20 overflow-hidden">
+          <div className="h-full bg-blue-600 animate-pulse w-1/2 translate-x-1/2"></div>
         </div>
       )}
       
-      {/* El dashboard se monta en el DOM pero se oculta visualmente (o se envía atrás) hasta que termine la validación */}
-      <div className={isGuarding ? 'opacity-0 pointer-events-none absolute inset-0' : 'opacity-100 transition-opacity duration-300'}>
-        {children}
-      </div>
+      {/* El dashboard siempre está presente, permitiendo First Contentful Paint instantáneo */}
+      {children}
     </>
   );
 

@@ -40,9 +40,9 @@ export default function DashboardLayout({
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  // Instrumentación de rendimiento [PERF_AUTH]
+  // Instrumentación de rendimiento [PERF_WATERFALL]
   const startLayoutRender = performance.now();
-  console.log(`[PERF_AUTH] [DashboardLayout] Primer render útil disparado. Usuario: ${user?.email}, Rol: ${role}`);
+  console.log(`[PERF_WATERFALL] [DashboardLayout] Primer render de UI (Shell) disparado. Usuario: ${user?.email || 'Pendiente'}, Rol: ${role || 'Pendiente'}`);
 
   // Determinar el mensaje de contexto según el rol
   const contextMessage = role === 'admin'

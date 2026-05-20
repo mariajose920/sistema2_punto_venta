@@ -19,9 +19,17 @@ export const AuthContext = createContext<AuthState | undefined>(undefined);
 const roleCache = new Map<string, Role>();
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  // Inicialización optimista: Si tenemos el rol guardado, hidratamos instantáneamente
+  const getInitialRole = () => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('pos_cached_role') as Role | null;
+    }
+    return null;
+  };
+
   const [state, setState] = useState<AuthState>({
     user: null,
-    role: null,
+    role: getInitialRole(),
     loading: true,
     isMounted: false,
   });
@@ -67,6 +75,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const loadedRole = (data as any).rol as Role;
     debugLog('[AuthContext] Rol cargado correctamente:', loadedRole);
     roleCache.set(uid, loadedRole);
+    
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('pos_cached_role', loadedRole);
+    }
+    
     return loadedRole;
   };
 
@@ -112,14 +125,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         });
 
         const startInitRole = performance.now();
-        const role = await fetchRole(session.user.id);
+        const fetchedRole = await fetchRole(session.user.id);
         const endInitRole = performance.now();
-        console.log(`[PERF_AUTH] Tiempo de obtención del rol en init() de AuthContext: ${(endInitRole - startInitRole).toFixed(2)}ms`);
+        console.log(`[PERF_WATERFALL] Tiempo de obtención del rol en AuthContext: ${(endInitRole - startInitRole).toFixed(2)}ms`);
 
         if (!active) return;
         setState({
           user: session.user,
-          role,
+          role: fetchedRole,
           loading: false,
           isMounted: true,
         });
@@ -145,6 +158,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (event === 'SIGNED_OUT') {
             initialLoadDone.current = false;
             roleCache.clear();
+            if (typeof window !== 'undefined') {
+              localStorage.removeItem('pos_cached_role');
+            }
             debugLog('[AuthContext] Sesión cerrada. Caché de roles en memoria limpiado.');
             setState(prev => ({ ...prev, user: null, role: null, loading: false }));
             return;
