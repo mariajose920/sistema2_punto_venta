@@ -2,12 +2,14 @@
   "name": "POSMASTER - Sistema de Punto de Venta",
   "short_name": "POSMASTER",
   "description": "Sistema de gestión de ventas, inventario y clientes",
-  "start_url": "/",
+  "start_url": "/login",
   "scope": "/",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
   "orientation": "portrait-primary",
   "background_color": "#ffffff",
   "theme_color": "#2563eb",
+  "prefer_related_applications": false,
   "categories": ["business", "productivity"],
   "icons": [
     {
@@ -33,14 +35,6 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
-    }
-  ],
-  "screenshots": [
-    {
-      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 540 720'><rect fill='%232563eb' width='540' height='720'/></svg>",
-      "sizes": "540x720",
-      "type": "image/svg+xml",
-      "form_factor": "narrow"
     }
   ],
   "shortcuts": [
