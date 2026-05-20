@@ -123,85 +123,36 @@ export default function PedidosPage() {
 
     setProcessing(true);
     try {
-      const totalVenta = selectedPedido.detalles.reduce((sum, d) => sum + d.subtotal, 0);
-      
-      // 1. Crear Venta
-      const { data: venta, error: ventaError } = await (supabase as any)
-        .from('Venta')
-        .insert({
-          id_usuario_cajera: user.id,
-          id_cliente: selectedClientId || null,
-          forma_pago: paymentMethod as any,
-          total_venta: totalVenta,
-          estado: 'cerrada',
-          subtotal: totalVenta,
-          iva: Math.round(totalVenta * 0.19),
-          observacion: 'Venta generada desde pedido web'
-        })
-        .select()
-        .single();
-        
-      if (ventaError) throw ventaError;
+      // LOG TEMPORAL PARA DEPURAR
+      console.log('Iniciando procesamiento de entrega...', {
+         pedidoId: selectedPedido.id,
+         usuarioId: user.id,
+         paymentMethod,
+         selectedClientId
+      });
 
-      // 2. Crear Detalles y Descontar Stock
-      for (const det of selectedPedido.detalles) {
-        const { error: detError } = await (supabase as any)
-          .from('DetalleVenta')
-          .insert({
-            id_venta: venta.id_venta,
-            id_producto: det.producto_id,
-            cantidad: det.cantidad,
-            precio_unitario_venta: det.precio_unitario,
-            subtotal: det.subtotal
-          });
-        if (detError) throw detError;
-        
-        // Descontar Stock
-        const { error: stockError } = await (supabase as any).rpc('reducir_stock', {
-          p_producto_id: det.producto_id,
-          p_cantidad: det.cantidad
-        });
-        
-        // Si no existe rpc, lo hacemos manual:
-        if (stockError) {
-          const currentStock = det.Producto.stock_actual;
-          await (supabase as any)
-            .from('Producto')
-            .update({ stock_actual: currentStock - det.cantidad })
-            .eq('id', det.producto_id);
-        }
+      // Llamada atómica a Supabase RPC
+      const { data, error } = await (supabase as any).rpc('procesar_entrega_pedido', {
+        p_pedido_id: selectedPedido.id,
+        p_usuario_id: user.id,
+        p_forma_pago: paymentMethod,
+        p_cliente_id: selectedClientId || null
+      });
+
+      if (error) {
+        console.error('Error de Supabase RPC:', error);
+        throw new Error(error.message || 'Error en la base de datos al procesar la entrega.');
       }
 
-      // Si es fiado, actualizar saldo del cliente
-      if (paymentMethod === 'fiado' && selectedClientId) {
-        const cliente = clientes.find(c => c.id === selectedClientId);
-        if (cliente) {
-          await (supabase as any)
-            .from('Cliente')
-            .update({ saldo_deudado: (cliente.saldo_deudado || 0) + totalVenta })
-            .eq('id', selectedClientId);
-            
-          // Registrar Credito (asumiendo tabla Credito)
-          await (supabase as any).from('Credito').insert({
-            cliente_id: selectedClientId,
-            venta_id: venta.id_venta,
-            monto_inicial: totalVenta,
-            saldo_pendiente: totalVenta,
-            estado: 'vigente'
-          });
-        }
-      }
-
-      // 3. Eliminar Pedido
-      await (supabase as any).from('Pedido').delete().eq('id', selectedPedido.id);
+      console.log('Entrega procesada con éxito:', data);
 
       setSelectedPedido(null);
-      fetchPedidos(true);
-      alert('Venta generada con éxito');
+      fetchPedidos(true); // Refresca la lista (elimina el pedido porque ya no está "pendiente")
+      alert('Venta generada y pedido entregado con éxito');
 
-    } catch (err) {
-      console.error(err);
-      alert('Error al procesar la entrega. Revisa la consola.');
+    } catch (err: any) {
+      console.error('Error capturado al procesar la entrega:', err);
+      alert(`Error al procesar la entrega: ${err.message || 'Revisa la consola.'}`);
     } finally {
       setProcessing(false);
     }

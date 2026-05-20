@@ -418,7 +418,11 @@ export default function ProductosPage() {
   const openEdit = (p: ProductoRow) => {
     setEditingId(p.id);
     setImageFile(null);
-    setFormData(p);
+    setFormData({
+      ...p,
+      categoria: normalizeText(p.categoria || ''),
+      codigo_barra: (p.codigo_barra || '').trim()
+    });
     setIsModalOpen(true);
   };
 
