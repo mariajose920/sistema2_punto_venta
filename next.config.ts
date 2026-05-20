@@ -1,10 +1,6 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  typescript: {
-    ignoreBuildErrors: true,
-  },
-  // Optimizaciones de imágenes para PWA
   images: {
     remotePatterns: [
       {
@@ -18,9 +14,6 @@ const nextConfig: NextConfig = {
     ],
     formats: ['image/avif', 'image/webp'],
   },
-  // Soporte para PWA
-  poweredByHeader: false,
-  compress: true,
 };
 
 export default nextConfig;
