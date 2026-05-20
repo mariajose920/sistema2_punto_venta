@@ -449,7 +449,8 @@ export default function UsuariosPage() {
                       <span className="text-[9px] font-black text-gray-400 uppercase opacity-50">Cajero ID: {selectedUser.id.slice(0,8)}</span>
                     </div>
                     <div className="max-h-[500px] overflow-auto custom-scrollbar">
-                      <table className="w-full text-left">
+                      {/* Desktop table */}
+                      <table className="hidden md:table w-full text-left">
                         <thead className="bg-gray-50/50 dark:bg-gray-900/50 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] sticky top-0">
                           <tr>
                             <th className="px-10 py-6">Fecha / Hora</th>
@@ -478,6 +479,28 @@ export default function UsuariosPage() {
                           ))}
                         </tbody>
                       </table>
+                      {/* Mobile cards */}
+                      <div className="md:hidden p-4 space-y-3">
+                        {historial.length === 0 ? (
+                          <div className="p-8 text-center text-gray-300 font-black uppercase tracking-widest italic opacity-40">Sin actividad de ventas</div>
+                        ) : historial.map(v => (
+                          <div key={v.id_venta} className="bg-gray-50 dark:bg-gray-900/50 rounded-2xl p-4 border border-gray-200 dark:border-gray-700 space-y-2">
+                            <div className="flex justify-between items-center">
+                              <div>
+                                <p className="font-black text-gray-900 dark:text-white text-sm">{new Date(v.fecha_venta).toLocaleDateString()}</p>
+                                <p className="text-[9px] text-gray-400 font-black uppercase tracking-widest">{new Date(v.fecha_venta).toLocaleTimeString()}</p>
+                              </div>
+                              <span className={`px-3 py-1 rounded-xl text-[8px] font-black uppercase tracking-widest ${v.forma_pago === 'efectivo' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>
+                                {v.forma_pago}
+                              </span>
+                            </div>
+                            <div className="flex justify-between items-center pt-2 border-t border-gray-200 dark:border-gray-700">
+                              <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Total</span>
+                              <span className="font-black text-gray-900 dark:text-white text-lg tracking-tighter">{formatCurrency(v.total_venta)}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -697,8 +720,8 @@ export default function UsuariosPage() {
 
       {/* Modal de Usuario Premium */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md">
-          <div className="bg-white dark:bg-gray-800 w-full max-w-lg rounded-[3.5rem] p-12 shadow-2xl animate-in zoom-in-95 duration-300">
+        <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/70 backdrop-blur-md">
+          <div className="bg-white dark:bg-gray-800 w-full max-w-lg rounded-t-[2rem] sm:rounded-[3.5rem] p-8 sm:p-12 shadow-2xl animate-in slide-in-from-bottom sm:zoom-in-95 duration-300">
             <h2 className="text-4xl font-black text-gray-900 dark:text-white mb-2 italic tracking-tighter">
               Perfil Operativo
             </h2>

@@ -538,8 +538,8 @@ export default function ClientesPage() {
 
       {/* Modal Abono */}
       {isAbonoOpen && selectedCliente && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md">
-          <div className="bg-white dark:bg-gray-800 w-full max-w-md rounded-[3rem] p-12 shadow-2xl animate-in zoom-in-95">
+        <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/70 backdrop-blur-md">
+          <div className="bg-white dark:bg-gray-800 w-full max-w-md rounded-t-[2rem] sm:rounded-[3rem] p-8 sm:p-12 shadow-2xl animate-in slide-in-from-bottom sm:zoom-in-95">
             <h2 className="text-3xl font-black text-gray-900 dark:text-white mb-2 italic">Registrar Pago</h2>
             <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-10">{selectedCliente.nombre}</p>
 
@@ -576,8 +576,8 @@ export default function ClientesPage() {
 
       {/* Modal Estado de Cuenta */}
       {isStatementOpen && selectedCliente && (
-        <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md">
-          <div className="bg-white dark:bg-gray-800 w-full max-w-3xl rounded-[3.5rem] p-12 shadow-2xl max-h-[90vh] overflow-hidden flex flex-col animate-in zoom-in-95">
+        <div className="fixed inset-0 z-[150] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/70 backdrop-blur-md">
+          <div className="bg-white dark:bg-gray-800 w-full max-w-3xl rounded-t-[2rem] sm:rounded-[3.5rem] p-6 sm:p-12 shadow-2xl max-h-[90vh] overflow-hidden flex flex-col animate-in slide-in-from-bottom sm:zoom-in-95">
             <div className="flex justify-between items-start mb-10">
               <div>
                 <h2 className="text-4xl font-black text-gray-900 dark:text-white tracking-tighter italic">Historial de Cuenta</h2>
@@ -625,8 +625,8 @@ export default function ClientesPage() {
 
       {/* Modal Ficha Cliente */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md">
-          <div className="bg-white dark:bg-gray-800 w-full max-w-lg rounded-[3.5rem] p-12 shadow-2xl animate-in zoom-in-95">
+        <div className="fixed inset-0 z-[300] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/70 backdrop-blur-md">
+          <div className="bg-white dark:bg-gray-800 w-full max-w-lg rounded-t-[2rem] sm:rounded-[3.5rem] p-8 sm:p-12 shadow-2xl animate-in slide-in-from-bottom sm:zoom-in-95">
             <h2 className="text-4xl font-black text-gray-900 dark:text-white mb-2 italic tracking-tighter">
               {selectedCliente ? 'Editar Ficha' : 'Nueva Ficha'}
             </h2>

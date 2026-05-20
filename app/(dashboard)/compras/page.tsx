@@ -66,7 +66,8 @@ export default function ComprasPage() {
         <div className="p-6 border-b border-gray-50 dark:border-gray-700">
           <h2 className="text-xs font-black text-gray-400 uppercase tracking-[0.2em]">Historial Reciente</h2>
         </div>
-        <div className="overflow-x-auto">
+        {/* Desktop table */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left">
             <thead className="bg-gray-50 dark:bg-gray-900/50 text-[10px] font-black text-gray-400 uppercase tracking-widest">
               <tr>
@@ -104,6 +105,36 @@ export default function ComprasPage() {
               ))}
             </tbody>
           </table>
+        </div>
+        {/* Mobile cards */}
+        <div className="md:hidden p-4 space-y-4">
+          {loading ? (
+            <div className="p-8 text-center text-gray-400 font-bold animate-pulse">Cargando historial...</div>
+          ) : compras.length === 0 ? (
+            <div className="p-8 text-center text-gray-400 italic">No hay compras registradas.</div>
+          ) : compras.map(compra => (
+            <div key={compra.id_compra} className="bg-gray-50 dark:bg-gray-900/50 rounded-2xl p-5 border border-gray-200 dark:border-gray-700 space-y-3">
+              <div className="flex justify-between items-start">
+                <div>
+                  <p className="text-xs font-black text-gray-400 uppercase tracking-widest">
+                    {new Date(compra.fecha_compra).toLocaleDateString()}
+                  </p>
+                  <p className="text-[10px] text-gray-400 font-black">
+                    {new Date(compra.fecha_compra).toLocaleTimeString()}
+                  </p>
+                </div>
+                <span className="font-black text-emerald-600 uppercase text-xs tracking-tighter">
+                  {compra.Proveedor?.nombre_empresa || 'Proveedor Desconocido'}
+                </span>
+              </div>
+              <div className="flex justify-between items-center pt-2 border-t border-gray-200 dark:border-gray-700">
+                <span className="font-black text-gray-900 dark:text-white text-lg">
+                  ${compra.total_compra.toLocaleString()}
+                </span>
+                <button className="text-[10px] font-black text-blue-600 uppercase tracking-widest hover:underline py-2 px-3">Ver Detalle</button>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     </div>

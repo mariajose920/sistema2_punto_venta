@@ -305,7 +305,8 @@ export default function NuevaCompraPage() {
 
         {/* Lista de Compra */}
         <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
-          <div className="overflow-x-auto">
+          {/* Desktop table */}
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-left">
               <thead className="bg-gray-50 dark:bg-gray-900/50 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">
                 <tr>
@@ -357,6 +358,46 @@ export default function NuevaCompraPage() {
               </tbody>
             </table>
           </div>
+          {/* Mobile cards */}
+          <div className="md:hidden p-4 space-y-4">
+            {cart.length === 0 ? (
+              <div className="p-8 text-center text-gray-300 font-black uppercase tracking-[0.3em] italic opacity-40">Lista de compra vacía</div>
+            ) : cart.map(item => (
+              <div key={item.id} className="bg-gray-50 dark:bg-gray-900/50 rounded-2xl p-5 border border-gray-200 dark:border-gray-700 space-y-3">
+                <div className="flex justify-between items-start">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-black text-gray-900 dark:text-white uppercase italic text-sm truncate">{item.nombre}</p>
+                    <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest truncate">{item.codigo_barra}</p>
+                  </div>
+                  <button onClick={() => setCart(cart.filter(i => i.id !== item.id))} className="text-red-400 hover:text-red-600 p-2 shrink-0">✕</button>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest block mb-1">Cant.</label>
+                    <input 
+                      type="number" 
+                      value={item.cantidad} 
+                      onChange={e => { e.target.value = e.target.value.replace(/^0+(?=\d)/, ''); updateItem(item.id, Number(e.target.value), item.costo_unitario) }} 
+                      className="w-full p-2 bg-white dark:bg-gray-800 rounded-xl text-center font-black text-blue-600 border-none text-sm focus:ring-2 focus:ring-blue-600/20" 
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest block mb-1">Costo U.</label>
+                    <input 
+                      type="number" 
+                      value={item.costo_unitario} 
+                      onChange={e => { e.target.value = e.target.value.replace(/^0+(?=\d)/, ''); updateItem(item.id, item.cantidad, Number(e.target.value)) }} 
+                      className="w-full p-2 bg-white dark:bg-gray-800 rounded-xl text-right font-black text-gray-900 dark:text-white border-none text-sm focus:ring-2 focus:ring-blue-600/20" 
+                    />
+                  </div>
+                  <div className="flex flex-col justify-center items-end">
+                    <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest block mb-1">Subtotal</label>
+                    <p className="font-black text-blue-600 text-base">{formatCurrency(item.subtotal)}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -385,8 +426,8 @@ export default function NuevaCompraPage() {
 
       {/* MODAL: Nuevo Proveedor Rápido */}
       {isNewProvOpen && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md">
-          <div className="bg-white dark:bg-gray-800 w-full max-w-md rounded-[3rem] p-12 shadow-2xl animate-in zoom-in-95 overflow-y-auto max-h-[90vh]">
+        <div className="fixed inset-0 z-[110] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/70 backdrop-blur-md">
+          <div className="bg-white dark:bg-gray-800 w-full max-w-md rounded-t-[2rem] sm:rounded-[3rem] p-8 sm:p-12 shadow-2xl animate-in slide-in-from-bottom sm:zoom-in-95 overflow-y-auto max-h-[90vh]">
             <h2 className="text-3xl font-black text-gray-900 dark:text-white mb-2 italic">Nuevo Proveedor</h2>
             <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-10">Registro rápido</p>
             <div className="space-y-5">
@@ -419,8 +460,8 @@ export default function NuevaCompraPage() {
 
       {/* MODAL: Nuevo Producto Rápido */}
       {isNewProdOpen && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md">
-          <div className="bg-white dark:bg-gray-800 w-full max-w-md rounded-[3rem] p-12 shadow-2xl animate-in zoom-in-95 overflow-y-auto max-h-[90vh]">
+        <div className="fixed inset-0 z-[110] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/70 backdrop-blur-md">
+          <div className="bg-white dark:bg-gray-800 w-full max-w-md rounded-t-[2rem] sm:rounded-[3rem] p-8 sm:p-12 shadow-2xl animate-in slide-in-from-bottom sm:zoom-in-95 overflow-y-auto max-h-[90vh]">
             <h2 className="text-3xl font-black text-gray-900 dark:text-white mb-2 italic">Crear Producto</h2>
             <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-10">Catálogo de Inventario</p>
             <div className="space-y-5">

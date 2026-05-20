@@ -284,7 +284,8 @@ export default function ReportesPage() {
         <div className="p-10 border-b border-gray-50 dark:border-gray-700 flex justify-between items-center bg-gray-50/20 dark:bg-gray-900/10">
           <h3 className="text-[10px] font-black text-gray-900 dark:text-white uppercase tracking-widest">Rendimiento Comparativo Cajeras</h3>
         </div>
-        <div className="overflow-x-auto">
+        {/* Desktop table */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left">
             <thead className="bg-gray-50/50 dark:bg-gray-900/50 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">
               <tr>
@@ -319,6 +320,29 @@ export default function ReportesPage() {
               ))}
             </tbody>
           </table>
+        </div>
+        {/* Mobile cards */}
+        <div className="md:hidden p-4 space-y-4">
+          {stats?.cajeraStats.map(c => (
+            <div key={c.nombre} className="bg-gray-50 dark:bg-gray-900/50 rounded-2xl p-5 border border-gray-200 dark:border-gray-700 space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-indigo-100 dark:bg-indigo-900/30 rounded-xl flex items-center justify-center text-indigo-600 font-black shrink-0">
+                  {c.nombre.charAt(0)}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="font-black text-gray-900 dark:text-white uppercase text-sm italic truncate">{c.nombre}</p>
+                  <p className="text-[10px] font-bold text-gray-500">{c.cant} Ventas</p>
+                </div>
+                <p className="font-black text-gray-900 dark:text-white text-lg tracking-tighter">{formatCurrency(c.monto)}</p>
+              </div>
+              <div className="flex items-center gap-3 pt-2 border-t border-gray-200 dark:border-gray-700">
+                <div className="flex-1 h-2 bg-gray-100 dark:bg-gray-900 rounded-full overflow-hidden">
+                  <div className="h-full bg-blue-600" style={{ width: `${(c.monto / (stats.totalVentas || 1)) * 100}%` }}></div>
+                </div>
+                <span className="text-[10px] font-black text-blue-600 shrink-0">{Math.round((c.monto / (stats.totalVentas || 1)) * 100)}%</span>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 

@@ -281,8 +281,8 @@ export default function ProveedoresPage() {
 
       {/* Modal Proveedor */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-white dark:bg-gray-800 w-full max-w-xl rounded-[2.5rem] p-10 shadow-2xl animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white dark:bg-gray-800 w-full max-w-xl rounded-t-[2rem] sm:rounded-[2.5rem] p-6 sm:p-10 shadow-2xl animate-in slide-in-from-bottom sm:zoom-in-95 duration-200">
             <h2 className="text-2xl font-black text-gray-900 dark:text-white mb-8 italic">
               {selectedProveedor ? 'Actualizar Ficha' : 'Nueva Ficha Proveedor'}
             </h2>
@@ -322,8 +322,8 @@ export default function ProveedoresPage() {
 
       {/* Modal Historial Compras */}
       {isHistoryOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-white dark:bg-gray-800 w-full max-w-2xl rounded-[2.5rem] p-10 shadow-2xl max-h-[80vh] overflow-auto animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white dark:bg-gray-800 w-full max-w-2xl rounded-t-[2rem] sm:rounded-[2.5rem] p-6 sm:p-10 shadow-2xl max-h-[80vh] overflow-auto animate-in slide-in-from-bottom sm:zoom-in-95 duration-200">
             <div className="flex justify-between items-center mb-8">
               <div>
                 <h2 className="text-3xl font-black text-gray-900 dark:text-white tracking-tighter italic">Historial de Abastecimiento</h2>

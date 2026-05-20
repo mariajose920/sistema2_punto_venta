@@ -565,8 +565,8 @@ export default function ProductosClient({
 
       {/* Modal de Producto */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
-          <div className="bg-white dark:bg-gray-800 w-full max-w-2xl rounded-[2rem] sm:rounded-[3rem] p-5 sm:p-10 shadow-2xl animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-[120] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-md">
+          <div className="bg-white dark:bg-gray-800 w-full max-w-2xl rounded-t-[2rem] sm:rounded-[3rem] p-5 sm:p-10 shadow-2xl animate-in slide-in-from-bottom sm:zoom-in-95 duration-200">
             <h2 className="text-2xl sm:text-4xl font-black text-gray-900 dark:text-white mb-1 sm:mb-2 italic">
               {editingId ? 'Editar Ítem' : 'Nuevo Ítem'}
             </h2>
@@ -737,8 +737,8 @@ export default function ProductosClient({
 
       {/* Modal de Gestión de Categorías */}
       {isCatManagerOpen && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
-          <div className="bg-white dark:bg-gray-800 w-full max-w-2xl rounded-[2rem] sm:rounded-[3rem] p-5 sm:p-10 shadow-2xl animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-[120] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-md">
+          <div className="bg-white dark:bg-gray-800 w-full max-w-2xl rounded-t-[2rem] sm:rounded-[3rem] p-5 sm:p-10 shadow-2xl animate-in slide-in-from-bottom sm:zoom-in-95 duration-200">
             <div className="flex justify-between items-start mb-4 sm:mb-8">
               <div>
                 <h2 className="text-2xl sm:text-4xl font-black text-gray-900 dark:text-white italic">Categorías</h2>
