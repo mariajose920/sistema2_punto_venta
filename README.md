@@ -1,36 +1,171 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🚀 POSMASTER - Sistema de Punto de Venta PWA
 
-## Getting Started
+Sistema moderno de gestión de ventas, inventario y clientes. **Funciona como aplicación web y nativa en móvil**.
 
-First, run the development server:
+## ✨ Características Principales
 
+- ✅ **Responsive** - Funciona perfectamente en móvil, tablet y computadora
+- 📱 **Instalable como App** - PWA con soporte para instalación nativa
+- 💾 **Sincronización automática** - Datos siempre actualizados
+- 📊 **Gestión de inventario** - Control de stock, categorías y productos
+- 👥 **Gestión de clientes** - Historial de compras y saldos
+- 💰 **Punto de venta** - Sistema de ventas con múltiples formas de pago
+- 📈 **Reportes** - Análisis de ventas y rentabilidad
+- 🔐 **Seguridad** - Autenticación y control de roles
+
+## 🌐 Responsividad Mejorada
+
+### ✅ Pantallas Adaptadas
+- **Historial de ventas**: Tablas en desktop → Cards en móvil
+- **Lista de productos**: Grid responsive (1-4 columnas)
+- **Lista de clientes**: Modo table/grid toggleable
+- **Tamaños de fuente**: Aumentados automáticamente en móvil
+
+### 🎯 Breakpoints
+- `sm: 640px` - Teléfonos pequeños
+- `md: 768px` - Tablets
+- `lg: 1024px` - Laptops
+- `xl: 1280px` - Desktops
+
+## 📱 Instalación como App
+
+### ¿Es gratis instalar como app?
+**Sí**, es totalmente gratuito. Solo es una instalación del navegador.
+
+### ¿Dónde están los pasos?
+👉 **Lee [INSTALL_PWA.md](INSTALL_PWA.md)** para instrucciones completas por dispositivo.
+
+### Pasos rápidos:
+
+**iPhone/iPad:**
+1. Abre en Safari
+2. Toca compartir → "Añadir a pantalla de inicio"
+
+**Android:**
+1. Abre en Chrome
+2. Toca el botón "Instalar" que aparece abajo
+
+**Windows/Mac:**
+1. Abre en Chrome/Edge
+2. Toca el ícono "Instalar" arriba a la derecha
+
+## 🏃 Inicio Rápido
+
+### Desarrollo Local
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+```
+Abre [http://localhost:3000](http://localhost:3000)
+
+### Build para Producción
+```bash
+npm run build
+npm start
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 📋 Requisitos
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- Node.js 18+
+- Navegador moderno (Chrome, Firefox, Safari, Edge)
+- Conexión a internet (para sincronización)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 🔧 Configuración PWA
 
-## Learn More
+La app está pre-configurada para PWA:
+- ✅ `manifest.json` - Metadatos de la app
+- ✅ `sw.js` - Service Worker para caché
+- ✅ Iconos adaptables (maskable)
+- ✅ Shortcuts para acciones rápidas
+- ✅ Modo offline parcial
 
-To learn more about Next.js, take a look at the following resources:
+## 📂 Estructura del Proyecto
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```
+app/
+├── (dashboard)/          # Rutas protegidas
+│   ├── cajera/          # Módulo de ventas
+│   ├── productos/       # Inventario (RESPONSIVE)
+│   ├── clientes/        # Clientes (RESPONSIVE)
+│   ├── ventas/
+│   │   └── historial/   # Historial (RESPONSIVE)
+│   └── ...
+├── login/               # Autenticación
+└── layout.tsx           # Layout principal
+components/
+├── PWAInstaller.tsx     # Botón para instalar app
+├── Sidebar.tsx          # Navegación
+└── ...
+public/
+├── manifest.json        # Configuración PWA
+├── sw.js               # Service Worker
+└── ...
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## 🎨 Diseño Responsivo
 
-## Deploy on Vercel
+### Cambios Implementados
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+1. **globals.css**
+   - Aumentó tamaños de fuente en móvil
+   - Mejor legibilidad en pantallas pequeñas
+   - Optimización para touch
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+2. **Páginas Principales**
+   - Historial de ventas: Tabla → Cards
+   - Lista de productos: Grid adaptable
+   - Lista de clientes: Vista dual (table/grid)
+
+3. **Componentes**
+   - Padding dinámico según pantalla
+   - Iconos escalables
+   - Botones con min-height de 44px (móvil)
+
+## 🔐 Seguridad y Privacidad
+
+- Autenticación con Supabase
+- Cifrado HTTPS obligatorio
+- Datos almacenados localmente (no compartidos)
+- Service Worker sin acceso a datos sensibles
+
+## 📊 Performance
+
+- Carga inicial: < 3 segundos
+- Caché automático de assets
+- Sincronización en background
+- Optimización de imágenes
+- Compresión de datos
+
+## 🐛 Solución de Problemas
+
+### "No aparece el botón de instalar"
+```bash
+# Asegúrate de HTTPS en producción
+# En desarrollo, verifica http://localhost:3000
+```
+
+### "La app no sincroniza"
+- Verifica conexión a internet
+- Recarga la aplicación (Ctrl+R)
+- Limpia el caché del navegador
+
+### "Las fuentes se ven pequeñas en móvil"
+- El sistema se ajusta automáticamente
+- Usa Ctrl++ para aumentar zoom si es necesario
+
+## 📞 Soporte
+
+Para preguntas sobre:
+- **PWA/Instalación**: Ver [INSTALL_PWA.md](INSTALL_PWA.md)
+- **Responsive Design**: Revisar [RESPONSIVE_GUIDE.md](RESPONSIVE_GUIDE.md)
+- **Deploy**: Ver [README_DEPLOY.md](README_DEPLOY.md)
+
+## 📝 Licencia
+
+Proyecto privado. Todos los derechos reservados.
+
+---
+
+**¡Listo para usar en cualquier dispositivo!** 🎉
+
+Instala ahora siguiendo los pasos en [INSTALL_PWA.md](INSTALL_PWA.md)

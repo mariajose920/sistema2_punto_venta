@@ -442,7 +442,8 @@ export default function ClientesPage() {
         </div>
       ) : (
         <div className="bg-white dark:bg-gray-800 rounded-[3rem] border border-gray-100 dark:border-gray-700 overflow-hidden shadow-sm">
-          <div className="overflow-x-auto">
+          {/* Vista Desktop - Tabla */}
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-left">
               <thead className="bg-gray-50 dark:bg-gray-900/50 text-[10px] font-black text-gray-400 uppercase tracking-[0.3em]">
                 <tr>
@@ -474,8 +475,66 @@ export default function ClientesPage() {
               </tbody>
             </table>
           </div>
+
+          {/* Vista Mobile - Cards */}
+          <div className="md:hidden p-4 space-y-4">
+            {filtered.map(c => (
+              <div 
+                key={c.id} 
+                className="bg-gray-50 dark:bg-gray-900/50 rounded-2xl p-4 border border-gray-200 dark:border-gray-700 space-y-3"
+              >
+                <div className="flex justify-between items-start mb-3">
+                  <div>
+                    <p className="font-black text-gray-900 dark:text-white text-base uppercase italic">{c.nombre}</p>
+                    <p className="text-xs font-mono text-gray-400">{c.rut || '---'}</p>
+                  </div>
+                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center font-black text-white text-sm ${c.saldo_deudado > 0 ? 'bg-red-500' : 'bg-emerald-500'}`}>
+                    {c.nombre.charAt(0).toUpperCase()}
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-3">
+                  <div className={`p-3 rounded-lg text-center ${c.saldo_deudado > 0 ? 'bg-red-100 dark:bg-red-900/20' : 'bg-gray-100 dark:bg-gray-800'}`}>
+                    <p className="text-xs font-bold text-gray-500 uppercase">Deuda</p>
+                    <p className={`text-sm font-black ${c.saldo_deudado > 0 ? 'text-red-600' : 'text-gray-300'}`}>
+                      {formatCurrency(c.saldo_deudado)}
+                    </p>
+                  </div>
+                  <div className={`p-3 rounded-lg text-center ${c.saldo_favor > 0 ? 'bg-emerald-100 dark:bg-emerald-900/20' : 'bg-gray-100 dark:bg-gray-800'}`}>
+                    <p className={`text-xs font-bold uppercase ${c.saldo_favor > 0 ? 'text-emerald-600' : 'text-gray-500'}`}>Favor</p>
+                    <p className={`text-sm font-black ${c.saldo_favor > 0 ? 'text-emerald-600' : 'text-gray-300'}`}>
+                      {formatCurrency(c.saldo_favor)}
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="pt-3 border-t border-gray-200 dark:border-gray-700 flex gap-2">
+                  <button 
+                    onClick={() => openStatement(c)} 
+                    className="flex-1 py-2 bg-gray-900 text-white text-xs font-black rounded-lg uppercase"
+                  >
+                    Historial
+                  </button>
+                  <button 
+                    onClick={() => { setSelectedCliente(c); setIsAbonoOpen(true); }} 
+                    className="flex-1 py-2 bg-emerald-600 text-white text-xs font-black rounded-lg uppercase"
+                  >
+                    Abonar
+                  </button>
+                  {canManageClientes && (
+                    <button 
+                      onClick={() => { setSelectedCliente(c); setFormData(c); setIsModalOpen(true); }} 
+                      className="py-2 px-3 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:text-blue-600 text-lg rounded-lg"
+                    >
+                      ✏️
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
-      )}
+      )}}
 
       {/* Modal Abono */}
       {isAbonoOpen && selectedCliente && (

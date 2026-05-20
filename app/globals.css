@@ -95,23 +95,32 @@ textarea {
   }
 }
 
-/* Viewport metrix para mejor responsividad */
+/* Viewport metrix para mejor responsividad - Aumentado para mejor legibilidad */
 @media (max-width: 640px) {
   html {
-    font-size: 14px;
+    font-size: 16px;
   }
   
   body {
-    font-size: 14px;
+    font-size: 16px;
   }
+  
+  /* Aumentar tamaño de fuentes específicas en móvil */
+  h1 { font-size: 1.75rem !important; }
+  h2 { font-size: 1.5rem !important; }
+  h3 { font-size: 1.25rem !important; }
+  p { font-size: 1rem !important; }
+  span { font-size: 1rem !important; }
+  button { font-size: 1rem !important; }
+  td, th { font-size: 1rem !important; }
 }
 
 @media (max-width: 380px) {
   html {
-    font-size: 12px;
+    font-size: 15px;
   }
   
   body {
-    font-size: 12px;
+    font-size: 15px;
   }
 }

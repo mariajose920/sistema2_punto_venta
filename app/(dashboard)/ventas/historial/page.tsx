@@ -105,9 +105,10 @@ export default function HistorialVentasPage() {
         </div>
       </div>
 
-      {/* Tabla de Ventas */}
+      {/* Tabla de Ventas - Responsive */}
       <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] border border-gray-100 dark:border-gray-700 overflow-hidden shadow-sm">
-        <div className="overflow-x-auto">
+        {/* Vista Desktop - Tabla */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead className="bg-gray-50 dark:bg-gray-900/50 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">
               <tr>
@@ -155,6 +156,55 @@ export default function HistorialVentasPage() {
               ))}
             </tbody>
           </table>
+        </div>
+
+        {/* Vista Mobile - Cards */}
+        <div className="md:hidden p-4 space-y-4">
+          {loading ? (
+            <div className="p-20 text-center animate-pulse font-bold text-gray-400 uppercase tracking-widest">Cargando Historial...</div>
+          ) : filteredVentas.length === 0 ? (
+            <div className="p-20 text-center font-bold text-gray-400 italic">No se encontraron ventas.</div>
+          ) : filteredVentas.map(v => (
+            <div 
+              key={v.id_venta} 
+              className="bg-gray-50 dark:bg-gray-900/50 rounded-2xl p-4 border border-gray-200 dark:border-gray-700 space-y-3"
+            >
+              <div className="flex justify-between items-start mb-3">
+                <div>
+                  <p className="font-black text-gray-900 dark:text-white text-base">#{v.id_venta.slice(0, 8).toUpperCase()}</p>
+                  <p className="text-xs font-bold text-gray-400 uppercase">{new Date(v.fecha_venta).toLocaleString()}</p>
+                </div>
+                <span className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-widest ${
+                  v.forma_pago === 'fiado' ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-600'
+                }`}>
+                  {v.forma_pago}
+                </span>
+              </div>
+              
+              <div className="space-y-2 text-sm">
+                <div>
+                  <p className="text-xs font-bold text-gray-400 uppercase">Cliente</p>
+                  <p className="font-bold text-gray-900 dark:text-white">{v.cliente?.nombre || 'Venta General'}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-gray-400 uppercase">Cajera</p>
+                  <p className="font-bold text-blue-600">{v.usuario?.nombre || '---'}</p>
+                </div>
+              </div>
+              
+              <div className="pt-3 border-t border-gray-200 dark:border-gray-700 flex justify-between items-center">
+                <p className="text-xs font-bold text-gray-400 uppercase">Total</p>
+                <p className="font-black text-gray-900 dark:text-white text-lg">${v.total_venta.toLocaleString()}</p>
+              </div>
+              
+              <button 
+                onClick={() => openDetail(v)}
+                className="w-full bg-gray-900 text-white px-4 py-3 rounded-xl text-sm font-black uppercase tracking-widest hover:scale-105 transition-all shadow-lg active:scale-95"
+              >
+                Ver Detalle
+              </button>
+            </div>
+          ))}
         </div>
       </div>
 

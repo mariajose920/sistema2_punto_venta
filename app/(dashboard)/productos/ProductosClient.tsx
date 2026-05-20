@@ -517,11 +517,11 @@ export default function ProductosClient({
           <p className="text-gray-400 font-bold mt-2">Prueba ajustando los filtros o el término de búsqueda.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6 lg:gap-8">
           {filtrados.map(p => (
-            <div key={p.id} className="bg-white dark:bg-gray-800 p-8 rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-gray-700 relative group transition-all hover:shadow-2xl hover:-translate-y-2 overflow-hidden">
-              <div className="flex justify-between items-start mb-6">
-                <div className="w-14 h-14 bg-gray-50 dark:bg-gray-900 rounded-2xl flex items-center justify-center text-3xl group-hover:scale-110 transition-transform overflow-hidden">
+            <div key={p.id} className="bg-white dark:bg-gray-800 p-4 sm:p-6 lg:p-8 rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-gray-700 relative group transition-all hover:shadow-2xl hover:-translate-y-2 overflow-hidden">
+              <div className="flex justify-between items-start mb-4 sm:mb-6">
+                <div className="w-12 h-12 sm:w-14 sm:h-14 bg-gray-50 dark:bg-gray-900 rounded-2xl flex items-center justify-center text-2xl sm:text-3xl group-hover:scale-110 transition-transform overflow-hidden">
                   {p.imagen_url ? (
                     <img src={p.imagen_url} alt={p.nombre} className="w-full h-full object-cover" />
                   ) : (
@@ -529,33 +529,33 @@ export default function ProductosClient({
                   )}
                 </div>
                 <div className="text-right">
-                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Precio Venta</p>
-                  <p className="text-2xl font-black text-blue-600 tracking-tighter">{formatCurrency(p.precio_venta_publico || 0)}</p>
+                  <p className="text-[9px] sm:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Precio Venta</p>
+                  <p className="text-xl sm:text-2xl font-black text-blue-600 tracking-tighter">{formatCurrency(p.precio_venta_publico || 0)}</p>
                 </div>
               </div>
 
-              <div className="mb-8">
-                <h3 className="text-lg font-black text-gray-900 dark:text-white truncate uppercase italic">{p.nombre}</h3>
-                <p className="text-[10px] font-bold text-blue-600 uppercase tracking-widest">{p.categoria || 'Sin Categoría'}</p>
+              <div className="mb-4 sm:mb-8">
+                <h3 className="text-base sm:text-lg font-black text-gray-900 dark:text-white truncate uppercase italic">{p.nombre}</h3>
+                <p className="text-[9px] sm:text-[10px] font-bold text-blue-600 uppercase tracking-widest">{p.categoria || 'Sin Categoría'}</p>
               </div>
 
-              <div className="grid grid-cols-2 gap-4 mb-8">
-                <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl">
-                  <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Stock</p>
-                  <p className={`text-xl font-black tracking-tighter ${(p.stock_actual || 0) <= (p.stock_minimo || 0) ? 'text-red-600' : 'text-gray-900 dark:text-white'}`}>
+              <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-4 sm:mb-8">
+                <div className="p-3 sm:p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl">
+                  <p className="text-[8px] sm:text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Stock</p>
+                  <p className={`text-lg sm:text-xl font-black tracking-tighter ${(p.stock_actual || 0) <= (p.stock_minimo || 0) ? 'text-red-600' : 'text-gray-900 dark:text-white'}`}>
                     {p.stock_actual}
                   </p>
                 </div>
-                <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl text-right">
-                  <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Código</p>
-                  <p className="text-[10px] font-black text-gray-400 truncate">{p.codigo_barra || 'S/N'}</p>
+                <div className="p-3 sm:p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl text-right">
+                  <p className="text-[8px] sm:text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Código</p>
+                  <p className="text-[9px] sm:text-[10px] font-black text-gray-400 truncate">{p.codigo_barra || 'S/N'}</p>
                 </div>
               </div>
 
               <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-all">
-                <button onClick={() => openEdit(p)} className="flex-1 py-3 bg-gray-900 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-gray-800 transition-all">Editar</button>
+                <button onClick={() => openEdit(p)} className="flex-1 py-2 sm:py-3 bg-gray-900 text-white rounded-xl font-black text-[9px] sm:text-[10px] uppercase tracking-widest hover:bg-gray-800 transition-all">Editar</button>
                 {role === 'admin' && (
-                  <button onClick={() => handleEliminar(p.id)} className="p-3 bg-red-50 text-red-600 rounded-xl hover:bg-red-600 hover:text-white transition-all">🗑️</button>
+                  <button onClick={() => handleEliminar(p.id)} className="p-2 sm:p-3 bg-red-50 text-red-600 rounded-xl hover:bg-red-600 hover:text-white transition-all text-lg">🗑️</button>
                 )}
               </div>
             </div>
