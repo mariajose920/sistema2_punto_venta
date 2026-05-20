@@ -48,18 +48,40 @@ export default function LoginPage() {
       const endAuth = performance.now();
       console.log(`[PERF_AUTH] Tiempo de signInWithPassword: ${(endAuth - startAuth).toFixed(2)}ms`);
 
-      if (authError) {
-        throw new Error(`ACCESO DENEGADO: ${authError.message}`);
+      if (authError) throw new Error(`ACCESO DENEGADO: ${authError.message}`);
+      if (!authData?.user?.id) throw new Error('No se pudo recuperar el usuario autenticado.');
+
+      // 🔥 REFACTOR DE RENDIMIENTO: Evitamos depender del onAuthStateChange para el primer render
+      // Obtenemos el rol Inmediatamente en paralelo o justo después del login
+      const startRole = performance.now();
+      const { data: roleData, error: roleError } = await supabase
+        .from('Usuario')
+        .select('rol')
+        .eq('id', authData.user.id)
+        .single();
+      const endRole = performance.now();
+      console.log(`[PERF_AUTH] Tiempo de fetchRole en Login: ${(endRole - startRole).toFixed(2)}ms`);
+
+      if (roleError) {
+        console.error('Error al obtener rol:', roleError);
       }
 
-      if (!authData?.user?.id) {
-        throw new Error('No se pudo recuperar el usuario autenticado.');
+      const userRole = (roleData as any)?.rol;
+      
+      if (!userRole) {
+        throw new Error('Usuario sin perfil en la base de datos.');
       }
 
-      // NO hacemos consultas manuales del perfil aquí.
-      // onAuthStateChange en el AuthContext global detectará el login del usuario,
-      // buscará el rol de forma asíncrona, y nuestro useEffect redireccionará
-      // de manera instantánea y reactiva en cuanto el estado global esté listo.
+      // Redirección imperativa inmediata (bypass al useEffect de React)
+      const redirectStart = performance.now();
+      console.log(`[PERF_AUTH] Iniciando redirección a dashboard: ${redirectStart}ms`);
+      
+      if (userRole === 'admin') {
+        router.push('/admin');
+      } else {
+        router.push('/cajera');
+      }
+
     } catch (err: any) {
       setError(err.message || 'Error crítico en el proceso de autenticación.');
       console.error('[LoginProcessError]', err);
