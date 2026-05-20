@@ -50,22 +50,33 @@ export default function AuthGuard({ children, requiredRole }: AuthGuardProps) {
     }
   }, [user, role, loading, isMounted, requiredRole, router]);
 
-  // Cargador Modular Ligero e Integrado (No bloquea la pantalla completa con overlays masivos)
-  if (!isMounted || loading) {
-    return (
-      <div className="w-full min-h-[60vh] flex flex-col items-center justify-center p-8">
-        <div className="w-10 h-10 border-4 border-blue-600/20 border-t-blue-600 rounded-full animate-spin mb-3"></div>
-        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest animate-pulse">
-          Validando Credenciales
-        </p>
-      </div>
-    );
-  }
-
-  // Prevención de renderizado accidental
-  if (!user || !role || (requiredRole && role !== requiredRole)) {
+  // REFACTOR PERF: En lugar de hacer 'return <Spinner />' (lo cual desmonta el árbol y crea un Waterfall),
+  // renderizamos el children SIEMPRE, pero le ponemos un Overlay encima si está cargando.
+  // Esto permite que React reciba el HTML del SSR, lo parsee, descargue imágenes y prepare el DOM en paralelo.
+  
+  if (!isMounted || (!user && !loading && !role)) {
+    // Si definitivamente no hay auth tras cargar, no renderizar layout privado (evita FOUC)
     return null;
   }
 
-  return <>{children}</>;
+  const isGuarding = loading || (!user && isMounted);
+
+  return (
+    <>
+      {isGuarding && (
+        <div className="fixed inset-0 z-[999] flex flex-col items-center justify-center bg-gray-50/90 dark:bg-gray-900/90 backdrop-blur-md">
+          <div className="w-10 h-10 border-4 border-blue-600/20 border-t-blue-600 rounded-full animate-spin mb-3"></div>
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest animate-pulse">
+            Validando Accesos
+          </p>
+        </div>
+      )}
+      
+      {/* El dashboard se monta en el DOM pero se oculta visualmente (o se envía atrás) hasta que termine la validación */}
+      <div className={isGuarding ? 'opacity-0 pointer-events-none absolute inset-0' : 'opacity-100 transition-opacity duration-300'}>
+        {children}
+      </div>
+    </>
+  );
+
 }

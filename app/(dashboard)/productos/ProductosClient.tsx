@@ -21,6 +21,9 @@ export default function ProductosClient({
 }) {
   const { role } = useAuth();
 
+  // Instrumentación de Hidratación
+  const mountTime = useRef(performance.now());
+
   // Estados de datos inicializados con SSR
   const [productos, setProductos] = useState<ProductoRow[]>(initialProductos);
   const [filtrados, setFiltrados] = useState<ProductoRow[]>(initialProductos);
@@ -86,6 +89,11 @@ export default function ProductosClient({
   }, []);
 
   // Se ELIMINA el useEffect vacío inicial. ¡Ya tenemos datos SSR!
+  useEffect(() => {
+    const hydrationTime = performance.now() - mountTime.current;
+    console.log(`[PERF_CACHE] [CLIENT] Hidratación completada en: ${hydrationTime.toFixed(2)}ms`);
+    console.log(`[PERF_CACHE] [CLIENT] Productos recibidos del SSR: ${initialProductos.length}`);
+  }, [initialProductos]);
 
   // Lógica combinada de Búsqueda, Filtrado y Ordenamiento
   useEffect(() => {

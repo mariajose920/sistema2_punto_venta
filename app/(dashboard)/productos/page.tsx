@@ -20,7 +20,7 @@ const getInitialData = unstable_cache(
     ]);
 
     const endFetch = performance.now();
-    console.log(`[PERF_SERVER] Primera carga rápida desde DB en SSR: ${(endFetch - startFetch).toFixed(2)}ms`);
+    console.log(`[PERF_CACHE] [SERVER] Tiempo de DB Fetch (Cache Miss): ${(endFetch - startFetch).toFixed(2)}ms`);
 
     return {
       productos: prodResult.data || [],
@@ -32,9 +32,12 @@ const getInitialData = unstable_cache(
 );
 
 export default async function ProductosPage() {
+  const startServerRender = performance.now();
+  console.log(`[PERF_CACHE] [SERVER] Iniciando render de página ProductosPage`);
+
   return (
     <div className="space-y-6">
-      {/* Opción 2: Implementación de Suspense para mostrar UI inmediata */}
+      {/* Suspense permite enviar el Skeleton al cliente inmediatamente, mientras DataFetcher espera la DB */}
       <Suspense fallback={<ProductosSkeleton />}>
         <DataFetcher />
       </Suspense>
@@ -44,7 +47,11 @@ export default async function ProductosPage() {
 
 // Componente servidor auxiliar que extrae los datos
 async function DataFetcher() {
+  const start = performance.now();
   const data = await getInitialData();
+  const end = performance.now();
+  
+  console.log(`[PERF_CACHE] [SERVER] Tiempo de DataFetcher (resolución de cache/DB): ${(end - start).toFixed(2)}ms`);
   
   return (
     <ProductosClient 
