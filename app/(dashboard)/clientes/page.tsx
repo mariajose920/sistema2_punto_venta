@@ -534,7 +534,7 @@ export default function ClientesPage() {
             ))}
           </div>
         </div>
-      )}}
+      )}
 
       {/* Modal Abono */}
       {isAbonoOpen && selectedCliente && (
