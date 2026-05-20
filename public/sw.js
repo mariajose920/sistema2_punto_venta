@@ -1,10 +1,8 @@
 const CACHE_NAME = 'posmaster-v1';
-const OFFLINE_URL = '/offline';
 
 const STATIC_ASSETS = [
   '/',
   '/login',
-  '/offline',
   '/globals.css',
 ];
 
@@ -78,9 +76,6 @@ self.addEventListener('fetch', (event) => {
       });
     }).catch(() => {
       // Fallback offline
-      if (event.request.destination === 'document') {
-        return caches.match(OFFLINE_URL);
-      }
       return new Response('', { status: 503 });
     })
   );
