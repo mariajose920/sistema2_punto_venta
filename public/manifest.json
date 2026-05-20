@@ -9,23 +9,6 @@
   "background_color": "#ffffff",
   "theme_color": "#2563eb",
   "categories": ["business", "productivity"],
-  "prefer_related_applications": false,
-  "screenshots": [
-    {
-      "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==",
-      "sizes": "540x720",
-      "type": "image/png",
-      "form_factor": "narrow",
-      "purpose": "any"
-    },
-    {
-      "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==",
-      "sizes": "1280x720",
-      "type": "image/png",
-      "form_factor": "wide",
-      "purpose": "any"
-    }
-  ],
   "icons": [
     {
       "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect fill='%232563eb' width='192' height='192'/><text x='50%' y='50%' font-size='120' font-weight='900' text-anchor='middle' dominant-baseline='middle' fill='white'>P</text></svg>",
@@ -52,15 +35,23 @@
       "purpose": "maskable"
     }
   ],
+  "screenshots": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 540 720'><rect fill='%232563eb' width='540' height='720'/></svg>",
+      "sizes": "540x720",
+      "type": "image/svg+xml",
+      "form_factor": "narrow"
+    }
+  ],
   "shortcuts": [
     {
       "name": "Nueva Venta",
       "short_name": "Venta",
-      "description": "Crear una nueva venta",
+      "description": "Registrar venta",
       "url": "/dashboard/cajera",
       "icons": [
         {
-          "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'><rect fill='%232563eb' width='96' height='96'/><text x='50%' y='50%' font-size='50' text-anchor='middle' dominant-baseline='middle' fill='white'>💰</text></svg>",
+          "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'><text x='50%' y='50%' font-size='60' text-anchor='middle' dominant-baseline='middle'>💰</text></svg>",
           "sizes": "96x96",
           "type": "image/svg+xml"
         }
@@ -69,11 +60,11 @@
     {
       "name": "Inventario",
       "short_name": "Productos",
-      "description": "Ver inventario de productos",
+      "description": "Ver productos",
       "url": "/dashboard/productos",
       "icons": [
         {
-          "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'><rect fill='%232563eb' width='96' height='96'/><text x='50%' y='50%' font-size='50' text-anchor='middle' dominant-baseline='middle' fill='white'>📦</text></svg>",
+          "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'><text x='50%' y='50%' font-size='60' text-anchor='middle' dominant-baseline='middle'>📦</text></svg>",
           "sizes": "96x96",
           "type": "image/svg+xml"
         }
@@ -86,61 +77,11 @@
       "url": "/dashboard/clientes",
       "icons": [
         {
-          "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'><rect fill='%232563eb' width='96' height='96'/><text x='50%' y='50%' font-size='50' text-anchor='middle' dominant-baseline='middle' fill='white'>👥</text></svg>",
+          "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'><text x='50%' y='50%' font-size='60' text-anchor='middle' dominant-baseline='middle'>👥</text></svg>",
           "sizes": "96x96",
           "type": "image/svg+xml"
         }
       ]
     }
-  ],
-  "share_target": {
-    "action": "/share",
-    "method": "POST",
-    "enctype": "application/x-www-form-urlencoded",
-    "params": {
-      "title": "title",
-      "text": "text",
-      "url": "url"
-    }
-  }
-}
-  ],
-  "shortcuts": [
-    {
-      "name": "Nueva Venta",
-      "short_name": "Venta",
-      "description": "Registrar una nueva venta",
-      "url": "/ventas/nueva",
-      "icons": [
-        {
-          "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'><text x='50%' y='50%' font-size='60' text-anchor='middle' dominant-baseline='middle'>🛒</text></svg>",
-          "sizes": "96x96",
-          "type": "image/svg+xml"
-        }
-      ]
-    },
-    {
-      "name": "Ver Productos",
-      "short_name": "Productos",
-      "description": "Ver catálogo de productos",
-      "url": "/productos",
-      "icons": [
-        {
-          "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'><text x='50%' y='50%' font-size='60' text-anchor='middle' dominant-baseline='middle'>📦</text></svg>",
-          "sizes": "96x96",
-          "type": "image/svg+xml"
-        }
-      ]
-    }
-  ],
-  "share_target": {
-    "action": "/share",
-    "method": "POST",
-    "enctype": "multipart/form-data",
-    "params": {
-      "title": "title",
-      "text": "text",
-      "url": "url"
-    }
-  }
+  ]
 }
