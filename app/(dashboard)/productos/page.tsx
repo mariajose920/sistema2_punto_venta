@@ -31,6 +31,10 @@ const getInitialData = unstable_cache(
   { revalidate: 60, tags: ['productos', 'categorias'] } // Revalidación cada minuto
 );
 
+// [BUILD FIX] Forzamos la ruta a dinámica para que next build NO intente prerenderizar estáticamente
+// un dashboard que requiere conexión a DB en vivo.
+export const dynamic = 'force-dynamic';
+
 export default async function ProductosPage() {
   const startServerRender = performance.now();
   console.log(`[PERF_CACHE] [SERVER] Iniciando render de página ProductosPage`);

@@ -18,9 +18,11 @@ export const supabase = createClient<Database>(
   isSupabaseConfigured ? supabaseAnonKey : 'placeholder-anon-key-for-robustness',
   {
     auth: {
-      persistSession: true,
-      autoRefreshToken: true,
-      detectSessionInUrl: true,
+      // PERF/BUILD FIX: No persistir sesión ni auto-refrescar en el servidor
+      // porque 'autoRefreshToken: true' inicia un setInterval que cuelga el 'next build'.
+      persistSession: typeof window !== 'undefined',
+      autoRefreshToken: typeof window !== 'undefined',
+      detectSessionInUrl: typeof window !== 'undefined',
     },
   }
 );
