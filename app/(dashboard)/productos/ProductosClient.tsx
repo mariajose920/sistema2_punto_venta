@@ -156,7 +156,7 @@ export default function ProductosClient({
       confirmMsg = `⚠️ ADVERTENCIA CRÍTICA ⚠️\n\n` +
         `La categoría "${cat.nombre.toUpperCase()}" contiene ${prodsAsociados.length} productos:\n` +
         prodsAsociados.map(p => `• ${p.nombre.toUpperCase()}`).join('\n') +
-        `\n\n¿DESEAS ELIMINAR LA CATEGORIA Y TODOS ESTOS PRODUCTOS DE FORMA PERMANENTE?\n\nEsta acción no se puede deshacer.`;
+        `\n\nLos productos sin historial de ventas se eliminarán. Los productos con ventas registradas se conservarán para preservar el historial.`;
     }
 
     if (!window.confirm(confirmMsg)) return;
@@ -164,20 +164,34 @@ export default function ProductosClient({
     try {
       setIsSaving(true); // Reutilizamos el estado de carga para feedback visual
 
-      // 1. Eliminar productos primero (para evitar errores de FK si existieran o simplemente limpiar)
       if (prodsAsociados.length > 0) {
-        const { error: pErr } = await (supabase.from('Producto') as any)
-          .delete()
-          .eq('categoria', cat.nombre);
-        if (pErr) throw pErr;
+        const productIds = prodsAsociados.map(p => p.id);
+
+        const { data: referencedRows, error: refErr } = await (supabase.from('DetalleVenta') as any)
+          .select('id_producto')
+          .in('id_producto', productIds)
+          .neq('id_producto', null);
+        if (refErr) throw refErr;
+
+        const referencedProductIds = new Set(
+          (referencedRows || []).map((row: any) => row.id_producto).filter(Boolean)
+        );
+
+        const productsToDelete = prodsAsociados.filter(p => !referencedProductIds.has(p.id));
+
+        if (productsToDelete.length > 0) {
+          const { error: pErr } = await (supabase.from('Producto') as any)
+            .delete()
+            .in('id', productsToDelete.map(p => p.id));
+          if (pErr) throw pErr;
+        }
       }
 
-      // 2. Eliminar la categoría
       const { error: cErr } = await (supabase.from('Categoria') as any).delete().eq('id', id);
       if (cErr) throw cErr;
 
       await fetchData();
-      alert('Categoría y productos asociados eliminados con éxito.');
+      alert('Categoría eliminada correctamente. Se conservaron los productos con historial de ventas.');
     } catch (err: any) {
       alert('Error en el proceso de eliminación: ' + err.message);
     } finally {
