@@ -204,6 +204,37 @@ export default function ClientesPage() {
     }
   };
 
+  const handleDeleteCliente = async (cliente: ClienteRow) => {
+    const confirmacion = window.confirm(
+      `¿Seguro que quieres eliminar al cliente "${cliente.nombre}"?\n\nEsta acción no se puede deshacer.`
+    );
+
+    if (!confirmacion) return;
+
+    try {
+      setLoading(true);
+      const { error } = await (supabase.from('Cliente') as any)
+        .delete()
+        .eq('id', cliente.id);
+
+      if (error) throw error;
+
+      if (selectedCliente?.id === cliente.id) {
+        setSelectedCliente(null);
+        setIsStatementOpen(false);
+        setIsAbonoOpen(false);
+      }
+
+      await fetchClientes();
+      alert('Cliente eliminado correctamente.');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Error al eliminar cliente';
+      alert(message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const openStatement = async (cliente: ClienteRow) => {
     // Normalizar saldos antes de mostrar en el historial
     const { deuda, favor } = compensarSaldo(cliente.saldo_deudado, cliente.saldo_favor);
@@ -435,7 +466,10 @@ export default function ClientesPage() {
                 <button onClick={() => openStatement(c)} className="flex-1 py-4 bg-gray-100 dark:bg-gray-900 text-gray-500 dark:text-gray-400 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-gray-900 hover:text-white transition-all">Historial</button>
                 <button onClick={() => { setSelectedCliente(c); setIsAbonoOpen(true); }} className="flex-1 py-4 bg-emerald-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-500/20">Abonar</button>
                 {canManageClientes && (
-                  <button onClick={() => { setSelectedCliente(c); setFormData(c); setIsModalOpen(true); }} className="p-4 bg-gray-50 dark:bg-gray-900 text-gray-300 hover:text-blue-600 rounded-2xl transition-all">✏️</button>
+                  <>
+                    <button onClick={() => { setSelectedCliente(c); setFormData(c); setIsModalOpen(true); }} className="p-4 bg-gray-50 dark:bg-gray-900 text-gray-300 hover:text-blue-600 rounded-2xl transition-all">✏️</button>
+                    <button onClick={() => handleDeleteCliente(c)} className="p-4 bg-red-50 dark:bg-red-900/20 text-red-600 rounded-2xl transition-all hover:scale-105">🗑️</button>
+                  </>
                 )}
               </div>
             </div>
@@ -467,7 +501,10 @@ export default function ClientesPage() {
                         <button onClick={() => openStatement(c)} className="text-[10px] font-black text-blue-600 uppercase tracking-widest hover:underline">Movimientos</button>
                         <button onClick={() => { setSelectedCliente(c); setIsAbonoOpen(true); }} className="text-[10px] font-black text-emerald-600 uppercase tracking-widest hover:underline">Abonar</button>
                         {canManageClientes && (
-                          <button onClick={() => { setSelectedCliente(c); setFormData(c); setIsModalOpen(true); }} className="text-gray-300 hover:text-blue-600">✏️</button>
+                          <>
+                            <button onClick={() => { setSelectedCliente(c); setFormData(c); setIsModalOpen(true); }} className="text-gray-300 hover:text-blue-600">✏️</button>
+                            <button onClick={() => handleDeleteCliente(c)} className="text-red-600 hover:text-red-700">🗑️</button>
+                          </>
                         )}
                       </div>
                     </td>
@@ -523,12 +560,20 @@ export default function ClientesPage() {
                     Abonar
                   </button>
                   {canManageClientes && (
-                    <button 
-                      onClick={() => { setSelectedCliente(c); setFormData(c); setIsModalOpen(true); }} 
-                      className="py-2 px-3 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:text-blue-600 text-lg rounded-lg"
-                    >
-                      ✏️
-                    </button>
+                    <>
+                      <button 
+                        onClick={() => { setSelectedCliente(c); setFormData(c); setIsModalOpen(true); }} 
+                        className="py-2 px-3 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:text-blue-600 text-lg rounded-lg"
+                      >
+                        ✏️
+                      </button>
+                      <button
+                        onClick={() => handleDeleteCliente(c)}
+                        className="py-2 px-3 bg-red-50 dark:bg-red-900/20 text-red-600 text-lg rounded-lg"
+                      >
+                        🗑️
+                      </button>
+                    </>
                   )}
                 </div>
               </div>
