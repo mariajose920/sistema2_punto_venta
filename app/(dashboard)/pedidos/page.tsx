@@ -14,6 +14,19 @@ type PedidoCompleto = {
   detalles: any[];
 };
 
+const allowedPaymentMethods = ['efectivo', 'tarjeta', 'transferencia', 'fiado'] as const;
+type FormaPagoVenta = (typeof allowedPaymentMethods)[number];
+
+function normalizeFormaPago(value: string): FormaPagoVenta {
+  const normalized = value.trim().toLowerCase();
+
+  if ((allowedPaymentMethods as readonly string[]).includes(normalized)) {
+    return normalized as FormaPagoVenta;
+  }
+
+  throw new Error(`Método de pago inválido: ${value}`);
+}
+
 export default function PedidosPage() {
   const { user } = useAuth();
   const [pedidos, setPedidos] = useState<PedidoCompleto[]>([]);
@@ -116,26 +129,27 @@ export default function PedidosPage() {
   const handleDelivery = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedPedido || !user) return;
-    if (paymentMethod === 'fiado' && !selectedClientId) {
+
+    const formaPago = normalizeFormaPago(paymentMethod);
+
+    if (formaPago === 'fiado' && !selectedClientId) {
       alert('Debes seleccionar un cliente para fiar.');
       return;
     }
 
     setProcessing(true);
     try {
-      // LOG TEMPORAL PARA DEPURAR
       console.log('Iniciando procesamiento de entrega...', {
          pedidoId: selectedPedido.id,
          usuarioId: user.id,
-         paymentMethod,
+         formaPago,
          selectedClientId
       });
 
-      // Llamada atómica a Supabase RPC
       const { data, error } = await (supabase as any).rpc('procesar_entrega_pedido', {
         p_pedido_id: selectedPedido.id,
         p_usuario_id: user.id,
-        p_forma_pago: paymentMethod,
+        p_forma_pago: formaPago,
         p_cliente_id: selectedClientId || null
       });
 
@@ -147,7 +161,7 @@ export default function PedidosPage() {
       console.log('Entrega procesada con éxito:', data);
 
       setSelectedPedido(null);
-      fetchPedidos(true); // Refresca la lista (elimina el pedido porque ya no está "pendiente")
+      fetchPedidos(true);
       alert('Venta generada y pedido entregado con éxito');
 
     } catch (err: any) {
