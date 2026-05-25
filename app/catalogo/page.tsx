@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { logPerf } from '@/lib/perf';
+import { supabase } from '@/lib/supabase';
 
 type CatalogProduct = {
   id: string;
@@ -63,19 +64,21 @@ export default function CatalogoPublico() {
     }
   };
 
-  const getStockStatus = (stock: number) => {
-    if (stock <= 0) return { label: 'Agotado', color: 'text-red-400 bg-red-900/40 border border-red-800' };
-    if (stock <= 5) return { label: 'Poco stock', color: 'text-orange-400 bg-orange-900/40 border border-orange-800' };
+  const getStockStatus = (stock: number | null) => {
+    const normalizedStock = stock ?? 0;
+    if (normalizedStock <= 0) return { label: 'Agotado', color: 'text-red-400 bg-red-900/40 border border-red-800' };
+    if (normalizedStock <= 5) return { label: 'Poco stock', color: 'text-orange-400 bg-orange-900/40 border border-orange-800' };
     return { label: 'Disponible', color: 'text-emerald-400 bg-emerald-900/40 border border-emerald-800' };
   };
 
   const addToCart = (producto: CatalogProduct) => {
-    if (producto.stock_actual <= 0) return;
+    const stockActual = producto.stock_actual ?? 0;
+    if (stockActual <= 0) return;
 
     setCart(prev => {
       const existing = prev.find(item => item.producto.id === producto.id);
       if (existing) {
-        if (existing.cantidad >= producto.stock_actual) return prev;
+        if (existing.cantidad >= stockActual) return prev;
         return prev.map(item =>
           item.producto.id === producto.id
             ? { ...item, cantidad: item.cantidad + 1 }
@@ -95,7 +98,8 @@ export default function CatalogoPublico() {
     setCart(prev => prev.map(item => {
       if (item.producto.id === productoId) {
         const newQ = item.cantidad + delta;
-        if (newQ > 0 && newQ <= item.producto.stock_actual) {
+        const stockActual = item.producto.stock_actual ?? 0;
+        if (newQ > 0 && newQ <= stockActual) {
           return { ...item, cantidad: newQ };
         }
       }
@@ -103,7 +107,7 @@ export default function CatalogoPublico() {
     }));
   };
 
-  const totalCart = cart.reduce((sum, item) => sum + (item.producto.precio_venta_publico * item.cantidad), 0);
+  const totalCart = cart.reduce((sum, item) => sum + ((item.producto.precio_venta_publico ?? 0) * item.cantidad), 0);
 
   // ── Utilidades de RUT (idénticas a clientes/page.tsx) ──────────────────────
   const cleanRUT = (rut: string) => (rut || '').replace(/[^0-9kK]/g, '').toUpperCase();
@@ -204,13 +208,16 @@ export default function CatalogoPublico() {
       }
 
       // 2. Insertar DetallePedido
-      const detalles = cart.map(item => ({
-        pedido_id:      pedidoData.id,
-        producto_id:    item.producto.id,
-        cantidad:       item.cantidad,
-        precio_unitario: item.producto.precio_venta_publico,
-        subtotal:       item.producto.precio_venta_publico * item.cantidad,
-      }));
+      const detalles = cart.map(item => {
+        const precioUnitario = item.producto.precio_venta_publico ?? 0;
+        return {
+          pedido_id:      pedidoData.id,
+          producto_id:    item.producto.id,
+          cantidad:       item.cantidad,
+          precio_unitario: precioUnitario,
+          subtotal:       precioUnitario * item.cantidad,
+        };
+      });
 
       const { error: detalleError } = await (supabase as any)
         .from('DetallePedido')
@@ -307,8 +314,10 @@ export default function CatalogoPublico() {
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
               {productos.map(producto => {
+                const stockActual = producto.stock_actual ?? 0;
+                const precioProducto = producto.precio_venta_publico ?? 0;
                 const status = getStockStatus(producto.stock_actual);
-                const isOutOfStock = producto.stock_actual <= 0;
+                const isOutOfStock = stockActual <= 0;
                 const inCart = cart.find(i => i.producto.id === producto.id);
 
                 return (
@@ -334,7 +343,7 @@ export default function CatalogoPublico() {
                       <h3 className="font-bold text-white text-sm md:text-lg mb-2 leading-tight line-clamp-2">{producto.nombre}</h3>
                       <div className="mt-auto flex items-end justify-between">
                         <span className="text-xl md:text-2xl font-black text-blue-400">
-                          ${producto.precio_venta_publico.toLocaleString('es-CL')}
+                          ${precioProducto.toLocaleString('es-CL')}
                         </span>
                       </div>
                     </div>
@@ -396,7 +405,7 @@ export default function CatalogoPublico() {
                     <div className="flex-1">
                       <h4 className="font-bold text-sm md:text-base text-white line-clamp-2">{item.producto.nombre}</h4>
                       <div className="text-blue-400 font-bold mt-1 text-sm md:text-base">
-                        ${item.producto.precio_venta_publico.toLocaleString('es-CL')}
+                        ${(item.producto.precio_venta_publico ?? 0).toLocaleString('es-CL')}
                       </div>
                       <div className="flex items-center gap-3 md:gap-4 mt-3 md:mt-4">
                         <div className="flex items-center bg-slate-900 rounded-lg border border-slate-700 overflow-hidden">

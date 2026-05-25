@@ -11,15 +11,27 @@ export type CatalogProduct = {
   imagen_url: string | null;
 };
 
+type CatalogQueryItem = {
+  id: string;
+  nombre: string;
+  categoria: string | null;
+  precio_venta_publico: number | null;
+  stock_actual: number | null;
+  imagen_url: string | null;
+};
+
 async function loadCatalogProducts(): Promise<CatalogProduct[]> {
   const result = await measureAsync(
     '[Cache] catalogo-productos',
     async () => {
-      const { data, error } = await supabase
+      const response = await supabase
         .from('Producto')
         .select('id, nombre, categoria, precio_venta_publico, stock_actual, imagen_url')
         .gt('stock_actual', 0)
         .order('nombre');
+
+      const data = response.data as CatalogQueryItem[] | null;
+      const error = response.error;
 
       if (error) {
         throw error;
