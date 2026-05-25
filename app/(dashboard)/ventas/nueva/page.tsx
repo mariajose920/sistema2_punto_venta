@@ -23,6 +23,7 @@ type ClienteRow = {
   id: string;
   nombre: string;
   saldo_favor: number | null;
+  saldo_deudado?: number | null;
 };
 
 type PromocionRow = {
