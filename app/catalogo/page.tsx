@@ -69,7 +69,7 @@ export default function CatalogoPublico() {
     return { label: 'Disponible', color: 'text-emerald-400 bg-emerald-900/40 border border-emerald-800' };
   };
 
-  const addToCart = (producto: Producto) => {
+  const addToCart = (producto: CatalogProduct) => {
     if (producto.stock_actual <= 0) return;
 
     setCart(prev => {
