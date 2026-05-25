@@ -170,27 +170,27 @@ export default function AdminDashboardPage() {
     <div className="space-y-10 animate-in fade-in duration-700">
       
       {/* Header Financiero */}
-      <div className="bg-white dark:bg-gray-900 p-12 rounded-[3.5rem] shadow-2xl border border-gray-50 dark:border-gray-800 flex flex-col lg:flex-row justify-between items-center gap-10 relative overflow-hidden group">
+      <div className="bg-white dark:bg-gray-900 p-4 sm:p-8 lg:p-12 rounded-[2rem] sm:rounded-[3.5rem] shadow-2xl border border-gray-50 dark:border-gray-800 flex flex-col lg:flex-row justify-between items-center gap-6 sm:gap-8 lg:gap-10 relative overflow-hidden group">
         <div className="absolute top-0 right-0 w-96 h-96 bg-blue-600/5 rounded-full -mr-48 -mt-48 blur-3xl transition-colors duration-1000"></div>
         
-        <div className="relative z-10 text-center lg:text-left">
-          <h1 className="text-5xl font-black text-gray-900 dark:text-white tracking-tighter mb-3 italic">Panel de Control</h1>
-          <p className="text-gray-400 font-bold uppercase text-[10px] tracking-[0.4em] flex items-center justify-center lg:justify-start gap-2">
+        <div className="relative z-10 text-center lg:text-left w-full">
+          <h1 className="text-2xl sm:text-3xl lg:text-5xl font-black text-gray-900 dark:text-white tracking-tighter mb-3 italic leading-tight break-words">Panel de Control</h1>
+          <p className="text-gray-400 font-bold uppercase text-[10px] tracking-[0.4em] flex items-center justify-center lg:justify-start gap-2 break-words">
             <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
             Actualizado en tiempo real
           </p>
         </div>
         
-        <div className="relative z-10 bg-gray-50 dark:bg-gray-800/50 p-8 rounded-[2.5rem] border border-gray-100 dark:border-gray-700 px-12">
+        <div className="relative z-10 bg-gray-50 dark:bg-gray-800/50 p-4 sm:p-6 lg:p-8 rounded-[2rem] sm:rounded-[2.5rem] border border-gray-100 dark:border-gray-700 w-full lg:w-auto max-w-full">
           <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-2 text-center">Balance Neto</p>
-          <p className={`text-6xl font-black tracking-tighter text-center ${stats && stats.balance >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
+          <p className={`text-3xl sm:text-5xl lg:text-6xl font-black tracking-tighter text-center break-words ${stats && stats.balance >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
             ${stats?.balance.toLocaleString() || '0'}
           </p>
         </div>
       </div>
 
       {/* Grid de Métricas Críticas */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-6">
         <MetricBox title="Ingresos" value={stats?.ingresos} subtext="Ventas Totales" color="text-emerald-600" bg="bg-emerald-50" icon="💹" />
         <MetricBox title="Gastos" value={stats?.gastos} subtext="Compras" color="text-red-600" bg="bg-red-50" icon="📉" />
         <MetricBox title="Por Cobrar" value={stats?.cuentasPorCobrar} subtext="Créditos Pendientes" color="text-amber-600" bg="bg-amber-50" icon="⏳" />
@@ -198,12 +198,12 @@ export default function AdminDashboardPage() {
       </div>
 
       {/* Analítica y Alertas */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 sm:gap-8 lg:gap-10">
         
         {/* Composición de Ventas */}
-        <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-[3rem] p-10 border border-gray-100 dark:border-gray-700 shadow-sm relative group overflow-hidden">
-          <div className="flex justify-between items-center mb-10">
-            <h2 className="text-2xl font-black text-gray-900 dark:text-white flex items-center gap-4 italic">
+        <div className="xl:col-span-2 bg-white dark:bg-gray-800 rounded-[2rem] sm:rounded-[3rem] p-5 sm:p-8 lg:p-10 border border-gray-100 dark:border-gray-700 shadow-sm relative group overflow-hidden">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-8 sm:mb-10">
+            <h2 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white flex items-center gap-4 italic break-words">
               <span className="w-2 h-10 bg-blue-600 rounded-full"></span>
               Dinámica de Cobros
             </h2>
@@ -240,12 +240,12 @@ export default function AdminDashboardPage() {
             </div>
           </div>
 
-          <div className="mt-12 grid grid-cols-2 gap-4">
-            <div className="p-6 bg-gray-50 dark:bg-gray-900/50 rounded-3xl border border-gray-100 dark:border-gray-800">
+          <div className="mt-8 sm:mt-12 grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="p-4 sm:p-6 bg-gray-50 dark:bg-gray-900/50 rounded-[2rem] border border-gray-100 dark:border-gray-800">
               <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Margen Contado</p>
               <p className="text-xl font-black text-gray-900 dark:text-white">{eficienciaCobro}%</p>
             </div>
-            <div className="p-6 bg-gray-50 dark:bg-gray-900/50 rounded-3xl border border-gray-100 dark:border-gray-800">
+            <div className="p-4 sm:p-6 bg-gray-50 dark:bg-gray-900/50 rounded-[2rem] border border-gray-100 dark:border-gray-800">
               <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Riesgo Fiado</p>
               <p className="text-xl font-black text-amber-600">{100 - eficienciaCobro}%</p>
             </div>
@@ -254,19 +254,19 @@ export default function AdminDashboardPage() {
 
         {/* Acciones Rápidas y Alertas */}
         <div className="space-y-6">
-          <div className="bg-red-600 p-10 rounded-[3rem] shadow-2xl shadow-red-200 dark:shadow-none text-white relative overflow-hidden group">
+          <div className="bg-red-600 p-5 sm:p-8 lg:p-10 rounded-[2rem] sm:rounded-[3rem] shadow-2xl shadow-red-200 dark:shadow-none text-white relative overflow-hidden group">
             <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -mr-8 -mt-8 blur-xl group-hover:scale-150 transition-transform duration-700"></div>
             <h3 className="text-xs font-black uppercase tracking-[0.2em] mb-4 text-red-100">Alerta de Inventario</h3>
-            <div className="flex items-baseline gap-2">
-              <p className="text-6xl font-black tracking-tighter">{stats?.productosStockBajo || 0}</p>
+            <div className="flex flex-wrap items-baseline gap-2">
+              <p className="text-4xl sm:text-6xl font-black tracking-tighter">{stats?.productosStockBajo || 0}</p>
               <p className="text-xs font-bold uppercase opacity-80 italic">Productos</p>
             </div>
-            <p className="text-sm font-bold text-red-100/70 mt-2">Nivel bajo de stock detectado.</p>
+            <p className="text-sm font-bold text-red-100/70 mt-2 break-words">Nivel bajo de stock detectado.</p>
             <Link href="/productos" className="mt-8 block text-center py-4 bg-white text-red-600 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-gray-100 transition-colors shadow-xl">Gestionar Reabastecimiento</Link>
           </div>
 
-          <div className="bg-white dark:bg-gray-800 p-10 rounded-[3rem] border border-gray-100 dark:border-gray-700 shadow-sm">
-            <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-8">Gestión de Operativa</h3>
+          <div className="bg-white dark:bg-gray-800 p-5 sm:p-8 rounded-[2rem] sm:rounded-[3rem] border border-gray-100 dark:border-gray-700 shadow-sm">
+            <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-6 sm:mb-8">Gestión de Operativa</h3>
             <div className="space-y-4">
               <DashLink href="/usuarios" label="Personal y Ventas" icon="👥" />
               <DashLink href="/proveedores" label="Gestión de Proveedores" icon="🏢" />
@@ -285,15 +285,15 @@ export default function AdminDashboardPage() {
  */
 function MetricBox({ title, value, subtext, color, bg, icon }: MetricBoxProps) {
   return (
-    <div className={`bg-white dark:bg-gray-800 p-10 rounded-[2.5rem] border border-gray-50 dark:border-gray-700 shadow-sm transition-all duration-500 hover:shadow-2xl hover:-translate-y-2 group`}>
-      <div className="flex justify-between items-start mb-6">
-        <div className={`w-14 h-14 ${bg} rounded-2xl flex items-center justify-center text-3xl shadow-sm group-hover:scale-110 transition-transform duration-500`}>{icon}</div>
+    <div className="bg-white dark:bg-gray-800 p-5 sm:p-8 lg:p-10 rounded-[2rem] sm:rounded-[2.5rem] border border-gray-50 dark:border-gray-700 shadow-sm transition-all duration-500 hover:shadow-2xl hover:-translate-y-2 group">
+      <div className="flex justify-between items-start mb-4 sm:mb-6">
+        <div className={`w-12 h-12 sm:w-14 sm:h-14 ${bg} rounded-2xl flex items-center justify-center text-2xl sm:text-3xl shadow-sm group-hover:scale-110 transition-transform duration-500`}>{icon}</div>
       </div>
       <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-2">{title}</p>
-      <p className={`text-3xl font-black ${color} tracking-tighter mb-1`}>
+      <p className={`text-2xl sm:text-3xl font-black ${color} tracking-tighter mb-1 break-words`}>
         ${value?.toLocaleString() || '0'}
       </p>
-      <p className="text-[10px] font-bold text-gray-500 italic opacity-80">{subtext}</p>
+      <p className="text-[10px] font-bold text-gray-500 italic opacity-80 break-words">{subtext}</p>
     </div>
   );
 }
@@ -303,9 +303,9 @@ function MetricBox({ title, value, subtext, color, bg, icon }: MetricBoxProps) {
  */
 function DashLink({ href, label, icon }: DashLinkProps) {
   return (
-    <Link href={href} className="flex items-center gap-5 p-5 bg-gray-50 dark:bg-gray-900/50 rounded-2xl hover:bg-blue-600 hover:text-white transition-all group border border-transparent hover:border-blue-500">
-      <span className="text-2xl group-hover:rotate-12 transition-transform">{icon}</span>
-      <span className="text-xs font-black uppercase tracking-widest">{label}</span>
+    <Link href={href} className="flex items-center gap-3 sm:gap-5 p-4 sm:p-5 bg-gray-50 dark:bg-gray-900/50 rounded-2xl hover:bg-blue-600 hover:text-white transition-all group border border-transparent hover:border-blue-500">
+      <span className="text-2xl group-hover:rotate-12 transition-transform shrink-0">{icon}</span>
+      <span className="text-[11px] sm:text-xs font-black uppercase tracking-widest break-words">{label}</span>
     </Link>
   );
 }

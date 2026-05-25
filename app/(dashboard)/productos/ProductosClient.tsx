@@ -443,8 +443,8 @@ export default function ProductosClient({
       {/* Encabezado y Filtros */}
       <div className="bg-white dark:bg-gray-800 p-4 sm:p-8 rounded-[2rem] sm:rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-gray-700 space-y-4 sm:space-y-6">
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 sm:gap-6">
-          <div className="flex-1 w-full">
-            <h1 className="text-2xl sm:text-3xl font-black text-gray-900 dark:text-white mb-3 sm:mb-4 tracking-tight">Inventario de Productos</h1>
+          <div className="flex-1 w-full min-w-0">
+            <h1 className="text-2xl sm:text-3xl font-black text-gray-900 dark:text-white mb-3 sm:mb-4 tracking-tight leading-tight break-words">Inventario de Productos</h1>
             <div className="relative group">
               <span className="absolute left-5 top-1/2 -translate-y-1/2 text-2xl group-focus-within:scale-110 transition-transform">🔍</span>
               <input
@@ -452,22 +452,22 @@ export default function ProductosClient({
                 placeholder="Buscar por nombre o código de barras..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-14 pr-6 py-4 bg-gray-50 dark:bg-gray-900 border-none rounded-2xl focus:ring-4 focus:ring-blue-600/20 transition-all font-bold text-lg"
+                className="w-full pl-14 pr-6 py-4 bg-gray-50 dark:bg-gray-900 border-none rounded-2xl focus:ring-4 focus:ring-blue-600/20 transition-all font-bold text-base sm:text-lg leading-normal"
               />
             </div>
           </div>
 
           {(role === 'admin' || role === 'cajera') && (
-            <div className="flex flex-row sm:flex-row gap-2 sm:gap-3 w-full lg:w-auto">
+            <div className="flex w-full flex-wrap gap-2 sm:gap-3 lg:w-auto">
               <button
                 onClick={() => setIsCatManagerOpen(true)}
-                className="flex-1 sm:flex-none bg-white text-gray-900 border-2 border-gray-900 px-4 sm:px-8 py-3 sm:py-4 rounded-2xl font-black shadow-sm hover:bg-gray-50 active:scale-95 transition-all flex items-center justify-center gap-2 sm:gap-3 uppercase text-[10px] sm:text-xs tracking-widest"
+                className="w-full sm:flex-none bg-white text-gray-900 border-2 border-gray-900 px-4 sm:px-8 py-3 sm:py-4 rounded-2xl font-black shadow-sm hover:bg-gray-50 active:scale-95 transition-all flex items-center justify-center gap-2 sm:gap-3 uppercase text-[10px] sm:text-xs tracking-widest"
               >
                 <span>📁</span> <span className="hidden sm:inline">Editar</span> Categorías
               </button>
               <button
                 onClick={() => { resetForm(); setIsModalOpen(true); }}
-                className="flex-1 sm:flex-none bg-gray-900 text-white px-4 sm:px-8 py-3 sm:py-4 rounded-2xl font-black shadow-2xl hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2 sm:gap-3 uppercase text-[10px] sm:text-xs tracking-widest"
+                className="w-full sm:flex-none bg-gray-900 text-white px-4 sm:px-8 py-3 sm:py-4 rounded-2xl font-black shadow-2xl hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2 sm:gap-3 uppercase text-[10px] sm:text-xs tracking-widest"
               >
                 <span>➕</span> <span className="hidden sm:inline">Nuevo</span> Producto
               </button>
@@ -475,13 +475,13 @@ export default function ProductosClient({
           )}
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
-          <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-900 p-2 rounded-2xl border border-gray-100 dark:border-gray-800">
+        <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full">
+          <div className="flex min-w-0 flex-1 items-center gap-2 bg-gray-50 dark:bg-gray-900 p-2 rounded-2xl border border-gray-100 dark:border-gray-800">
             <span className="text-[9px] sm:text-[10px] font-black text-gray-400 uppercase tracking-widest px-1 sm:px-2 shrink-0">Categoría:</span>
             <select
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value)}
-              className="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white border-none font-bold text-[11px] sm:text-xs focus:ring-0 cursor-pointer"
+              className="w-full min-w-0 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white border-none font-bold text-[11px] sm:text-xs focus:ring-0 cursor-pointer"
             >
               <option value="todas" className="bg-white dark:bg-gray-900 text-gray-900 dark:text-white">Todas</option>
               {categorias.map(cat => (
@@ -490,12 +490,12 @@ export default function ProductosClient({
             </select>
           </div>
 
-          <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-900 p-2 rounded-2xl border border-gray-100 dark:border-gray-800">
+          <div className="flex min-w-0 flex-1 items-center gap-2 bg-gray-50 dark:bg-gray-900 p-2 rounded-2xl border border-gray-100 dark:border-gray-800">
             <span className="text-[9px] sm:text-[10px] font-black text-gray-400 uppercase tracking-widest px-1 sm:px-2 shrink-0">Orden:</span>
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as OrderType)}
-              className="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white border-none font-bold text-[11px] sm:text-xs focus:ring-0 cursor-pointer"
+              className="w-full min-w-0 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white border-none font-bold text-[11px] sm:text-xs focus:ring-0 cursor-pointer"
             >
               <option value="name_asc" className="bg-white dark:bg-gray-900 text-gray-900 dark:text-white">A-Z</option>
               <option value="stock_asc" className="bg-white dark:bg-gray-900 text-gray-900 dark:text-white">Stock ↑</option>
@@ -515,45 +515,45 @@ export default function ProductosClient({
           <p className="text-gray-400 font-bold mt-2">Prueba ajustando los filtros o el término de búsqueda.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6 lg:gap-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4 sm:gap-6 lg:gap-8">
           {filtrados.map(p => (
-            <div key={p.id} className="bg-white dark:bg-gray-800 p-4 sm:p-6 lg:p-8 rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-gray-700 relative group transition-all hover:shadow-2xl hover:-translate-y-2 overflow-hidden">
-              <div className="flex justify-between items-start mb-4 sm:mb-6">
-                <div className="w-12 h-12 sm:w-14 sm:h-14 bg-gray-50 dark:bg-gray-900 rounded-2xl flex items-center justify-center text-2xl sm:text-3xl group-hover:scale-110 transition-transform overflow-hidden">
+            <div key={p.id} className="min-w-0 bg-white dark:bg-gray-800 p-4 sm:p-6 rounded-[2rem] shadow-sm border border-gray-100 dark:border-gray-700 relative group transition-all hover:shadow-2xl hover:-translate-y-1 overflow-hidden">
+              <div className="flex justify-between items-start gap-3 mb-4 sm:mb-6">
+                <div className="aspect-square w-full max-w-[4.5rem] sm:max-w-[5rem] bg-gray-50 dark:bg-gray-900 rounded-2xl flex items-center justify-center text-2xl sm:text-3xl group-hover:scale-110 transition-transform overflow-hidden shrink-0">
                   {p.imagen_url ? (
-                    <img src={p.imagen_url} alt={p.nombre} className="w-full h-full object-cover" />
+                    <img src={p.imagen_url} alt={p.nombre} className="w-full h-full object-contain" />
                   ) : (
                     categorias.find(c => c.nombre === p.categoria) ? '📁' : '📦'
                   )}
                 </div>
-                <div className="text-right">
+                <div className="text-right min-w-0">
                   <p className="text-[9px] sm:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Precio Venta</p>
-                  <p className="text-xl sm:text-2xl font-black text-blue-600 tracking-tighter">{formatCurrency(p.precio_venta_publico || 0)}</p>
+                  <p className="text-lg sm:text-2xl font-black text-blue-600 tracking-tighter break-words">{formatCurrency(p.precio_venta_publico || 0)}</p>
                 </div>
               </div>
 
-              <div className="mb-4 sm:mb-8">
-                <h3 className="text-base sm:text-lg font-black text-gray-900 dark:text-white truncate uppercase italic">{p.nombre}</h3>
-                <p className="text-[9px] sm:text-[10px] font-bold text-blue-600 uppercase tracking-widest">{p.categoria || 'Sin Categoría'}</p>
+              <div className="mb-4 sm:mb-8 min-w-0">
+                <h3 className="text-base sm:text-lg font-black text-gray-900 dark:text-white uppercase italic break-words leading-tight">{p.nombre}</h3>
+                <p className="text-[9px] sm:text-[10px] font-bold text-blue-600 uppercase tracking-widest break-words">{p.categoria || 'Sin Categoría'}</p>
               </div>
 
               <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-4 sm:mb-8">
-                <div className="p-3 sm:p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl">
+                <div className="p-3 sm:p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl min-w-0">
                   <p className="text-[8px] sm:text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Stock</p>
-                  <p className={`text-lg sm:text-xl font-black tracking-tighter ${(p.stock_actual || 0) <= (p.stock_minimo || 0) ? 'text-red-600' : 'text-gray-900 dark:text-white'}`}>
+                  <p className={`text-lg sm:text-xl font-black tracking-tighter break-words ${(p.stock_actual || 0) <= (p.stock_minimo || 0) ? 'text-red-600' : 'text-gray-900 dark:text-white'}`}>
                     {p.stock_actual}
                   </p>
                 </div>
-                <div className="p-3 sm:p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl text-right">
+                <div className="p-3 sm:p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl text-right min-w-0">
                   <p className="text-[8px] sm:text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Código</p>
-                  <p className="text-[9px] sm:text-[10px] font-black text-gray-400 truncate">{p.codigo_barra || 'S/N'}</p>
+                  <p className="text-[9px] sm:text-[10px] font-black text-gray-400 break-words">{p.codigo_barra || 'S/N'}</p>
                 </div>
               </div>
 
-              <div className="flex gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all">
-                <button onClick={() => openEdit(p)} className="flex-1 py-3 sm:py-3 bg-gray-900 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-gray-800 transition-all min-h-[44px]">Editar</button>
+              <div className="flex flex-wrap gap-2">
+                <button onClick={() => openEdit(p)} className="w-full sm:flex-1 py-3 bg-gray-900 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-gray-800 transition-all min-h-[44px]">Editar</button>
                 {role === 'admin' && (
-                  <button onClick={() => handleEliminar(p.id)} className="p-3 sm:p-3 bg-red-50 text-red-600 rounded-xl hover:bg-red-600 hover:text-white transition-all text-lg min-h-[44px] min-w-[44px] flex items-center justify-center">🗑️</button>
+                  <button onClick={() => handleEliminar(p.id)} className="shrink-0 p-3 bg-red-50 text-red-600 rounded-xl hover:bg-red-600 hover:text-white transition-all text-lg min-h-[44px] min-w-[44px] flex items-center justify-center">🗑️</button>
                 )}
               </div>
             </div>
@@ -570,11 +570,11 @@ export default function ProductosClient({
             </h2>
             <p className="text-[10px] sm:text-xs font-bold text-gray-400 uppercase tracking-widest mb-6 sm:mb-10">Completa la ficha del producto</p>
 
-            <form onSubmit={handleSave} className="space-y-6 max-h-[60vh] overflow-y-auto px-2">
-              <div className="grid grid-cols-2 gap-6">
-                <div className="col-span-2 sm:col-span-1">
+            <form onSubmit={handleSave} className="space-y-6 max-h-[70vh] overflow-y-auto px-1 sm:px-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+                <div className="sm:col-span-1">
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Código de Barras</label>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
                     <input
                       placeholder="Escanear o digitar..."
                       value={formData.codigo_barra || ''}
@@ -586,13 +586,13 @@ export default function ProductosClient({
                           handleBarcodeSearch(formData.codigo_barra || '');
                         }
                       }}
-                      className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold text-lg"
+                      className="min-w-0 flex-1 p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold text-base"
                     />
                     <button
                       type="button"
                       onClick={() => handleBarcodeSearch(formData.codigo_barra || '')}
                       disabled={!formData.codigo_barra || isSearchingBarcode || (!!editingId && role !== 'admin')}
-                      className="px-4 bg-blue-50 dark:bg-blue-900/20 text-blue-600 rounded-2xl font-black text-xs hover:bg-blue-100 disabled:opacity-50 transition-colors"
+                      className="px-4 bg-blue-50 dark:bg-blue-900/20 text-blue-600 rounded-2xl font-black text-xs hover:bg-blue-100 disabled:opacity-50 transition-colors min-h-[44px]"
                       title="Buscar en base local y externa"
                     >
                       {isSearchingBarcode ? '...' : '🔍'}
@@ -603,7 +603,7 @@ export default function ProductosClient({
                   )}
                 </div>
 
-                <div className="col-span-2 sm:col-span-1">
+                <div className="sm:col-span-1">
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Categoría</label>
                   {!showNewCategoryInput ? (
                     <div className="space-y-3">
@@ -629,7 +629,7 @@ export default function ProductosClient({
                       </button>
                     </div>
                   ) : (
-                    <div className="flex items-center gap-2 w-full">
+                    <div className="flex flex-wrap items-center gap-2 w-full">
                       <input
                         autoFocus
                         placeholder="Nueva categoría..."
@@ -638,16 +638,16 @@ export default function ProductosClient({
                         className="min-w-0 flex-1 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-2xl border border-blue-200 dark:border-blue-800 font-bold text-sm"
                       />
                       <div className="flex shrink-0 gap-2">
-                        <button type="button" onClick={handleSaveCategory} className="p-4 bg-blue-600 text-white rounded-2xl hover:bg-blue-700 transition-colors">✓</button>
-                        <button type="button" onClick={() => setShowNewCategoryInput(false)} className="p-4 bg-gray-200 dark:bg-gray-700 rounded-2xl hover:bg-gray-300 transition-colors">✕</button>
+                        <button type="button" onClick={handleSaveCategory} className="p-4 bg-blue-600 text-white rounded-2xl hover:bg-blue-700 transition-colors min-h-[44px]">✓</button>
+                        <button type="button" onClick={() => setShowNewCategoryInput(false)} className="p-4 bg-gray-200 dark:bg-gray-700 rounded-2xl hover:bg-gray-300 transition-colors min-h-[44px]">✕</button>
                       </div>
                     </div>
                   )}
                 </div>
 
-                <div className="col-span-2">
+                <div className="sm:col-span-2">
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Nombre del Producto</label>
-                  <input required value={formData.nombre || ''} onChange={e => setFormData({ ...formData, nombre: e.target.value })} className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold text-lg" />
+                  <input required value={formData.nombre || ''} onChange={e => setFormData({ ...formData, nombre: e.target.value })} className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold text-base" />
                 </div>
 
                 <div>
@@ -691,7 +691,7 @@ export default function ProductosClient({
                   />
                 </div>
 
-                <div className="col-span-2">
+                <div className="sm:col-span-2">
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Imagen del Producto (Opcional)</label>
                   <div className="space-y-4">
                     <div>
@@ -711,8 +711,8 @@ export default function ProductosClient({
                 </div>
               </div>
 
-              <div className="pt-8 flex gap-4">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 py-5 font-black text-gray-400 uppercase tracking-widest">Cancelar</button>
+              <div className="pt-8 flex flex-col sm:flex-row gap-3">
+                <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 py-4 sm:py-5 font-black text-gray-400 uppercase tracking-widest min-h-[44px]">Cancelar</button>
                 <button
                   type="submit"
                   disabled={isSaving}
@@ -721,7 +721,7 @@ export default function ProductosClient({
                       ? `linear-gradient(to right, #111827 ${saveProgress}%, #374151 ${saveProgress}%)`
                       : undefined
                   }}
-                  className={`flex-[2] py-5 bg-gray-900 text-white font-black rounded-3xl shadow-2xl transition-all uppercase tracking-[0.2em] text-xs relative overflow-hidden ${isSaving ? 'cursor-not-allowed' : 'hover:scale-105 active:scale-95 active:bg-blue-600'}`}
+                  className={`flex-1 sm:flex-[2] py-4 sm:py-5 bg-gray-900 text-white font-black rounded-3xl shadow-2xl transition-all uppercase tracking-[0.2em] text-xs relative overflow-hidden min-h-[44px] ${isSaving ? 'cursor-not-allowed' : 'hover:scale-105 active:scale-95 active:bg-blue-600'}`}
                 >
                   <span className="relative z-10">
                     {isSaving ? `GUARDANDO (${saveProgress}%)` : (editingId ? 'Actualizar Ficha' : 'Registrar Producto')}
@@ -747,45 +747,45 @@ export default function ProductosClient({
 
             <div className="space-y-4 max-h-[50vh] overflow-y-auto pr-2">
               {categorias.map((cat: any) => (
-                <div key={cat.id} className="flex items-center justify-between p-6 bg-gray-50 dark:bg-gray-900 rounded-[2rem] group">
+                <div key={cat.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 sm:p-6 bg-gray-50 dark:bg-gray-900 rounded-[2rem] group min-w-0">
                   {editingCatId === cat.id ? (
-                    <div className="flex-1 flex gap-2 mr-4">
+                    <div className="flex-1 flex flex-wrap gap-2 w-full">
                       <input
                         autoFocus
                         value={catFormName}
                         onChange={e => setCatFormName(e.target.value)}
-                        className="flex-1 p-3 bg-white dark:bg-gray-800 rounded-xl border-2 border-blue-500 font-bold"
+                        className="min-w-0 flex-1 p-3 bg-white dark:bg-gray-800 rounded-xl border-2 border-blue-500 font-bold"
                       />
-                      <button onClick={() => handleUpdateCategory(cat.id)} className="px-4 py-2 bg-blue-600 text-white rounded-xl font-bold">✓</button>
-                      <button onClick={() => setEditingCatId(null)} className="px-4 py-2 bg-gray-400 text-white rounded-xl font-bold">✕</button>
+                      <button onClick={() => handleUpdateCategory(cat.id)} className="px-4 py-2 bg-blue-600 text-white rounded-xl font-bold min-h-[44px]">✓</button>
+                      <button onClick={() => setEditingCatId(null)} className="px-4 py-2 bg-gray-400 text-white rounded-xl font-bold min-h-[44px]">✕</button>
                     </div>
                   ) : (
-                    <div className="flex-1">
-                      <h3 className={`text-xl font-black italic uppercase ${cat.activo === false ? 'line-through text-gray-400' : 'text-gray-900 dark:text-white'}`}>
+                    <div className="flex-1 min-w-0">
+                      <h3 className={`text-lg sm:text-xl font-black italic uppercase break-words ${cat.activo === false ? 'line-through text-gray-400' : 'text-gray-900 dark:text-white'}`}>
                         {cat.nombre}
                       </h3>
                       {cat.activo === false && <span className="text-[10px] font-black text-red-500 uppercase tracking-widest">Suspendida</span>}
                     </div>
                   )}
 
-                  <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-all">
+                  <div className="flex flex-wrap gap-2 sm:opacity-0 sm:group-hover:opacity-100 transition-all">
                     <button
                       onClick={() => { setEditingCatId(cat.id); setCatFormName(cat.nombre); }}
-                      className="p-3 bg-white dark:bg-gray-800 rounded-xl shadow-sm hover:scale-110 transition-transform"
+                      className="p-3 bg-white dark:bg-gray-800 rounded-xl shadow-sm hover:scale-110 transition-transform min-h-[44px] min-w-[44px]"
                       title="Editar nombre"
                     >
                       ✏️
                     </button>
                     <button
                       onClick={() => handleToggleCategory(cat.id, cat.activo !== false)}
-                      className={`p-3 rounded-xl shadow-sm hover:scale-110 transition-transform ${cat.activo === false ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}
+                      className={`p-3 rounded-xl shadow-sm hover:scale-110 transition-transform min-h-[44px] min-w-[44px] ${cat.activo === false ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}
                       title={cat.activo === false ? "Activar" : "Suspender"}
                     >
                       {cat.activo === false ? '🔓' : '🔒'}
                     </button>
                     <button
                       onClick={() => handleDeleteCategory(cat.id)}
-                      className="p-3 bg-red-50 text-red-600 rounded-xl shadow-sm hover:scale-110 transition-transform"
+                      className="p-3 bg-red-50 text-red-600 rounded-xl shadow-sm hover:scale-110 transition-transform min-h-[44px] min-w-[44px]"
                       title="Eliminar"
                     >
                       🗑️

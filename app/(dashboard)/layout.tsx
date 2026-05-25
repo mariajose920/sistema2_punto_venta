@@ -67,7 +67,7 @@ export default function DashboardLayout({
   return (
     <>
       <AuthGuard />
-      <div className="flex min-h-screen bg-[#F8FAFC] dark:bg-gray-950 font-sans selection:bg-blue-100 selection:text-blue-700">
+      <div className="flex min-h-screen overflow-x-hidden bg-[#F8FAFC] dark:bg-gray-950 font-sans selection:bg-blue-100 selection:text-blue-700">
 
         {/* ── Overlay mobile backdrop ── */}
         {mobileOpen && (
@@ -78,7 +78,7 @@ export default function DashboardLayout({
         )}
 
         {/* ── Drawer de navegación mobile ── */}
-        <div className={`fixed inset-y-0 left-0 w-72 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 flex flex-col z-50 transition-transform duration-300 lg:hidden ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        <div className={`fixed inset-y-0 left-0 w-72 max-w-[85vw] bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 flex flex-col z-50 transition-transform duration-300 lg:hidden ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}>
           {/* Logo */}
           <div className="h-16 flex items-center justify-between px-6 border-b border-gray-100 dark:border-gray-800">
             <Link href="/" className="flex items-center gap-3" onClick={() => setMobileOpen(false)}>
@@ -151,37 +151,37 @@ export default function DashboardLayout({
         <Sidebar role={role} user={user} pathname={pathname} />
 
         {/* Contenido Principal */}
-        <div className="lg:ml-72 flex-1 flex flex-col min-h-screen">
+        <div className="lg:ml-72 flex-1 flex flex-col min-h-screen min-w-0">
 
           {/* Header Superior */}
-          <header className="h-16 lg:h-20 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-800 sticky top-0 z-20 px-4 lg:px-8 flex items-center justify-between">
-            <div className="flex items-center gap-3 lg:gap-4">
+          <header className="min-h-[4rem] lg:h-20 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-800 sticky top-0 z-20 px-3 sm:px-4 lg:px-8 py-2 flex flex-wrap items-center justify-between gap-2 overflow-x-hidden">
+            <div className="flex items-center gap-2 lg:gap-4 min-w-0">
               {/* Botón hamburguesa — solo mobile */}
               <button
                 onClick={() => setMobileOpen(true)}
-                className="lg:hidden p-2 rounded-xl text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                className="lg:hidden p-2 rounded-xl text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors shrink-0"
                 aria-label="Abrir menú"
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
                 </svg>
               </button>
-              <div className={`px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-wider ${role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-emerald-100 text-emerald-700'}`}>
+              <div className={`px-3 py-1 rounded-full text-[9px] sm:text-xs font-black uppercase tracking-wider break-words ${role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-emerald-100 text-emerald-700'}`}>
                 {role}
               </div>
-              <p className="hidden md:block text-sm text-gray-500 font-medium">
+              <p className="hidden md:block text-sm text-gray-500 font-medium truncate">
                 {contextMessage}
               </p>
             </div>
 
-            <div className="flex items-center gap-4 lg:gap-6">
+            <div className="flex items-center gap-2 sm:gap-4 lg:gap-6 shrink-0">
               <button className="p-2 text-gray-400 hover:text-blue-600 transition-colors">
                 <span className="text-xl">🔔</span>
               </button>
               <div className="h-8 w-px bg-gray-200 dark:bg-gray-800"></div>
-              <div className="text-right hidden sm:block">
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-tighter">Fecha Hoy</p>
-                <p className="text-sm font-bold text-gray-900 dark:text-white">
+              <div className="text-right hidden sm:block min-w-0">
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">Fecha Hoy</p>
+                <p className="text-sm font-bold text-gray-900 dark:text-white truncate">
                   {new Date().toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'short' })}
                 </p>
               </div>
@@ -189,26 +189,26 @@ export default function DashboardLayout({
           </header>
 
           {/* Área de Página — pb-20 en mobile para no quedar bajo la barra inferior */}
-          <main className="p-4 lg:p-8 flex-1 pb-24 lg:pb-8">
+          <main className="w-full max-w-full p-3 sm:p-4 lg:p-8 flex-1 pb-24 lg:pb-8 overflow-x-hidden min-w-0">
             {children}
           </main>
         </div>
 
         {/* ── Barra de navegación rápida inferior — solo mobile ── */}
         <nav className="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 z-30 lg:hidden safe-area-bottom">
-          <div className="flex items-center justify-around px-2 py-2">
+          <div className="grid grid-cols-5 gap-1 px-1 py-1.5">
             {quickNavItems.map(item => {
               const isActive = pathname === item.href;
               return (
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-all min-w-[60px] ${
+                  className={`flex min-w-0 flex-col items-center gap-1 rounded-xl px-1 py-2 transition-all ${
                     isActive ? 'text-blue-600' : 'text-gray-400'
                   }`}
                 >
-                  <span className="text-2xl leading-none">{item.icon}</span>
-                  <span className={`text-[9px] font-black uppercase tracking-wider ${isActive ? 'text-blue-600' : 'text-gray-400'}`}>
+                  <span className="text-xl leading-none">{item.icon}</span>
+                  <span className={`text-[8px] sm:text-[9px] font-black uppercase tracking-wider break-words text-center ${isActive ? 'text-blue-600' : 'text-gray-400'}`}>
                     {item.label}
                   </span>
                 </Link>
@@ -217,10 +217,10 @@ export default function DashboardLayout({
             {/* Botón menú completo */}
             <button
               onClick={() => setMobileOpen(true)}
-              className="flex flex-col items-center gap-1 px-3 py-2 rounded-xl text-gray-400 min-w-[60px]"
+              className="flex min-w-0 flex-col items-center gap-1 rounded-xl px-1 py-2 text-gray-400"
             >
-              <span className="text-2xl leading-none">☰</span>
-              <span className="text-[9px] font-black uppercase tracking-wider">Más</span>
+              <span className="text-xl leading-none">☰</span>
+              <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-wider break-words text-center">Más</span>
             </button>
           </div>
         </nav>

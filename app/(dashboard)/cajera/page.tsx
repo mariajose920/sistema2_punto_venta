@@ -88,58 +88,58 @@ export default function CajeraDashboardPage() {
     <div className="space-y-8 animate-in fade-in duration-700">
       
       {/* Bienvenida y Acciones Rápidas */}
-      <header className="bg-white dark:bg-gray-900 p-5 sm:p-10 rounded-[2rem] sm:rounded-[3rem] shadow-xl border border-gray-100 dark:border-gray-800 flex flex-col md:flex-row justify-between items-center gap-5 sm:gap-8 relative overflow-hidden">
+      <header className="bg-white dark:bg-gray-900 p-4 sm:p-8 lg:p-10 rounded-[2rem] sm:rounded-[3rem] shadow-xl border border-gray-100 dark:border-gray-800 flex flex-col md:flex-row justify-between items-center gap-4 sm:gap-6 lg:gap-8 relative overflow-hidden">
         <div className="absolute top-0 left-0 w-64 h-64 bg-blue-600/5 rounded-full -ml-32 -mt-32 blur-3xl"></div>
-        <div className="relative z-10 text-center md:text-left">
-          <h1 className="text-2xl sm:text-4xl font-black text-gray-900 dark:text-white tracking-tighter mb-1 sm:mb-2 italic">Terminal de Caja</h1>
-          <p className="text-gray-400 font-bold uppercase text-[10px] sm:text-xs tracking-[0.3em]">Operador: {user?.email}</p>
+        <div className="relative z-10 text-center md:text-left w-full">
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-gray-900 dark:text-white tracking-tighter mb-1 sm:mb-2 italic leading-tight break-words">Terminal de Caja</h1>
+          <p className="text-gray-400 font-bold uppercase text-[10px] sm:text-xs tracking-[0.3em] break-words">Operador: {user?.email}</p>
         </div>
         
         <Link 
           href="/ventas/nueva" 
-          className="relative z-10 bg-blue-600 hover:bg-blue-700 text-white px-6 sm:px-10 py-3 sm:py-5 rounded-[2rem] font-black text-base sm:text-xl shadow-2xl shadow-blue-200 dark:shadow-none transition-all transform hover:scale-105 active:scale-95 flex items-center gap-3 sm:gap-4 w-full sm:w-auto justify-center"
+          className="relative z-10 bg-blue-600 hover:bg-blue-700 text-white px-6 sm:px-10 py-3 sm:py-5 rounded-[2rem] font-black text-base sm:text-xl shadow-2xl shadow-blue-200 dark:shadow-none transition-all transform hover:scale-105 active:scale-95 flex items-center justify-center gap-3 sm:gap-4 w-full sm:w-auto text-center"
         >
           <span>🛒</span> NUEVA VENTA (F1)
         </Link>
       </header>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8">
         
         {/* Columna Principal: Inventario y Actividad */}
         <div className="lg:col-span-2 space-y-8">
           
           {/* Consulta Rápida de Inventario */}
-          <section className="bg-white dark:bg-gray-800 rounded-[2.5rem] p-4 sm:p-8 border border-gray-100 dark:border-gray-700 shadow-sm">
+          <section className="bg-white dark:bg-gray-800 rounded-[2rem] sm:rounded-[2.5rem] p-4 sm:p-8 border border-gray-100 dark:border-gray-700 shadow-sm">
             <div className="flex flex-wrap justify-between items-center gap-3 mb-4 sm:mb-6">
               <h2 className="text-sm sm:text-lg font-black text-gray-900 dark:text-white uppercase tracking-widest flex items-center gap-3">
                 <span className="w-2 h-6 bg-blue-600 rounded-full"></span>
                 Stock Disponible
               </h2>
-              <Link href="/productos" className="text-[10px] font-black text-blue-600 uppercase tracking-widest bg-blue-50 dark:bg-blue-900/20 px-3 py-1.5 rounded-full">Ver Catálogo Completo</Link>
+              <Link href="/productos" className="text-[10px] font-black text-blue-600 uppercase tracking-widest bg-blue-50 dark:bg-blue-900/20 px-3 py-1.5 rounded-full text-center">Ver Catálogo Completo</Link>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {productos.map(p => (
-                <div key={p.id} className="group p-4 bg-gray-50 dark:bg-gray-900/50 rounded-2xl border border-transparent hover:border-blue-100 dark:hover:border-blue-900/30 transition-all flex justify-between items-center">
-                  <div>
-                    <p className="font-bold text-gray-800 dark:text-white text-sm">{p.nombre}</p>
+                <div key={p.id} className="group p-4 bg-gray-50 dark:bg-gray-900/50 rounded-2xl border border-transparent hover:border-blue-100 dark:hover:border-blue-900/30 transition-all flex flex-wrap justify-between items-center gap-3">
+                  <div className="min-w-0">
+                    <p className="font-bold text-gray-800 dark:text-white text-sm break-words">{p.nombre}</p>
                     <p className={`text-[10px] font-black uppercase ${p.stock_actual > 10 ? 'text-emerald-500' : 'text-red-500'}`}>
                       {p.stock_actual} Unidades en stock
                     </p>
                   </div>
-                  <p className="font-black text-gray-900 dark:text-white text-lg">${p.precio_venta_publico.toLocaleString()}</p>
+                  <p className="font-black text-gray-900 dark:text-white text-lg whitespace-nowrap">${p.precio_venta_publico.toLocaleString()}</p>
                 </div>
               ))}
             </div>
           </section>
 
           {/* Registro de Actividad Personal */}
-          <section className="bg-white dark:bg-gray-800 rounded-[2.5rem] border border-gray-100 dark:border-gray-700 overflow-hidden shadow-sm">
+          <section className="bg-white dark:bg-gray-800 rounded-[2rem] sm:rounded-[2.5rem] border border-gray-100 dark:border-gray-700 overflow-hidden shadow-sm">
             <div className="p-4 sm:p-8 border-b border-gray-50 dark:border-gray-700">
               <h2 className="text-sm sm:text-lg font-black text-gray-900 dark:text-white uppercase tracking-widest">Mis Últimas Ventas</h2>
             </div>
             <div className="overflow-x-auto">
               {actividadReciente.length > 0 ? (
-                  <table className="w-full text-left">
+                  <table className="w-full text-left min-w-[320px]">
                     <thead className="bg-gray-50 dark:bg-gray-900/50 text-[10px] font-black text-gray-400 uppercase tracking-widest">
                       <tr>
                         <th className="px-4 sm:px-8 py-3 sm:py-5">Hora</th>
@@ -173,16 +173,16 @@ export default function CajeraDashboardPage() {
         </div>
 
         {/* Columna Lateral: Alertas y Promociones */}
-        <div className="space-y-8">
+        <div className="space-y-6 sm:space-y-8">
           
           {/* Monitor de Créditos / Fiados */}
-          <section className="bg-amber-50 dark:bg-amber-900/10 p-5 sm:p-8 rounded-[2rem] sm:rounded-[2.5rem] border border-amber-100 dark:border-amber-900/30">
+          <section className="bg-amber-50 dark:bg-amber-900/10 p-4 sm:p-8 rounded-[2rem] sm:rounded-[2.5rem] border border-amber-100 dark:border-amber-900/30">
             <h2 className="text-[10px] sm:text-xs font-black text-amber-700 uppercase tracking-widest mb-4 sm:mb-6">Pendientes de Pago</h2>
             <div className="space-y-3 sm:space-y-4">
               {clientesFiado.length > 0 ? (
                 clientesFiado.map(c => (
                   <div key={c.id} className="p-4 bg-white dark:bg-gray-800 rounded-2xl shadow-sm">
-                    <p className="font-bold text-gray-900 dark:text-white text-sm">{c.nombre}</p>
+                    <p className="font-bold text-gray-900 dark:text-white text-sm break-words">{c.nombre}</p>
                     <p className="text-xl font-black text-amber-600 tracking-tighter">${c.saldo_deudado.toLocaleString()}</p>
                   </div>
                 ))
@@ -194,15 +194,15 @@ export default function CajeraDashboardPage() {
           </section>
 
           {/* Tablero de Ofertas */}
-          <section className="bg-indigo-600 p-5 sm:p-8 rounded-[2rem] sm:rounded-[2.5rem] shadow-2xl relative overflow-hidden">
+          <section className="bg-indigo-600 p-4 sm:p-8 rounded-[2rem] sm:rounded-[2.5rem] shadow-2xl relative overflow-hidden">
             <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16 blur-2xl"></div>
             <h2 className="text-[10px] sm:text-xs font-black text-indigo-100 uppercase tracking-widest mb-4 sm:mb-6 relative z-10">Promociones Activas</h2>
             <div className="space-y-3 sm:space-y-4 relative z-10">
               {promociones.length > 0 ? (
                 promociones.map(p => (
                   <div key={p.id} className="p-4 bg-white/10 backdrop-blur-md rounded-2xl border border-white/20">
-                    <p className="font-bold text-white text-sm">{p.nombre}</p>
-                    <p className="text-[10px] font-black text-indigo-200 uppercase mt-1">
+                    <p className="font-bold text-white text-sm break-words">{p.nombre}</p>
+                    <p className="text-[10px] font-black text-indigo-200 uppercase mt-1 break-words">
                       {p.tipo === '2x1' ? 'Oferta 2x1' : `${p.valor}${p.tipo === 'porcentaje' ? '%' : '$'} de Descuento`}
                     </p>
                   </div>

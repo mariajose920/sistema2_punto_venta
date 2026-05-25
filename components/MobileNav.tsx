@@ -44,9 +44,14 @@ export default function MobileNav({ role, user, pathname }: MobileNavProps) {
   };
 
   const items = getItems();
-  // Mostrar solo los primeros 4 en la barra inferior
-  const bottomItems = items.slice(0, 4);
   const allItems = items;
+  const homeHref = role === 'admin' ? '/admin' : '/cajera';
+  const bottomItems = [
+    { href: homeHref, label: 'Inicio', icon: '🏠' },
+    { href: '/ventas/nueva', label: 'Venta', icon: '🛒' },
+    { href: '/clientes', label: 'Clientes', icon: '👥' },
+    { href: '/ventas/historial', label: 'Historial', icon: '🧾' },
+  ];
 
   return (
     <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40">
@@ -97,27 +102,40 @@ export default function MobileNav({ role, user, pathname }: MobileNavProps) {
       </div>
 
       {/* Bottom Navigation Bar */}
-      <nav className="bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 flex items-center justify-around h-20 px-2">
+      <nav className="w-full bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 flex items-stretch justify-between gap-1 px-1 pb-[max(env(safe-area-inset-bottom),0.25rem)] pt-1 sm:px-2 sm:gap-2 sm:pb-2 sm:pt-2">
         {bottomItems.map(item => (
           <Link
             key={item.href}
             href={item.href}
-            className={`flex flex-col items-center justify-center py-2 px-2 rounded-lg transition-all duration-200 flex-1 ${
+            aria-label={item.label}
+            className={`flex flex-1 min-w-0 flex-col items-center justify-center rounded-xl transition-all duration-200 min-h-11 px-1 py-1.5 touch-manipulation ${
               pathname === item.href
-                ? 'text-blue-600'
+                ? 'text-blue-600 bg-blue-50 dark:bg-blue-900/20'
                 : 'text-gray-600 dark:text-gray-400'
             }`}
           >
-            <span className="text-2xl">{item.icon}</span>
-            <span className="text-xs mt-1 font-semibold text-center">{item.label}</span>
+            <span className="text-xl leading-none sm:text-2xl">{item.icon}</span>
+            <span className="hidden text-[10px] font-semibold text-center sm:inline sm:text-xs">
+              {item.label}
+            </span>
+            <span className="sr-only sm:not-sr-only">
+              {item.label}
+            </span>
           </Link>
         ))}
         <button
+          type="button"
+          aria-label="Abrir menú"
           onClick={() => setIsMenuOpen(!isMenuOpen)}
-          className="flex flex-col items-center justify-center py-2 px-2 rounded-lg transition-all duration-200 flex-1 text-gray-600 dark:text-gray-400 hover:text-blue-600"
+          className="flex flex-1 min-w-0 flex-col items-center justify-center rounded-xl transition-all duration-200 min-h-11 px-1 py-1.5 touch-manipulation text-gray-600 dark:text-gray-400 hover:text-blue-600"
         >
-          <span className="text-2xl">⋯</span>
-          <span className="text-xs mt-1 font-semibold">Más</span>
+          <span className="text-xl leading-none sm:text-2xl">⋯</span>
+          <span className="hidden text-[10px] font-semibold sm:inline sm:text-xs">
+            Menú
+          </span>
+          <span className="sr-only sm:not-sr-only">
+            Menú
+          </span>
         </button>
       </nav>
     </div>
