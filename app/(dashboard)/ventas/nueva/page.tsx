@@ -14,7 +14,10 @@ type ProductoRow = {
   stock_actual: number | null;
   codigo_barra?: string | null;
   categoria?: string | null;
-};
+  created_at?: string | null;
+  stock_minimo?: number | null;
+  precio_compra?: number | null;
+} & Record<string, unknown>;
 
 type ClienteRow = {
   id: string;
