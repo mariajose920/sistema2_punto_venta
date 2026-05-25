@@ -29,6 +29,7 @@ interface MetricBoxProps {
   color: string;
   bg: string;
   icon: string;
+  loading?: boolean;
 }
 
 /**
@@ -131,22 +132,6 @@ export default function AdminDashboardPage() {
     return Math.round((stats.totalVentasContado / stats.ingresos) * 100);
   }, [stats]);
 
-  // UI DE CARGA DIFERIDA (SKELETONS)
-  if (loading) {
-    return (
-      <div className="space-y-10 animate-pulse">
-        <div className="h-64 bg-gray-200 dark:bg-gray-800 rounded-[3.5rem]"></div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {[1,2,3,4].map(i => <div key={i} className="h-48 bg-gray-100 dark:bg-gray-800 rounded-[2.5rem]"></div>)}
-        </div>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
-          <div className="lg:col-span-2 h-96 bg-gray-100 dark:bg-gray-800 rounded-[3rem]"></div>
-          <div className="h-96 bg-gray-100 dark:bg-gray-800 rounded-[3rem]"></div>
-        </div>
-      </div>
-    );
-  }
-
   if (role !== 'admin') {
     return (
       <div className="p-16 text-center max-w-2xl mx-auto bg-white dark:bg-gray-800 rounded-[3rem] border border-gray-100 shadow-2xl">
@@ -183,18 +168,18 @@ export default function AdminDashboardPage() {
         
         <div className="relative z-10 bg-gray-50 dark:bg-gray-800/50 p-4 sm:p-6 lg:p-8 rounded-[2rem] sm:rounded-[2.5rem] border border-gray-100 dark:border-gray-700 w-full lg:w-auto max-w-full">
           <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-2 text-center">Balance Neto</p>
-          <p className={`text-3xl sm:text-5xl lg:text-6xl font-black tracking-tighter text-center break-words ${stats && stats.balance >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
-            ${stats?.balance.toLocaleString() || '0'}
+          <p className={`text-3xl sm:text-5xl lg:text-6xl font-black tracking-tighter text-center break-words ${loading ? 'text-gray-400' : stats && stats.balance >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
+            {loading ? 'Cargando…' : `$${stats?.balance.toLocaleString() || '0'}`}
           </p>
         </div>
       </div>
 
       {/* Grid de Métricas Críticas */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-6">
-        <MetricBox title="Ingresos" value={stats?.ingresos} subtext="Ventas Totales" color="text-emerald-600" bg="bg-emerald-50" icon="💹" />
-        <MetricBox title="Gastos" value={stats?.gastos} subtext="Compras" color="text-red-600" bg="bg-red-50" icon="📉" />
-        <MetricBox title="Por Cobrar" value={stats?.cuentasPorCobrar} subtext="Créditos Pendientes" color="text-amber-600" bg="bg-amber-50" icon="⏳" />
-        <MetricBox title="Inventario" value={stats?.valorInventario} subtext="Valor Capital" color="text-indigo-600" bg="bg-indigo-50" icon="🏢" />
+        <MetricBox title="Ingresos" value={stats?.ingresos} subtext="Ventas Totales" color="text-emerald-600" bg="bg-emerald-50" icon="💹" loading={loading} />
+        <MetricBox title="Gastos" value={stats?.gastos} subtext="Compras" color="text-red-600" bg="bg-red-50" icon="📉" loading={loading} />
+        <MetricBox title="Por Cobrar" value={stats?.cuentasPorCobrar} subtext="Créditos Pendientes" color="text-amber-600" bg="bg-amber-50" icon="⏳" loading={loading} />
+        <MetricBox title="Inventario" value={stats?.valorInventario} subtext="Valor Capital" color="text-indigo-600" bg="bg-indigo-50" icon="🏢" loading={loading} />
       </div>
 
       {/* Analítica y Alertas */}
@@ -213,31 +198,46 @@ export default function AdminDashboardPage() {
           </div>
           
           <div className="space-y-10">
-            <div className="space-y-4">
-              <div className="flex justify-between text-[11px] font-black uppercase tracking-widest text-gray-500">
-                <span>Ventas al Contado (Efectivo/Transf)</span>
-                <span className="text-gray-900 dark:text-white">${stats?.totalVentasContado.toLocaleString()}</span>
-              </div>
-              <div className="w-full h-5 bg-gray-50 dark:bg-gray-900 rounded-2xl overflow-hidden p-1 border border-gray-100 dark:border-gray-700">
-                <div 
-                  className="h-full bg-blue-600 rounded-xl transition-all duration-1000 ease-out" 
-                  style={{ width: stats && stats.ingresos > 0 ? `${(stats.totalVentasContado / stats.ingresos) * 100}%` : '0%' }}
-                ></div>
-              </div>
-            </div>
+            {loading ? (
+              <>
+                <div className="space-y-3 animate-pulse">
+                  <div className="h-3 bg-gray-100 dark:bg-gray-700 rounded-full w-2/3"></div>
+                  <div className="h-5 bg-gray-100 dark:bg-gray-700 rounded-2xl"></div>
+                </div>
+                <div className="space-y-3 animate-pulse">
+                  <div className="h-3 bg-gray-100 dark:bg-gray-700 rounded-full w-1/2"></div>
+                  <div className="h-5 bg-gray-100 dark:bg-gray-700 rounded-2xl"></div>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="space-y-4">
+                  <div className="flex justify-between text-[11px] font-black uppercase tracking-widest text-gray-500">
+                    <span>Ventas al Contado (Efectivo/Transf)</span>
+                    <span className="text-gray-900 dark:text-white">${stats?.totalVentasContado.toLocaleString()}</span>
+                  </div>
+                  <div className="w-full h-5 bg-gray-50 dark:bg-gray-900 rounded-2xl overflow-hidden p-1 border border-gray-100 dark:border-gray-700">
+                    <div 
+                      className="h-full bg-blue-600 rounded-xl transition-all duration-1000 ease-out" 
+                      style={{ width: stats && stats.ingresos > 0 ? `${(stats.totalVentasContado / stats.ingresos) * 100}%` : '0%' }}
+                    ></div>
+                  </div>
+                </div>
 
-            <div className="space-y-4">
-              <div className="flex justify-between text-[11px] font-black uppercase tracking-widest text-gray-500">
-                <span>Ventas al Fiado (Créditos)</span>
-                <span className="text-gray-900 dark:text-white">${stats?.totalVentasCredito.toLocaleString()}</span>
-              </div>
-              <div className="w-full h-5 bg-gray-50 dark:bg-gray-900 rounded-2xl overflow-hidden p-1 border border-gray-100 dark:border-gray-700">
-                <div 
-                  className="h-full bg-amber-500 rounded-xl transition-all duration-1000 ease-out" 
-                  style={{ width: stats && stats.ingresos > 0 ? `${(stats.totalVentasCredito / stats.ingresos) * 100}%` : '0%' }}
-                ></div>
-              </div>
-            </div>
+                <div className="space-y-4">
+                  <div className="flex justify-between text-[11px] font-black uppercase tracking-widest text-gray-500">
+                    <span>Ventas al Fiado (Créditos)</span>
+                    <span className="text-gray-900 dark:text-white">${stats?.totalVentasCredito.toLocaleString()}</span>
+                  </div>
+                  <div className="w-full h-5 bg-gray-50 dark:bg-gray-900 rounded-2xl overflow-hidden p-1 border border-gray-100 dark:border-gray-700">
+                    <div 
+                      className="h-full bg-amber-500 rounded-xl transition-all duration-1000 ease-out" 
+                      style={{ width: stats && stats.ingresos > 0 ? `${(stats.totalVentasCredito / stats.ingresos) * 100}%` : '0%' }}
+                    ></div>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
 
           <div className="mt-8 sm:mt-12 grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -257,12 +257,22 @@ export default function AdminDashboardPage() {
           <div className="bg-red-600 p-5 sm:p-8 lg:p-10 rounded-[2rem] sm:rounded-[3rem] shadow-2xl shadow-red-200 dark:shadow-none text-white relative overflow-hidden group">
             <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -mr-8 -mt-8 blur-xl group-hover:scale-150 transition-transform duration-700"></div>
             <h3 className="text-xs font-black uppercase tracking-[0.2em] mb-4 text-red-100">Alerta de Inventario</h3>
-            <div className="flex flex-wrap items-baseline gap-2">
-              <p className="text-4xl sm:text-6xl font-black tracking-tighter">{stats?.productosStockBajo || 0}</p>
-              <p className="text-xs font-bold uppercase opacity-80 italic">Productos</p>
-            </div>
-            <p className="text-sm font-bold text-red-100/70 mt-2 break-words">Nivel bajo de stock detectado.</p>
-            <Link href="/productos" className="mt-8 block text-center py-4 bg-white text-red-600 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-gray-100 transition-colors shadow-xl">Gestionar Reabastecimiento</Link>
+            {loading ? (
+              <div className="space-y-4 animate-pulse">
+                <div className="h-14 bg-white/20 rounded-2xl w-28"></div>
+                <div className="h-4 bg-white/20 rounded-full w-40"></div>
+                <div className="h-12 bg-white/20 rounded-2xl"></div>
+              </div>
+            ) : (
+              <>
+                <div className="flex flex-wrap items-baseline gap-2">
+                  <p className="text-4xl sm:text-6xl font-black tracking-tighter">{stats?.productosStockBajo || 0}</p>
+                  <p className="text-xs font-bold uppercase opacity-80 italic">Productos</p>
+                </div>
+                <p className="text-sm font-bold text-red-100/70 mt-2 break-words">Nivel bajo de stock detectado.</p>
+                <Link href="/productos" className="mt-8 block text-center py-4 bg-white text-red-600 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-gray-100 transition-colors shadow-xl">Gestionar Reabastecimiento</Link>
+              </>
+            )}
           </div>
 
           <div className="bg-white dark:bg-gray-800 p-5 sm:p-8 rounded-[2rem] sm:rounded-[3rem] border border-gray-100 dark:border-gray-700 shadow-sm">
@@ -283,17 +293,26 @@ export default function AdminDashboardPage() {
 /**
  * Componente Visual para Métricas de Cuadrícula
  */
-function MetricBox({ title, value, subtext, color, bg, icon }: MetricBoxProps) {
+function MetricBox({ title, value, subtext, color, bg, icon, loading }: MetricBoxProps) {
   return (
     <div className="bg-white dark:bg-gray-800 p-5 sm:p-8 lg:p-10 rounded-[2rem] sm:rounded-[2.5rem] border border-gray-50 dark:border-gray-700 shadow-sm transition-all duration-500 hover:shadow-2xl hover:-translate-y-2 group">
       <div className="flex justify-between items-start mb-4 sm:mb-6">
         <div className={`w-12 h-12 sm:w-14 sm:h-14 ${bg} rounded-2xl flex items-center justify-center text-2xl sm:text-3xl shadow-sm group-hover:scale-110 transition-transform duration-500`}>{icon}</div>
       </div>
       <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-2">{title}</p>
-      <p className={`text-2xl sm:text-3xl font-black ${color} tracking-tighter mb-1 break-words`}>
-        ${value?.toLocaleString() || '0'}
-      </p>
-      <p className="text-[10px] font-bold text-gray-500 italic opacity-80 break-words">{subtext}</p>
+      {loading ? (
+        <div className="space-y-2 animate-pulse">
+          <div className="h-8 bg-gray-100 dark:bg-gray-700 rounded-full w-28"></div>
+          <div className="h-3 bg-gray-100 dark:bg-gray-700 rounded-full w-24"></div>
+        </div>
+      ) : (
+        <>
+          <p className={`text-2xl sm:text-3xl font-black ${color} tracking-tighter mb-1 break-words`}>
+            ${value?.toLocaleString() || '0'}
+          </p>
+          <p className="text-[10px] font-bold text-gray-500 italic opacity-80 break-words">{subtext}</p>
+        </>
+      )}
     </div>
   );
 }

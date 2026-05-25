@@ -1,9 +1,33 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
+
+type CachedRoleEntry = {
+  uid: string;
+  role: string;
+};
+
+const CACHED_ROLE_KEY = 'pos_cached_role_entry';
+
+const getCachedRoleEntry = () => {
+  if (typeof window === 'undefined') return null;
+
+  try {
+    const raw = localStorage.getItem(CACHED_ROLE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as CachedRoleEntry;
+  } catch {
+    return null;
+  }
+};
+
+const saveCachedRoleEntry = (uid: string, role: string) => {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(CACHED_ROLE_KEY, JSON.stringify({ uid, role }));
+};
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -13,20 +37,18 @@ export default function LoginPage() {
   const router = useRouter();
   const { user, role } = useAuth();
 
-  // 1. Auto-redirección si el usuario ya está autenticado y tiene un rol asignado
   useEffect(() => {
     if (user && role) {
       router.push(role === 'admin' ? '/admin' : '/cajera');
     }
   }, [user, role, router]);
 
-  // 2. Capturar errores de redirección de seguridad (por ejemplo, usuario sin rol en AuthGuard)
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      if (params.get('error') === 'no_role') {
-        setError('⚠️ Acceso restringido: Tu cuenta es válida, pero no tienes un perfil operativo asignado. Contacta al administrador para que te asigne un rol.');
-      }
+    if (typeof window === 'undefined') return;
+
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('error') === 'no_role') {
+      setError('⚠️ Acceso restringido: Tu cuenta es válida, pero no tienes un perfil operativo asignado. Contacta al administrador para que te asigne un rol.');
     }
   }, []);
 
@@ -35,54 +57,84 @@ export default function LoginPage() {
     setLoading(true);
     setError(null);
 
+    const loginStart = performance.now();
+
     try {
       const cleanEmail = email.trim().toLowerCase();
       const cleanPassword = password.trim();
 
-      // 1. Autenticación directa en Supabase Auth
-      const startAuth = performance.now();
+      const authStart = performance.now();
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email: cleanEmail,
         password: cleanPassword,
       });
-      const endAuth = performance.now();
-      console.log(`[PERF_AUTH] Tiempo de signInWithPassword: ${(endAuth - startAuth).toFixed(2)}ms`);
+      const authElapsed = performance.now() - authStart;
+      console.log('[LOGIN_TRACE] signInWithPassword', {
+        ms: Number(authElapsed.toFixed(2)),
+        hasError: Boolean(authError),
+        errorMessage: authError?.message ?? null,
+        userId: authData?.user?.id ?? null,
+      });
 
-      if (authError) throw new Error(`ACCESO DENEGADO: ${authError.message}`);
-      if (!authData?.user?.id) throw new Error('No se pudo recuperar el usuario autenticado.');
+      if (authError) {
+        throw new Error(`ACCESO DENEGADO: ${authError.message}`);
+      }
 
-      // 🔥 REFACTOR DE RENDIMIENTO: Evitamos depender del onAuthStateChange para el primer render
-      // Obtenemos el rol Inmediatamente en paralelo o justo después del login
-      const startRole = performance.now();
+      if (!authData?.user?.id) {
+        throw new Error('No se pudo recuperar el usuario autenticado.');
+      }
+
+      const cachedRoleEntry = getCachedRoleEntry();
+      if (cachedRoleEntry?.uid === authData.user.id && cachedRoleEntry.role) {
+        console.log('[LOGIN_TRACE] role_cache_hit_login', {
+          ms: Number((performance.now() - loginStart).toFixed(2)),
+          userId: authData.user.id,
+          role: cachedRoleEntry.role,
+        });
+
+        router.push(cachedRoleEntry.role === 'admin' ? '/admin' : '/cajera');
+        return;
+      }
+
+      const roleStart = performance.now();
       const { data: roleData, error: roleError } = await supabase
         .from('Usuario')
         .select('rol')
         .eq('id', authData.user.id)
         .single();
-      const endRole = performance.now();
-      console.log(`[PERF_AUTH] Tiempo de fetchRole en Login: ${(endRole - startRole).toFixed(2)}ms`);
+      const roleElapsed = performance.now() - roleStart;
+
+      console.log('[LOGIN_TRACE] role_query_login', {
+        ms: Number(roleElapsed.toFixed(2)),
+        userId: authData.user.id,
+        hasError: Boolean(roleError),
+        errorMessage: roleError?.message ?? null,
+        role: (roleData as { rol?: string | null } | null)?.rol ?? null,
+      });
 
       if (roleError) {
-        console.error('Error al obtener rol:', roleError);
+        throw new Error('No se pudo validar el perfil del usuario.');
       }
 
-      const userRole = (roleData as any)?.rol;
-      
+      const userRole = (roleData as { rol?: string | null } | null)?.rol;
       if (!userRole) {
         throw new Error('Usuario sin perfil en la base de datos.');
       }
 
-      // Redirección imperativa inmediata (bypass al useEffect de React)
-      const redirectStart = performance.now();
-      console.log(`[PERF_AUTH] Iniciando redirección a dashboard: ${redirectStart}ms`);
-      
-      if (userRole === 'admin') {
-        router.push('/admin');
-      } else {
-        router.push('/cajera');
-      }
+      saveCachedRoleEntry(authData.user.id, userRole);
 
+      const targetPath = userRole === 'admin' ? '/admin' : '/cajera';
+      console.log('[LOGIN_TRACE] router_push', {
+        ms: Number((performance.now() - loginStart).toFixed(2)),
+        target: targetPath,
+      });
+
+      router.push(targetPath);
     } catch (err: any) {
+      console.log('[LOGIN_TRACE] login_error', {
+        ms: Number((performance.now() - loginStart).toFixed(2)),
+        message: err?.message ?? 'unknown',
+      });
       setError(err.message || 'Error crítico en el proceso de autenticación.');
       console.error('[LoginProcessError]', err);
       setLoading(false);
@@ -92,9 +144,7 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-950 dark:to-gray-900 px-3 sm:px-4 py-6 sm:py-8">
       <div className="w-full max-w-md">
-        {/* Card Principal */}
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 sm:p-8">
-          {/* Logo y Branding */}
           <div className="text-center mb-8">
             <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-br from-blue-600 to-blue-700 rounded-2xl flex items-center justify-center text-white font-black text-2xl sm:text-3xl mx-auto mb-4 shadow-lg">
               P
@@ -106,17 +156,14 @@ export default function LoginPage() {
               Sistema de Punto de Venta
             </p>
           </div>
-          
-          {/* Mensaje de Error */}
+
           {error && (
             <div className="bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 p-3 sm:p-4 mb-6 rounded" role="alert">
               <p className="text-xs sm:text-sm text-red-700 dark:text-red-400 leading-relaxed">{error}</p>
             </div>
           )}
 
-          {/* Formulario de Login */}
           <form onSubmit={handleLogin} className="space-y-4 sm:space-y-6">
-            {/* Email */}
             <div>
               <label className="block text-xs sm:text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2" htmlFor="email">
                 Correo Electrónico
@@ -133,7 +180,6 @@ export default function LoginPage() {
               />
             </div>
 
-            {/* Password */}
             <div>
               <label className="block text-xs sm:text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2" htmlFor="password">
                 Contraseña
@@ -150,13 +196,12 @@ export default function LoginPage() {
               />
             </div>
 
-            {/* Botón Login */}
             <button
               type="submit"
               disabled={loading}
               className={`w-full py-2.5 sm:py-3 px-4 rounded-lg text-white font-bold transition-all duration-200 shadow-md text-sm sm:text-base
-                ${loading 
-                  ? 'bg-blue-400 cursor-not-allowed' 
+                ${loading
+                  ? 'bg-blue-400 cursor-not-allowed'
                   : 'bg-blue-600 hover:bg-blue-700 hover:shadow-lg active:scale-95'
                 }`}
             >
@@ -174,7 +219,6 @@ export default function LoginPage() {
             </button>
           </form>
 
-          {/* Divisor */}
           <div className="mt-6 sm:mt-8">
             <div className="relative mb-6 sm:mb-8">
               <div className="absolute inset-0 flex items-center">
@@ -184,8 +228,7 @@ export default function LoginPage() {
                 <span className="px-3 sm:px-4 bg-white dark:bg-gray-800 text-xs sm:text-sm text-gray-500 dark:text-gray-400 font-medium">Para Clientes</span>
               </div>
             </div>
-            
-            {/* Botón Catálogo */}
+
             <button
               type="button"
               onClick={() => router.push('/catalogo')}
@@ -199,7 +242,6 @@ export default function LoginPage() {
           </div>
         </div>
 
-        {/* Footer Info - Solo Desktop */}
         <div className="hidden sm:block text-center mt-6 text-xs text-gray-500 dark:text-gray-400">
           <p>© 2024 POSMASTER. Todos los derechos reservados.</p>
         </div>

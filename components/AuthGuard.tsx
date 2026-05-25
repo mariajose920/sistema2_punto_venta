@@ -10,41 +10,42 @@ export default function AuthGuard({ requiredRole }: { requiredRole?: Role }) {
   const startGuardRender = useRef(performance.now());
 
   useEffect(() => {
-    // 1. Si no ha montado o está cargando, esperamos
     if (!isMounted || loading) return;
 
-    const endGuardCheck = performance.now();
-    console.log(`[PERF_AUTH] Tiempo desde inicio de carga de AuthGuard hasta validación lista: ${(endGuardCheck - startGuardRender.current).toFixed(2)}ms. Usuario: ${user?.email}, Rol: ${role}`);
+    const elapsedMs = performance.now() - startGuardRender.current;
+    console.log('[AUTH_GUARD_TRACE] guard_ready', {
+      elapsedMs: Number(elapsedMs.toFixed(2)),
+      hasUser: Boolean(user),
+      hasRole: Boolean(role),
+      role,
+    });
 
-    // 2. Si NO hay usuario autenticado
     if (!user) {
+      console.log('[AUTH_GUARD_TRACE] redirect_to_login', {
+        elapsedMs: Number(elapsedMs.toFixed(2)),
+      });
       router.replace('/login');
       return;
     }
 
-    // 3. Si hay usuario pero no tiene rol en la tabla 'Usuario'
     if (user && !role) {
-      console.error('Acceso denegado: Usuario sin perfil en la base de datos.');
-      router.replace('/login?error=no_role');
+      console.log('[AUTH_GUARD_TRACE] role_pending', {
+        elapsedMs: Number(elapsedMs.toFixed(2)),
+        email: user.email,
+      });
       return;
     }
 
-    // 4. Protección por Rol Específico
     if (requiredRole && role !== requiredRole) {
-      if (role === 'admin') router.replace('/admin');
-      else if (role === 'cajera') router.replace('/cajera');
-      else router.replace('/login');
+      if (role === 'admin') {
+        router.replace('/admin');
+      } else if (role === 'cajera') {
+        router.replace('/cajera');
+      } else {
+        router.replace('/login');
+      }
     }
   }, [user, role, loading, isMounted, requiredRole, router]);
-
-  // No bloqueamos el DOM. Solo mostramos la barrita de progreso
-  if (loading || !isMounted) {
-    return (
-      <div className="fixed top-0 left-0 w-full h-1 z-[9999] bg-blue-500/20 overflow-hidden">
-        <div className="h-full bg-blue-600 animate-pulse w-1/2 translate-x-1/2"></div>
-      </div>
-    );
-  }
 
   return null;
 }
