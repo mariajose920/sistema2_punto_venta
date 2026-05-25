@@ -5,14 +5,36 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
 import { normalizeText, formatCurrency } from '@/lib/utils';
-import { Database } from '@/types/database.types';
+import { measureAsync } from '@/lib/perf';
 
-type ProductoRow = Database['public']['Tables']['Producto']['Row'];
-type ClienteRow = Database['public']['Tables']['Cliente']['Row'];
-type PromocionRow = Database['public']['Tables']['Promocion']['Row'];
-type VentaInsert = Database['public']['Tables']['Venta']['Insert'];
-type DetalleVentaInsert = Database['public']['Tables']['DetalleVenta']['Insert'];
-type CreditoInsert = Database['public']['Tables']['Credito']['Insert'];
+type ProductoRow = {
+  id: string;
+  nombre: string;
+  precio_venta_publico: number | null;
+  stock_actual: number | null;
+  codigo_barra?: string | null;
+  categoria?: string | null;
+};
+
+type ClienteRow = {
+  id: string;
+  nombre: string;
+  saldo_favor: number | null;
+};
+
+type PromocionRow = {
+  id: string;
+  nombre: string;
+  tipo: string;
+  valor: number | null;
+  activa?: boolean;
+  fecha_inicio?: string | null;
+  fecha_fin?: string | null;
+};
+
+type VentaInsert = Record<string, unknown>;
+type DetalleVentaInsert = Record<string, unknown>;
+type CreditoInsert = Record<string, unknown>;
 
 interface CartItem extends ProductoRow {
   cantidad: number;
@@ -62,18 +84,44 @@ export default function NuevaVentaPage() {
     const fetchData = async () => {
       try {
         const today = new Date().toISOString().split('T')[0];
+        const startFetch = performance.now();
+
         const [pRes, cRes, promoRes] = await Promise.all([
-          (supabase.from('Producto') as any).select('*'),
-          (supabase.from('Cliente') as any).select('*'),
-          (supabase.from('Promocion') as any)
-            .select('*')
-            .eq('activa', true)
-            .lte('fecha_inicio', today)
-            .gte('fecha_fin', today)
+          measureAsync(
+            '[Venta] cargar productos',
+            async () =>
+              (supabase.from('Producto') as any)
+                .select('id, nombre, precio_venta_publico, stock_actual, codigo_barra')
+                .order('nombre')
+          ),
+          measureAsync(
+            '[Venta] cargar clientes',
+            async () =>
+              (supabase.from('Cliente') as any)
+                .select('id, nombre, saldo_favor')
+                .order('nombre')
+          ),
+          measureAsync(
+            '[Venta] cargar promociones',
+            async () =>
+              (supabase.from('Promocion') as any)
+                .select('id, nombre, tipo, valor, activa, fecha_inicio, fecha_fin')
+                .eq('activa', true)
+                .lte('fecha_inicio', today)
+                .gte('fecha_fin', today)
+          ),
         ]);
-        setProductos(pRes.data || []);
-        setClientes(cRes.data || []);
-        setPromociones(promoRes.data || []);
+
+        console.log('[PERF_VENTA] carga inicial completa', {
+          ms: Number((performance.now() - startFetch).toFixed(2)),
+          productos: pRes.data?.length ?? 0,
+          clientes: cRes.data?.length ?? 0,
+          promociones: promoRes.data?.length ?? 0,
+        });
+
+        setProductos((pRes.data || []) as ProductoRow[]);
+        setClientes((cRes.data || []) as ClienteRow[]);
+        setPromociones((promoRes.data || []) as PromocionRow[]);
       } catch (err: unknown) {
         console.error('Error fetching data:', err);
       }

@@ -1,18 +1,24 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
-import { Database } from '@/types/database.types';
+import { logPerf } from '@/lib/perf';
 
-type Producto = Database['public']['Tables']['Producto']['Row'];
+type CatalogProduct = {
+  id: string;
+  nombre: string;
+  categoria: string | null;
+  precio_venta_publico: number | null;
+  stock_actual: number | null;
+  imagen_url: string | null;
+};
 
 interface CartItem {
-  producto: Producto;
+  producto: CatalogProduct;
   cantidad: number;
 }
 
 export default function CatalogoPublico() {
-  const [productos, setProductos] = useState<Producto[]>([]);
+  const [productos, setProductos] = useState<CatalogProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [showCart, setShowCart] = useState(false);
@@ -32,17 +38,29 @@ export default function CatalogoPublico() {
 
   const fetchProductos = async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('Producto')
-      .select('*')
-      .order('nombre');
-      
-    if (error) {
+    const start = performance.now();
+
+    try {
+      const response = await fetch('/api/catalogo', {
+        headers: {
+          'Cache-Control': 'public, max-age=300',
+        },
+      });
+      const json = await response.json();
+      const duration = performance.now() - start;
+
+      logPerf('[Cliente] fetch catálogo', duration, {
+        source: 'api/catalogo',
+        count: Array.isArray(json.products) ? json.products.length : 0,
+      });
+
+      setProductos(Array.isArray(json.products) ? json.products : []);
+    } catch (error) {
       console.error('Error fetching productos:', error);
-    } else if (data) {
-      setProductos(data);
+      setProductos([]);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const getStockStatus = (stock: number) => {
