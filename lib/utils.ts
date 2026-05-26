@@ -75,3 +75,34 @@ export function debugError(message: string, errorObj?: any): void {
     console.error(message);
   }
 }
+
+const cleanRUTInternal = (rut: string) => (rut || '').replace(/[^0-9kK]/g, '').toUpperCase();
+
+export const validateRUT = (rut: string) => {
+  const clean = cleanRUTInternal(rut);
+  if (clean.length < 2) return false;
+  const body = clean.slice(0, -1);
+  const dv = clean.slice(-1);
+  let sum = 0;
+  let mul = 2;
+  for (let i = body.length - 1; i >= 0; i--) {
+    sum += parseInt(body.charAt(i)) * mul;
+    mul = mul === 7 ? 2 : mul + 1;
+  }
+  const res = 11 - (sum % 11);
+  const calculatedDV = res === 11 ? '0' : res === 10 ? 'K' : res.toString();
+  return calculatedDV === dv;
+};
+
+export const formatRUTVisual = (rut: string) => {
+  const clean = cleanRUTInternal(rut);
+  if (clean.length < 2) return clean;
+  const body = clean.slice(0, -1);
+  const dv = clean.slice(-1);
+  let formatted = '';
+  for (let i = body.length - 1, j = 1; i >= 0; i--, j++) {
+    formatted = body.charAt(i) + formatted;
+    if (j % 3 === 0 && i !== 0) formatted = '.' + formatted;
+  }
+  return `${formatted}-${dv}`;
+};

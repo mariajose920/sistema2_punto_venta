@@ -4,7 +4,8 @@ import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
-import { normalizeText, formatCurrency, normalizeAmount } from '@/lib/utils';
+import { normalizeText, formatCurrency, normalizeAmount, formatRUTVisual } from '@/lib/utils';
+import { saveCliente } from '@/lib/services/clientes';
 import { measureAsync } from '@/lib/perf';
 
 type ProductoRow = {
@@ -496,18 +497,11 @@ export default function NuevaVentaPage() {
     e.preventDefault();
     try {
       setLoading(true);
-      const { data, error } = await (supabase.from('Cliente') as any).insert([{
-        nombre: normalizeText(newClient.nombre),
-        rut: newClient.rut.toUpperCase(),
-        telefono: newClient.telefono,
-        saldo_favor: 0,
-        saldo_deudado: 0
-      }]).select().single();
-
-      if (error) throw error;
       
-      setClientes([...clientes, data]);
-      setSelectedClientId(data.id);
+      const newClientData = await saveCliente(newClient);
+
+      setClientes([...clientes, newClientData]);
+      setSelectedClientId(newClientData.id);
       setIsClientModalOpen(false);
       setNewClient({ nombre: '', rut: '', telefono: '' });
       alert('Cliente creado y seleccionado');
@@ -826,7 +820,7 @@ export default function NuevaVentaPage() {
               </div>
               <div>
                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">RUT / ID</label>
-                <input required value={newClient.rut} onChange={e => setNewClient({...newClient, rut: e.target.value})} className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl font-bold border-none" />
+                <input required value={newClient.rut} onChange={e => setNewClient({...newClient, rut: e.target.value})} onBlur={e => setNewClient({...newClient, rut: formatRUTVisual(e.target.value)})} className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl font-bold border-none" />
               </div>
               <div>
                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Teléfono</label>

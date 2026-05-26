@@ -3,7 +3,8 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
-import { normalizeText, normalizeRUT, formatCurrency, normalizeAmount } from '@/lib/utils';
+import { normalizeText, normalizeRUT, formatCurrency, normalizeAmount, formatRUTVisual } from '@/lib/utils';
+import { saveCliente } from '@/lib/services/clientes';
 import { Database } from '@/types/database.types';
 
 type ClienteRow = Database['public']['Tables']['Cliente']['Row'];
@@ -48,37 +49,7 @@ export default function ClientesPage() {
     rut: ''
   });
 
-  // Utilidades de RUT
-  const cleanRUTInternal = (rut: string) => (rut || '').replace(/[^0-9kK]/g, '').toUpperCase();
-
-  const validateRUT = (rut: string) => {
-    const clean = cleanRUTInternal(rut);
-    if (clean.length < 2) return false;
-    const body = clean.slice(0, -1);
-    const dv = clean.slice(-1);
-    let sum = 0;
-    let mul = 2;
-    for (let i = body.length - 1; i >= 0; i--) {
-      sum += parseInt(body.charAt(i)) * mul;
-      mul = mul === 7 ? 2 : mul + 1;
-    }
-    const res = 11 - (sum % 11);
-    const calculatedDV = res === 11 ? '0' : res === 10 ? 'K' : res.toString();
-    return calculatedDV === dv;
-  };
-
-  const formatRUTVisual = (rut: string) => {
-    const clean = cleanRUTInternal(rut);
-    if (clean.length < 2) return clean;
-    const body = clean.slice(0, -1);
-    const dv = clean.slice(-1);
-    let formatted = '';
-    for (let i = body.length - 1, j = 1; i >= 0; i--, j++) {
-      formatted = body.charAt(i) + formatted;
-      if (j % 3 === 0 && i !== 0) formatted = '.' + formatted;
-    }
-    return `${formatted}-${dv}`;
-  };
+  // Utilidades de RUT delegadas a lib/utils.ts y lib/services/clientes.ts
 
   // ============================================================================
   // REGLA INVARIANTE: nunca saldo_deudado > 0 y saldo_favor > 0 al mismo tiempo.
@@ -143,56 +114,15 @@ export default function ClientesPage() {
   const handleSaveCliente = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const nombreNorm = normalizeText(formData.nombre);
-      if (!nombreNorm) throw new Error('El nombre es obligatorio');
-
-      if (!formData.rut) throw new Error('El RUT es obligatorio');
-      const rutNormalizado = formatRUTVisual(formData.rut);
-      if (!validateRUT(rutNormalizado)) throw new Error('El RUT ingresado no es válido');
-
       setLoading(true);
 
-      // Validar duplicado de NOMBRE
-      const { data: nombreExistente } = await (supabase.from('Cliente') as any)
-        .select('id')
-        .eq('nombre', nombreNorm)
-        .neq('id', selectedCliente?.id || '00000000-0000-0000-0000-000000000000')
-        .maybeSingle();
-
-      if (nombreExistente) {
-        throw new Error(`Ya existe un cliente con el nombre: "${nombreNorm}"`);
-      }
-
-      // Validar duplicado de RUT
-      const { data: existente } = await (supabase.from('Cliente') as any)
-        .select('id, nombre')
-        .eq('rut', rutNormalizado)
-        .neq('id', selectedCliente?.id || '00000000-0000-0000-0000-000000000000')
-        .maybeSingle();
-      if (existente) {
-        throw new Error(`Ya existe un cliente registrado con el RUT: ${rutNormalizado} (${(existente as any).nombre})`);
-      }
-
       const finalData = {
-        nombre: nombreNorm,
-        rut: rutNormalizado,
+        nombre: formData.nombre || '',
+        rut: formData.rut || '',
         telefono: formData.telefono || ''
       };
 
-      if (selectedCliente?.id) {
-        const { error } = await (supabase.from('Cliente') as any)
-          .update(finalData)
-          .eq('id', selectedCliente.id);
-        if (error) throw error;
-      } else {
-        const { error } = await (supabase.from('Cliente') as any)
-          .insert([{
-            ...finalData,
-            saldo_deudado: 0,
-            saldo_favor: 0
-          }]);
-        if (error) throw error;
-      }
+      await saveCliente(finalData, selectedCliente?.id);
 
       setIsModalOpen(false);
       fetchClientes();
