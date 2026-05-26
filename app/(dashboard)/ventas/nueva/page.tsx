@@ -115,6 +115,7 @@ export default function NuevaVentaPage() {
     cantidad: 1,
   });
   const [draftRestored, setDraftRestored] = useState(false);
+  const [isDraftLoaded, setIsDraftLoaded] = useState(false);
 
   // Estado para Nuevo Cliente
   const [isClientModalOpen, setIsClientModalOpen] = useState(false);
@@ -180,27 +181,38 @@ export default function NuevaVentaPage() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    const storedDraft = safeParseJson<VentaDraft>(window.localStorage.getItem(DRAFT_KEY));
-    if (!storedDraft) return;
+    try {
+      const storedDraft = safeParseJson<VentaDraft>(window.localStorage.getItem(DRAFT_KEY));
+      if (storedDraft) {
+        setTimeout(() => {
+          if (Array.isArray(storedDraft.cart)) {
+            setCart(storedDraft.cart as CartItem[]);
+          }
 
-    if (Array.isArray(storedDraft.cart)) {
-      setCart(storedDraft.cart as CartItem[]);
+          setPaymentMethod(storedDraft.paymentMethod || 'efectivo');
+          setSelectedClientId(storedDraft.selectedClientId || '');
+          setSearch(storedDraft.search || '');
+          setCalcData(storedDraft.calcData || {
+            nombre: 'Producto por Peso/Medida',
+            precioUnitario: 0,
+            cantidad: 1,
+          });
+          setShowProductSearch(Boolean(storedDraft.search));
+          setDraftRestored(true);
+        }, 0);
+      }
+    } catch (err) {
+      console.warn('Error al restaurar borrador:', err);
+    } finally {
+      setTimeout(() => {
+        setIsDraftLoaded(true);
+      }, 0);
     }
-
-    setPaymentMethod(storedDraft.paymentMethod || 'efectivo');
-    setSelectedClientId(storedDraft.selectedClientId || '');
-    setSearch(storedDraft.search || '');
-    setCalcData(storedDraft.calcData || {
-      nombre: 'Producto por Peso/Medida',
-      precioUnitario: 0,
-      cantidad: 1,
-    });
-    setShowProductSearch(Boolean(storedDraft.search));
-    setDraftRestored(true);
   }, []);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    if (!isDraftLoaded) return; // Evitar sobrescribir con datos vacíos en el primer render
     saveDraft({
       cart,
       paymentMethod,
@@ -208,7 +220,7 @@ export default function NuevaVentaPage() {
       search,
       calcData,
     });
-  }, [cart, paymentMethod, selectedClientId, search, calcData]);
+  }, [cart, paymentMethod, selectedClientId, search, calcData, isDraftLoaded]);
 
   const applyPromotions = useCallback((items: CartItem[]) => {
     return items.map(item => {
@@ -310,10 +322,13 @@ export default function NuevaVentaPage() {
 
   // Limpiar cliente si no es Fiado (Requerimiento de ocultar y no ser obligatorio)
   useEffect(() => {
+    if (!isDraftLoaded) return; // Esperar a que el borrador sea cargado
     if (paymentMethod !== 'fiado') {
-      setSelectedClientId('');
+      setTimeout(() => {
+        setSelectedClientId('');
+      }, 0);
     }
-  }, [paymentMethod]);
+  }, [paymentMethod, isDraftLoaded]);
 
   useEffect(() => {
     if (!draftRestored) return;
