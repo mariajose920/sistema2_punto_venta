@@ -77,7 +77,20 @@ export default function LoginPage() {
       });
 
       if (authError) {
-        throw new Error(`ACCESO DENEGADO: ${authError.message}`);
+        const isNetwork =
+          authError.message === 'Failed to fetch' ||
+          authError.message === 'NetworkError' ||
+          authError.message?.toLowerCase().includes('network') ||
+          authError.message?.toLowerCase().includes('fetch') ||
+          authError.message?.toLowerCase().includes('could not connect');
+
+        if (isNetwork) {
+          console.error('[AuthNetworkError] Fallo de conexión al iniciar sesión:', authError);
+          throw new Error('No se pudo conectar con el servidor de autenticación. Verifica tu conexión a internet.');
+        }
+
+        console.error('[AuthCredentialError] Credenciales rechazadas:', authError);
+        throw new Error('Acceso denegado: Credenciales inválidas. Revisa tu correo y contraseña.');
       }
 
       if (!authData?.user?.id) {
@@ -131,12 +144,26 @@ export default function LoginPage() {
 
       router.push(targetPath);
     } catch (err: any) {
+      const errMsg = err?.message ?? 'unknown';
       console.log('[LOGIN_TRACE] login_error', {
         ms: Number((performance.now() - loginStart).toFixed(2)),
-        message: err?.message ?? 'unknown',
+        message: errMsg,
       });
-      setError(err.message || 'Error crítico en el proceso de autenticación.');
       console.error('[LoginProcessError]', err);
+
+      const isNetwork =
+        errMsg === 'Failed to fetch' ||
+        errMsg === 'NetworkError' ||
+        errMsg?.toLowerCase().includes('network') ||
+        errMsg?.toLowerCase().includes('fetch') ||
+        errMsg?.toLowerCase().includes('could not connect') ||
+        err?.name === 'TypeError';
+
+      setError(
+        isNetwork
+          ? 'No se pudo conectar con el servidor de autenticación. Verifica tu conexión a internet.'
+          : errMsg || 'Error crítico en el proceso de autenticación.'
+      );
       setLoading(false);
     }
   };
