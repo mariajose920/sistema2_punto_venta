@@ -83,35 +83,46 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     if (roleCache.has(uid)) {
-      console.log('[AUTH_TRACE] role_memory_hit', {
-        uid,
-        role: roleCache.get(uid),
-        ms: Number((performance.now() - cacheStart).toFixed(2)),
-      });
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('[PERF][PROFILE] role_memory_hit', {
+          uid,
+          role: roleCache.get(uid),
+          ms: Number((performance.now() - cacheStart).toFixed(2)),
+        });
+      }
       return roleCache.get(uid)!;
     }
 
     const fetchStart = performance.now();
     debugLog('[AuthContext] Verificando rol para UID:', uid);
 
-    const loadedRole = await getUserRole(uid) as Role | null;
+    try {
+      const rolePromise = getUserRole(uid);
+      const timeoutPromise = new Promise<null>((_, reject) => setTimeout(() => reject(new Error('TIMEOUT_ERROR')), 8000));
+      const loadedRole = await Promise.race([rolePromise, timeoutPromise]) as Role | null;
 
-    console.log('[AUTH_TRACE] role_query_authcontext', {
-      uid,
-      ms: Number((performance.now() - fetchStart).toFixed(2)),
-      role: loadedRole,
-    });
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('[PERF][PROFILE] role_query_authcontext', {
+          uid,
+          ms: Number((performance.now() - fetchStart).toFixed(2)),
+          role: loadedRole,
+        });
+      }
 
-    if (!loadedRole) {
-      debugError('[AuthContext] No se encontró perfil para UID:', uid);
+      if (!loadedRole) {
+        debugError('[AuthContext] No se encontró perfil para UID:', uid);
+        return null;
+      }
+
+      roleCache.set(uid, loadedRole);
+      saveCachedRoleEntry(uid, loadedRole);
+      debugLog('[AuthContext] Rol cargado correctamente:', loadedRole);
+
+      return loadedRole;
+    } catch (err: any) {
+      console.error('[AuthContext] Error fetching role:', err);
       return null;
     }
-
-    roleCache.set(uid, loadedRole);
-    saveCachedRoleEntry(uid, loadedRole);
-    debugLog('[AuthContext] Rol cargado correctamente:', loadedRole);
-
-    return loadedRole;
   };
 
   useEffect(() => {
@@ -132,13 +143,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const sessionStart = performance.now();
         const { data: { session }, error } = await supabase.auth.getSession();
-        console.log('[AUTH_TRACE] getSession', {
-          ms: Number((performance.now() - sessionStart).toFixed(2)),
-          hasError: Boolean(error),
-          errorMessage: error?.message ?? null,
-          hasUser: Boolean(session?.user),
-          userId: session?.user?.id ?? null,
-        });
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('[PERF][AUTH] getSession', {
+            ms: Number((performance.now() - sessionStart).toFixed(2)),
+            hasError: Boolean(error),
+            errorMessage: error?.message ?? null,
+            hasUser: Boolean(session?.user),
+            userId: session?.user?.id ?? null,
+          });
+        }
 
         if (error || !session?.user) {
           if (active && !currentUserRef.current) {
@@ -169,11 +182,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         const roleStart = performance.now();
         const fetchedRole = await fetchRole(session.user.id);
-        console.log('[AUTH_TRACE] role_bootstrap_after_getSession', {
-          uid: session.user.id,
-          role: fetchedRole,
-          ms: Number((performance.now() - roleStart).toFixed(2)),
-        });
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('[PERF][PROFILE] role_bootstrap_after_getSession', {
+            uid: session.user.id,
+            role: fetchedRole,
+            ms: Number((performance.now() - roleStart).toFixed(2)),
+          });
+        }
+
+        if (!fetchedRole) {
+          await supabase.auth.signOut();
+          if (active) {
+            setState(prev => ({ ...prev, user: null, role: null, loading: false }));
+            if (window.location.pathname === '/login') {
+              window.history.replaceState({}, '', '/login?error=no_role');
+              // Disparar evento para que el componente login detecte el error
+              window.dispatchEvent(new Event('popstate'));
+            } else {
+              window.location.href = '/login?error=no_role';
+            }
+          }
+          return;
+        }
 
         if (active) {
           setState(prev => ({
@@ -226,11 +256,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         const roleStart = performance.now();
         const fetchedRole = await fetchRole(session.user.id);
-        console.log('[AUTH_TRACE] role_bootstrap_after_onAuthStateChange', {
-          uid: session.user.id,
-          role: fetchedRole,
-          ms: Number((performance.now() - roleStart).toFixed(2)),
-        });
+        
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('[PERF][PROFILE] role_bootstrap_after_onAuthStateChange', {
+            uid: session.user.id,
+            role: fetchedRole,
+            ms: Number((performance.now() - roleStart).toFixed(2)),
+          });
+        }
+
+        if (!fetchedRole) {
+          await supabase.auth.signOut();
+          if (active) {
+            setState(prev => ({ ...prev, user: null, role: null, loading: false }));
+            if (window.location.pathname === '/login') {
+              window.history.replaceState({}, '', '/login?error=no_role');
+              // Workaround to trigger re-render on the login page params logic
+              window.dispatchEvent(new Event('popstate'));
+              // Fallback to reload if popstate doesn't work for query params in next
+              window.location.reload();
+            } else {
+              window.location.href = '/login?error=no_role';
+            }
+          }
+          return;
+        }
 
         if (active) {
           setState(prev => ({

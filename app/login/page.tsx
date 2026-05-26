@@ -60,23 +60,41 @@ export default function LoginPage() {
     setError(null);
 
     const loginStart = performance.now();
+    const attemptId = `log-${Math.random().toString(36).substring(2, 9)}`;
+
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`[PERF][LOGIN] Inicia intento ${attemptId}`);
+    }
+
+    let loginSuccess = false;
 
     try {
       const cleanEmail = email.trim().toLowerCase();
       const cleanPassword = password.trim();
 
       const authStart = performance.now();
-      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+      
+      const authPromise = supabase.auth.signInWithPassword({
         email: cleanEmail,
         password: cleanPassword,
       });
+
+      const timeoutPromise = new Promise<{ data: any; error: any }>((_, reject) =>
+        setTimeout(() => reject(new Error('TIMEOUT_ERROR')), 8000)
+      );
+
+      const { data: authData, error: authError } = await Promise.race([authPromise, timeoutPromise]);
+      
       const authElapsed = performance.now() - authStart;
-      console.log('[LOGIN_TRACE] signInWithPassword', {
-        ms: Number(authElapsed.toFixed(2)),
-        hasError: Boolean(authError),
-        errorMessage: authError?.message ?? null,
-        userId: authData?.user?.id ?? null,
-      });
+      
+      if (process.env.NODE_ENV !== 'production') {
+        console.log(`[PERF][AUTH] signInWithPassword completado. Intento: ${attemptId}`, {
+          ms: Number(authElapsed.toFixed(2)),
+          hasError: Boolean(authError),
+          errorMessage: authError?.message ?? null,
+          userId: authData?.user?.id ?? null,
+        });
+      }
 
       if (authError) {
         const isNetwork =
@@ -87,43 +105,44 @@ export default function LoginPage() {
           authError.message?.toLowerCase().includes('could not connect');
 
         if (isNetwork) {
-          console.error('[AuthNetworkError] Fallo de conexión al iniciar sesión:', authError);
-          throw new Error('No se pudo conectar con el servidor de autenticación. Verifica tu conexión a internet.');
+          throw new Error('NETWORK_ERROR');
         }
 
-        console.error('[AuthCredentialError] Credenciales rechazadas:', authError);
-        throw new Error('Acceso denegado: Credenciales inválidas. Revisa tu correo y contraseña.');
+        throw new Error('CREDENTIAL_ERROR');
       }
 
       if (!authData?.user?.id) {
-        throw new Error('No se pudo recuperar el usuario autenticado.');
+        throw new Error('USER_DATA_ERROR');
       }
 
-      // Redundant role fetching removed. AuthContext handles role retrieval and navigation via its onAuthStateChange listener.
-// The useEffect at lines 40-44 will redirect once user and role are populated.
-
+      loginSuccess = true;
     } catch (err: any) {
       const errMsg = err?.message ?? 'unknown';
-      console.log('[LOGIN_TRACE] login_error', {
-        ms: Number((performance.now() - loginStart).toFixed(2)),
-        message: errMsg,
-      });
-      console.error('[LoginProcessError]', err);
+      
+      if (process.env.NODE_ENV !== 'production') {
+        console.log(`[PERF][LOGIN] Error en intento ${attemptId}`, {
+          ms: Number((performance.now() - loginStart).toFixed(2)),
+          message: errMsg,
+        });
+      }
 
-      const isNetwork =
-        errMsg === 'Failed to fetch' ||
-        errMsg === 'NetworkError' ||
-        errMsg?.toLowerCase().includes('network') ||
-        errMsg?.toLowerCase().includes('fetch') ||
-        errMsg?.toLowerCase().includes('could not connect') ||
-        err?.name === 'TypeError';
-
-      setError(
-        isNetwork
-          ? 'No se pudo conectar con el servidor de autenticación. Verifica tu conexión a internet.'
-          : errMsg || 'Error crítico en el proceso de autenticación.'
-      );
-      setLoading(false);
+      if (errMsg === 'TIMEOUT_ERROR') {
+        setError('El inicio de sesión está tardando demasiado (Timeout). Revisa tu conexión a internet e intenta de nuevo.');
+      } else if (errMsg === 'NETWORK_ERROR') {
+        setError('No se pudo conectar con el servidor de autenticación. Verifica tu conexión a internet.');
+      } else if (errMsg === 'CREDENTIAL_ERROR') {
+        setError('Acceso denegado: Credenciales inválidas. Revisa tu correo y contraseña.');
+      } else if (errMsg === 'USER_DATA_ERROR') {
+        setError('Error: No se pudo recuperar el usuario autenticado. Intente nuevamente.');
+      } else if (errMsg === 'ROLE_ERROR') {
+        setError('Error al cargar tu perfil/rol de usuario. Contacta a soporte.');
+      } else {
+        setError('Error crítico en el proceso de autenticación. Intente nuevamente.');
+      }
+    } finally {
+      if (!loginSuccess) {
+        setLoading(false);
+      }
     }
   };
 
