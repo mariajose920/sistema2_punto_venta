@@ -56,14 +56,14 @@ type VentaDraft = {
 
 const DRAFT_KEY = 'pos:nueva-venta:borrador';
 
-const safeParseJson = <T>(value: string | null): T | null => {
+function safeParseJson<T>(value: string | null): T | null {
   if (!value) return null;
   try {
     return JSON.parse(value) as T;
   } catch {
     return null;
   }
-};
+}
 
 const saveDraft = (draft: VentaDraft) => {
   if (typeof window === 'undefined') return;
@@ -788,6 +788,8 @@ export default function NuevaVentaPage() {
                 <div>
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Cantidad / Peso (Unidades)</label>
                   <input type="number" step="1" min="0" value={calcData.cantidad} onChange={e => { const val = Math.floor(Number(e.target.value) || 0); setCalcData({...calcData, cantidad: Math.max(1, val)}) }} className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl font-bold border-none" />
+                </div>
+              </div>
               <div className="p-6 bg-blue-50 dark:bg-blue-900/20 rounded-3xl text-center border-2 border-blue-100 dark:border-blue-900/30">
                 <p className="text-blue-600 font-black uppercase text-[10px] tracking-widest mb-1">Total Calculado</p>
                 <p className="font-black text-4xl text-gray-900 dark:text-white tracking-tighter">
