@@ -32,6 +32,7 @@ const saveCachedRoleEntry = (uid: string, role: string) => {
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [selectedRole, setSelectedRole] = useState<'admin' | 'cajera'>('cajera');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
@@ -115,6 +116,12 @@ export default function LoginPage() {
         throw new Error('USER_DATA_ERROR');
       }
 
+      const actualRole = authData.user.user_metadata?.rol;
+      if (actualRole && actualRole !== selectedRole) {
+        await supabase.auth.signOut();
+        throw new Error('ROLE_MISMATCH');
+      }
+
       loginSuccess = true;
     } catch (err: any) {
       const errMsg = err?.message ?? 'unknown';
@@ -134,8 +141,8 @@ export default function LoginPage() {
         setError('Acceso denegado: Credenciales inválidas. Revisa tu correo y contraseña.');
       } else if (errMsg === 'USER_DATA_ERROR') {
         setError('Error: No se pudo recuperar el usuario autenticado. Intente nuevamente.');
-      } else if (errMsg === 'ROLE_ERROR') {
-        setError('Error al cargar tu perfil/rol de usuario. Contacta a soporte.');
+      } else if (errMsg === 'ROLE_MISMATCH') {
+        setError(`Acceso denegado: Tu cuenta no tiene permisos de ${selectedRole === 'admin' ? 'Administrador' : 'Cajero'}. Verifica el rol seleccionado.`);
       } else {
         setError('Error crítico en el proceso de autenticación. Intente nuevamente.');
       }
@@ -177,6 +184,38 @@ export default function LoginPage() {
           )}
 
           <form onSubmit={handleLogin} className="space-y-4 sm:space-y-6">
+            <div>
+              <label className="block text-xs sm:text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+                Selecciona tu Rol
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setSelectedRole('cajera')}
+                  disabled={loading}
+                  className={`py-2.5 sm:py-3 px-4 rounded-xl font-bold border-2 transition-all duration-200 flex items-center justify-center gap-2 ${
+                    selectedRole === 'cajera'
+                      ? 'border-blue-600 bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-500'
+                      : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400'
+                  }`}
+                >
+                  🛒 Cajero
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedRole('admin')}
+                  disabled={loading}
+                  className={`py-2.5 sm:py-3 px-4 rounded-xl font-bold border-2 transition-all duration-200 flex items-center justify-center gap-2 ${
+                    selectedRole === 'admin'
+                      ? 'border-purple-600 bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-500'
+                      : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400'
+                  }`}
+                >
+                  ⚙️ Admin
+                </button>
+              </div>
+            </div>
+
             <div>
               <label className="block text-xs sm:text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2" htmlFor="email">
                 Correo Electrónico
