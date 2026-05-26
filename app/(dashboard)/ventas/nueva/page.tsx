@@ -184,29 +184,24 @@ export default function NuevaVentaPage() {
     try {
       const storedDraft = safeParseJson<VentaDraft>(window.localStorage.getItem(DRAFT_KEY));
       if (storedDraft) {
-        setTimeout(() => {
-          if (Array.isArray(storedDraft.cart)) {
-            setCart(storedDraft.cart as CartItem[]);
-          }
-
-          setPaymentMethod(storedDraft.paymentMethod || 'efectivo');
-          setSelectedClientId(storedDraft.selectedClientId || '');
-          setSearch(storedDraft.search || '');
-          setCalcData(storedDraft.calcData || {
-            nombre: 'Producto por Peso/Medida',
-            precioUnitario: 0,
-            cantidad: 1,
-          });
-          setShowProductSearch(Boolean(storedDraft.search));
-          setDraftRestored(true);
-        }, 0);
+        if (Array.isArray(storedDraft.cart)) {
+          setCart(storedDraft.cart as CartItem[]);
+        }
+        setPaymentMethod(storedDraft.paymentMethod || 'efectivo');
+        setSelectedClientId(storedDraft.selectedClientId || '');
+        setSearch(storedDraft.search || '');
+        setCalcData(storedDraft.calcData || {
+          nombre: 'Producto por Peso/Medida',
+          precioUnitario: 0,
+          cantidad: 1,
+        });
+        setShowProductSearch(Boolean(storedDraft.search));
+        setDraftRestored(true);
       }
     } catch (err) {
       console.warn('Error al restaurar borrador:', err);
     } finally {
-      setTimeout(() => {
-        setIsDraftLoaded(true);
-      }, 0);
+      setIsDraftLoaded(true);
     }
   }, []);
 
@@ -485,7 +480,7 @@ export default function NuevaVentaPage() {
     }
   };
 
-  const handleCancelarVenta = () => {
+  const handleResetCart = () => {
     setCart([]);
     setSelectedClientId('');
     setSearch('');
@@ -743,10 +738,10 @@ export default function NuevaVentaPage() {
             </button>
             <button
               type="button"
-              onClick={handleCancelarVenta}
+              onClick={handleResetCart}
               className="w-full py-4 rounded-3xl font-black text-sm text-gray-600 border border-gray-200 hover:bg-gray-100 transition-all"
             >
-              Cancelar venta
+              Restablecer carrito / Cancelar venta
             </button>
           </div>
         </div>
