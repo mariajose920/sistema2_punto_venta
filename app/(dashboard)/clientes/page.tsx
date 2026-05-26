@@ -463,14 +463,24 @@ export default function ClientesPage() {
                 </div>
               </div>
 
-              <div className="mt-8 pt-8 border-t border-gray-50 dark:border-gray-800 flex gap-3">
-                <button onClick={() => openStatement(c)} className="flex-1 py-4 bg-gray-100 dark:bg-gray-900 text-gray-500 dark:text-gray-400 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-gray-900 hover:text-white transition-all">Historial</button>
-                <button onClick={() => { setSelectedCliente(c); setIsAbonoOpen(true); }} className="flex-1 py-4 bg-emerald-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-500/20">Abonar</button>
+              <div className="mt-8 pt-8 border-t border-gray-50 dark:border-gray-800 flex flex-wrap gap-2">
+                <button
+                  onClick={() => openStatement(c)}
+                  className="flex-1 min-w-0 py-4 bg-gray-100 dark:bg-gray-900 text-gray-500 dark:text-gray-400 rounded-2xl font-black text-[10px] uppercase tracking-wider whitespace-nowrap hover:bg-gray-900 hover:text-white transition-all"
+                >
+                  Historial
+                </button>
+                <button
+                  onClick={() => { setSelectedCliente(c); setIsAbonoOpen(true); }}
+                  className="flex-1 min-w-0 py-4 bg-emerald-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-wider whitespace-nowrap hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-500/20"
+                >
+                  Abonar
+                </button>
                 {canManageClientes && (
-                  <>
+                  <div className="flex gap-2 shrink-0">
                     <button onClick={() => { setSelectedCliente(c); setFormData(c); setIsModalOpen(true); }} className="p-4 bg-gray-50 dark:bg-gray-900 text-gray-300 hover:text-blue-600 rounded-2xl transition-all">✏️</button>
                     <button onClick={() => handleDeleteCliente(c)} className="p-4 bg-red-50 dark:bg-red-900/20 text-red-600 rounded-2xl transition-all hover:scale-105">🗑️</button>
-                  </>
+                  </div>
                 )}
               </div>
             </div>
@@ -547,23 +557,23 @@ export default function ClientesPage() {
                   </div>
                 </div>
                 
-                <div className="pt-3 border-t border-gray-200 dark:border-gray-700 flex gap-2">
-                  <button 
-                    onClick={() => openStatement(c)} 
-                    className="flex-1 py-2 bg-gray-900 text-white text-xs font-black rounded-lg uppercase"
+                <div className="pt-3 border-t border-gray-200 dark:border-gray-700 flex flex-wrap gap-2">
+                  <button
+                    onClick={() => openStatement(c)}
+                    className="flex-1 min-w-0 py-2 bg-gray-900 text-white text-[10px] font-black rounded-lg uppercase tracking-wider whitespace-nowrap"
                   >
                     Historial
                   </button>
-                  <button 
-                    onClick={() => { setSelectedCliente(c); setIsAbonoOpen(true); }} 
-                    className="flex-1 py-2 bg-emerald-600 text-white text-xs font-black rounded-lg uppercase"
+                  <button
+                    onClick={() => { setSelectedCliente(c); setIsAbonoOpen(true); }}
+                    className="flex-1 min-w-0 py-2 bg-emerald-600 text-white text-[10px] font-black rounded-lg uppercase tracking-wider whitespace-nowrap"
                   >
                     Abonar
                   </button>
                   {canManageClientes && (
-                    <>
-                      <button 
-                        onClick={() => { setSelectedCliente(c); setFormData(c); setIsModalOpen(true); }} 
+                    <div className="flex gap-2 shrink-0">
+                      <button
+                        onClick={() => { setSelectedCliente(c); setFormData(c); setIsModalOpen(true); }}
                         className="py-2 px-3 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:text-blue-600 text-lg rounded-lg"
                       >
                         ✏️
@@ -574,7 +584,7 @@ export default function ClientesPage() {
                       >
                         🗑️
                       </button>
-                    </>
+                    </div>
                   )}
                 </div>
               </div>
