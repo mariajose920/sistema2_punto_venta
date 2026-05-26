@@ -188,30 +188,32 @@ export default function LoginPage() {
               <label className="block text-xs sm:text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
                 Selecciona tu Rol
               </label>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-2 sm:gap-3">
                 <button
                   type="button"
                   onClick={() => setSelectedRole('cajera')}
                   disabled={loading}
-                  className={`py-2.5 sm:py-3 px-4 rounded-xl font-bold border-2 transition-all duration-200 flex items-center justify-center gap-2 ${
+                  className={`py-2 sm:py-2.5 px-2 sm:px-4 rounded-xl font-semibold sm:font-bold border-2 transition-all duration-200 flex items-center justify-center gap-1 sm:gap-2 text-xs sm:text-sm min-w-0 overflow-hidden ${
                     selectedRole === 'cajera'
                       ? 'border-blue-600 bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-500'
                       : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400'
                   }`}
                 >
-                  🛒 Cajero
+                  <span className="shrink-0">🛒</span>
+                  <span className="truncate">Cajero</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setSelectedRole('admin')}
                   disabled={loading}
-                  className={`py-2.5 sm:py-3 px-4 rounded-xl font-bold border-2 transition-all duration-200 flex items-center justify-center gap-2 ${
+                  className={`py-2 sm:py-2.5 px-2 sm:px-4 rounded-xl font-semibold sm:font-bold border-2 transition-all duration-200 flex items-center justify-center gap-1 sm:gap-2 text-xs sm:text-sm min-w-0 overflow-hidden ${
                     selectedRole === 'admin'
                       ? 'border-purple-600 bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-500'
                       : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400'
                   }`}
                 >
-                  ⚙️ Admin
+                  <span className="shrink-0">⚙️</span>
+                  <span className="truncate">Admin</span>
                 </button>
               </div>
             </div>
@@ -285,10 +287,10 @@ export default function LoginPage() {
               type="button"
               onClick={() => router.push('/catalogo')}
               disabled={loading}
-              className="w-full flex items-center justify-center gap-2 py-2.5 sm:py-3 px-4 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 font-bold hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-all duration-200 border border-emerald-200 dark:border-emerald-800 shadow-sm text-sm sm:text-base active:scale-95 disabled:opacity-50"
+              className="w-full flex items-center justify-center gap-1.5 sm:gap-2 py-2.5 sm:py-3 px-3 sm:px-4 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 font-bold hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-all duration-200 border border-emerald-200 dark:border-emerald-800 shadow-sm text-xs sm:text-base active:scale-95 disabled:opacity-50 min-w-0"
             >
-              <span className="text-lg sm:text-xl">🛍️</span>
-              Ver Catálogo Público
+              <span className="text-base sm:text-xl shrink-0">🛍️</span>
+              <span className="truncate">Ver Catálogo Público</span>
             </button>
             <p className="mt-2 text-xs text-gray-400 text-center">Sin requerir inicio de sesión</p>
           </div>
