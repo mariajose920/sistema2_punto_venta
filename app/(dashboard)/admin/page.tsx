@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
+import { roundMoney } from '@/lib/utils';
 
 /**
  * Interfaz para las métricas consolidadas del Dashboard
@@ -90,25 +91,26 @@ export default function AdminDashboardPage() {
           const creditos = (cr.data || []) as unknown as CreditoRow[];
           const productos = (p.data || []) as unknown as ProductoRow[];
 
-          // Agregación eficiente en una sola pasada
-          const ingresos = ventas.reduce((acc, val) => acc + (val.total_venta || 0), 0);
-          const gastos = compras.reduce((acc, val) => acc + (val.total_compra || 0), 0);
-          const cuentasPorCobrar = creditos.reduce((acc, val) => acc + (val.saldo_pendiente || 0), 0);
-          const vContado = ventas.filter(v => v.forma_pago !== 'fiado').reduce((acc, val) => acc + (val.total_venta || 0), 0);
-          const vCredito = ventas.filter(v => v.forma_pago === 'fiado').reduce((acc, val) => acc + (val.total_venta || 0), 0);
+          // Agregación eficiente en una sola pasada (con redondeo de montos)
+          const ingresos = roundMoney(ventas.reduce((acc, val) => acc + (val.total_venta || 0), 0));
+          const gastos = roundMoney(compras.reduce((acc, val) => acc + (val.total_compra || 0), 0));
+          const cuentasPorCobrar = roundMoney(creditos.reduce((acc, val) => acc + (val.saldo_pendiente || 0), 0));
+          const vContado = roundMoney(ventas.filter(v => v.forma_pago !== 'fiado').reduce((acc, val) => acc + (val.total_venta || 0), 0));
+          const vCredito = roundMoney(ventas.filter(v => v.forma_pago === 'fiado').reduce((acc, val) => acc + (val.total_venta || 0), 0));
 
           let valorInv = 0;
           let sBajo = 0;
           for (let i = 0; i < productos.length; i++) {
             const prod = productos[i];
-            valorInv += (prod.stock_actual * prod.precio_compra);
+            valorInv += Math.round((prod.stock_actual || 0) * (prod.precio_compra || 0));
             if (prod.stock_actual <= prod.stock_minimo) sBajo++;
           }
+          valorInv = roundMoney(valorInv);
 
           setStats({
             ingresos,
             gastos,
-            balance: ingresos - gastos,
+            balance: roundMoney(ingresos - gastos),
             cuentasPorCobrar,
             valorInventario: valorInv,
             productosStockBajo: sBajo,

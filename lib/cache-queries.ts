@@ -1,4 +1,3 @@
-import { unstable_cache } from 'next/cache';
 import { supabase } from './supabase';
 import { measureAsync } from './perf';
 
@@ -52,10 +51,9 @@ async function loadCatalogProducts(): Promise<CatalogProduct[]> {
   return result;
 }
 
-export const getCatalogProducts = unstable_cache(loadCatalogProducts, ['catalogo-products-v1'], {
-  revalidate: 300,
-  tags: ['catalogo-products'],
-});
+export async function getCatalogProducts(): Promise<CatalogProduct[]> {
+  return loadCatalogProducts();
+}
 
 export async function warmCriticalCaches() {
   const [catalogProducts] = await Promise.all([

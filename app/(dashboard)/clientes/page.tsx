@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
-import { normalizeText, normalizeRUT, formatCurrency } from '@/lib/utils';
+import { normalizeText, normalizeRUT, formatCurrency, normalizeAmount } from '@/lib/utils';
 import { Database } from '@/types/database.types';
 
 type ClienteRow = Database['public']['Tables']['Cliente']['Row'];
@@ -87,8 +87,8 @@ export default function ClientesPage() {
   //          deuda=300,  favor=1400 => deuda=0,    favor=1100
   // ============================================================================
   const compensarSaldo = (deuda: number, favor: number): { deuda: number; favor: number } => {
-    const d = Math.max(0, Number(deuda || 0));
-    const f = Math.max(0, Number(favor || 0));
+    const d = Math.max(0, normalizeAmount(deuda || 0));
+    const f = Math.max(0, normalizeAmount(favor || 0));
     if (d > 0 && f > 0) {
       if (f >= d) return { deuda: 0, favor: f - d };
       return { deuda: d - f, favor: 0 };
@@ -300,15 +300,16 @@ export default function ClientesPage() {
         Number(freshCliente.saldo_deudado || 0),
         Number(freshCliente.saldo_favor   || 0)
       );
-      let nuevaDeuda      = compensado.deuda;
-      let nuevoSaldoFavor = compensado.favor;
+      let nuevaDeuda      = normalizeAmount(compensado.deuda);
+      let nuevoSaldoFavor = normalizeAmount(compensado.favor);
 
       console.log('Paso 0-B: Saldos compensados antes del abono:', { nuevaDeuda, nuevoSaldoFavor });
 
       // 1. Registrar el Pago
+      const montoAbonoNorm = normalizeAmount(montoAbono);
       const { error: pError } = await (supabase.from('Pago') as any).insert([{
         cliente_id: selectedCliente.id,
-        monto: Number(montoAbono),
+        monto: montoAbonoNorm,
         metodo_pago: metodoPago
       }]);
 
@@ -316,7 +317,7 @@ export default function ClientesPage() {
       if (pError) throw pError;
 
       // 2. Aplicar el monto del abono: primero paga deuda, el resto va a favor
-      let restante = Number(montoAbono);
+      let restante = montoAbonoNorm;
 
       if (nuevaDeuda > 0) {
         if (restante >= nuevaDeuda) {
@@ -334,14 +335,14 @@ export default function ClientesPage() {
 
       // 2-B: Compensación final por seguridad (garantía de invariante)
       const final = compensarSaldo(nuevaDeuda, nuevoSaldoFavor);
-      nuevaDeuda      = final.deuda;
-      nuevoSaldoFavor = final.favor;
+      nuevaDeuda      = normalizeAmount(final.deuda);
+      nuevoSaldoFavor = normalizeAmount(final.favor);
 
       // 3. Actualizar Cliente
       const { error: cError } = await (supabase.from('Cliente') as any)
         .update({
-          saldo_deudado: nuevaDeuda,
-          saldo_favor:   nuevoSaldoFavor
+          saldo_deudado: normalizeAmount(nuevaDeuda),
+          saldo_favor:   normalizeAmount(nuevoSaldoFavor)
         })
         .eq('id', selectedCliente.id);
 
@@ -356,11 +357,11 @@ export default function ClientesPage() {
         .order('created_at', { ascending: true });
 
       if (creditos && (creditos as CreditoRow[]).length > 0) {
-        let montoParaCreditos = montoAbono;
+        let montoParaCreditos = montoAbonoNorm;
         for (const cred of (creditos as CreditoRow[])) {
           if (montoParaCreditos <= 0) break;
-          const aPagar = Math.min(cred.saldo_pendiente, montoParaCreditos);
-          const nuevoSaldoCred = cred.saldo_pendiente - aPagar;
+          const aPagar = Math.min(normalizeAmount(cred.saldo_pendiente), montoParaCreditos);
+          const nuevoSaldoCred = normalizeAmount(cred.saldo_pendiente - aPagar);
           await (supabase.from('Credito') as any)
             .update({
               saldo_pendiente: nuevoSaldoCred,

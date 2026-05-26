@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
-import { formatCurrency, normalizeText } from '@/lib/utils';
+import { formatCurrency, normalizeText, roundMoney } from '@/lib/utils';
 import { Database } from '@/types/database.types';
 
 type VentaRow = Database['public']['Tables']['Venta']['Row'];
@@ -88,19 +88,19 @@ export default function ReportesPage() {
 
     const { ventas, detalles, productos, usuarios } = data;
 
-    // A. Resumen General
-    const totalVentas = ventas.reduce((acc, v) => acc + (v.total_venta || 0), 0);
+    // A. Resumen General (con redondeo de montos)
+    const totalVentas = roundMoney(ventas.reduce((acc, v) => acc + (v.total_venta || 0), 0));
     const cantidadVentas = ventas.length;
-    const ticketPromedio = cantidadVentas > 0 ? totalVentas / cantidadVentas : 0;
+    const ticketPromedio = cantidadVentas > 0 ? roundMoney(totalVentas / cantidadVentas) : 0;
 
     const porMetodo = {
-      efectivo: ventas.filter(v => v.forma_pago === 'efectivo').reduce((acc, v) => acc + (v.total_venta || 0), 0),
-      transferencia: ventas.filter(v => v.forma_pago === 'transferencia').reduce((acc, v) => acc + (v.total_venta || 0), 0),
-      tarjeta: ventas.filter(v => v.forma_pago === 'tarjeta').reduce((acc, v) => acc + (v.total_venta || 0), 0),
-      fiado: ventas.filter(v => v.forma_pago === 'fiado').reduce((acc, v) => acc + (v.total_venta || 0), 0),
+      efectivo: roundMoney(ventas.filter(v => v.forma_pago === 'efectivo').reduce((acc, v) => acc + (v.total_venta || 0), 0)),
+      transferencia: roundMoney(ventas.filter(v => v.forma_pago === 'transferencia').reduce((acc, v) => acc + (v.total_venta || 0), 0)),
+      tarjeta: roundMoney(ventas.filter(v => v.forma_pago === 'tarjeta').reduce((acc, v) => acc + (v.total_venta || 0), 0)),
+      fiado: roundMoney(ventas.filter(v => v.forma_pago === 'fiado').reduce((acc, v) => acc + (v.total_venta || 0), 0)),
     };
 
-    // B. Análisis de Productos
+    // B. Análisis de Productos (con redondeo de ganancias)
     const prodStats: Record<string, { cant: number; ganancia: number; nombre: string }> = {};
     detalles.forEach(d => {
       if (!d.id_producto) return;
@@ -110,7 +110,7 @@ export default function ReportesPage() {
       prodStats[d.id_producto].cant += d.cantidad;
       const costo = d.Producto?.precio_compra || 0;
       const venta = d.precio_unitario_venta || 0;
-      prodStats[d.id_producto].ganancia += (venta - costo) * d.cantidad;
+      prodStats[d.id_producto].ganancia += roundMoney((venta - costo) * d.cantidad);
     });
 
     const sortedByCant = Object.values(prodStats).sort((a, b) => b.cant - a.cant);
@@ -119,7 +119,7 @@ export default function ReportesPage() {
     const stockBajo = productos.filter(p => p.stock_actual > 0 && p.stock_actual <= p.stock_minimo);
     const sinStock = productos.filter(p => p.stock_actual <= 0);
 
-    // C. Rendimiento Cajeras
+    // C. Rendimiento Cajeras (con redondeo de montos)
     const cajeraStats: Record<string, { monto: number; cant: number; nombre: string }> = {};
     ventas.forEach(v => {
       const u = usuarios.find(user => user.id === v.id_usuario_cajera);
@@ -129,6 +129,11 @@ export default function ReportesPage() {
       }
       cajeraStats[v.id_usuario_cajera].monto += (v.total_venta || 0);
       cajeraStats[v.id_usuario_cajera].cant += 1;
+    });
+    
+    // Redondear montos finales de cada cajera
+    Object.keys(cajeraStats).forEach(key => {
+      cajeraStats[key].monto = roundMoney(cajeraStats[key].monto);
     });
 
     const mejorCajera = Object.values(cajeraStats).sort((a, b) => b.monto - a.monto)[0] || null;

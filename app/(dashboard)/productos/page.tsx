@@ -1,39 +1,32 @@
 import { Suspense } from 'react';
 import { supabase } from '@/lib/supabase';
-import { unstable_cache } from 'next/cache';
 import ProductosClient from './ProductosClient';
 
-// Opción 1 y 4: Data Cache de Next.js con carga en paralelo (Evita Waterfalls)
-// Almacena en la caché agresiva de Next.js y revalida en background cada 60s
-const getInitialData = unstable_cache(
-  async () => {
-    const startFetch = performance.now();
-    
-    // [PERF] Refactorización de Payload: Limitamos a 1000 y extraemos columnas mínimas
-    const [prodResult, catResult] = await Promise.all([
-      (supabase.from('Producto') as any)
-        .select('id, nombre, categoria, codigo_barra, precio_compra, precio_venta_publico, stock_actual, stock_minimo, fuente_datos, imagen_url')
-        .limit(1000),
-      (supabase.from('Categoria') as any)
-        .select('id, nombre, activo')
-        .order('nombre', { ascending: true })
-    ]);
+async function getInitialData() {
+  const startFetch = performance.now();
 
-    const endFetch = performance.now();
-    console.log(`[PERF_CACHE] [SERVER] Tiempo de DB Fetch (Cache Miss): ${(endFetch - startFetch).toFixed(2)}ms`);
+  const [prodResult, catResult] = await Promise.all([
+    (supabase.from('Producto') as any)
+      .select('id, nombre, categoria, codigo_barra, precio_compra, precio_venta_publico, stock_actual, stock_minimo, fuente_datos, imagen_url')
+      .limit(1000),
+    (supabase.from('Categoria') as any)
+      .select('id, nombre, activo')
+      .order('nombre', { ascending: true })
+  ]);
 
-    return {
-      productos: prodResult.data || [],
-      categorias: catResult.data || []
-    };
-  },
-  ['productos-categorias-cache-v1'],
-  { revalidate: 60, tags: ['productos', 'categorias'] } // Revalidación cada minuto
-);
+  const endFetch = performance.now();
+  console.log(`[PERF_CACHE] [SERVER] Tiempo de DB Fetch: ${(endFetch - startFetch).toFixed(2)}ms`);
+
+  return {
+    productos: prodResult.data || [],
+    categorias: catResult.data || []
+  };
+}
 
 // [BUILD FIX] Forzamos la ruta a dinámica para que next build NO intente prerenderizar estáticamente
 // un dashboard que requiere conexión a DB en vivo.
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export default async function ProductosPage() {
   const startServerRender = performance.now();

@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 import { getCatalogProducts } from '@/lib/cache-queries';
 import { logPerf } from '@/lib/perf';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export async function GET() {
   const start = performance.now();
   const products = await getCatalogProducts();
@@ -19,7 +22,7 @@ export async function GET() {
     },
     {
       headers: {
-        'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600',
+        'Cache-Control': 'no-store, max-age=0, must-revalidate',
       },
     }
   );

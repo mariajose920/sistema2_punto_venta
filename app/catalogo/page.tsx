@@ -43,9 +43,7 @@ export default function CatalogoPublico() {
 
     try {
       const response = await fetch('/api/catalogo', {
-        headers: {
-          'Cache-Control': 'public, max-age=300',
-        },
+        cache: 'no-store',
       });
       const json = await response.json();
       const duration = performance.now() - start;

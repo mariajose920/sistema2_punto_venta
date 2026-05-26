@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
-import { normalizeText, formatCurrency } from '@/lib/utils';
+import { normalizeText, formatCurrency, normalizeAmount } from '@/lib/utils';
 import { measureAsync } from '@/lib/perf';
 
 type ProductoRow = {
@@ -40,6 +40,49 @@ type VentaInsert = Record<string, unknown>;
 type DetalleVentaInsert = Record<string, unknown>;
 type CreditoInsert = Record<string, unknown>;
 
+type CalcData = {
+  nombre: string;
+  precioUnitario: number;
+  cantidad: number;
+};
+
+type VentaDraft = {
+  cart: CartItem[];
+  paymentMethod: 'efectivo' | 'transferencia' | 'tarjeta' | 'fiado';
+  selectedClientId: string;
+  search: string;
+  calcData: CalcData;
+};
+
+const DRAFT_KEY = 'pos:nueva-venta:borrador';
+
+const safeParseJson = <T>(value: string | null): T | null => {
+  if (!value) return null;
+  try {
+    return JSON.parse(value) as T;
+  } catch {
+    return null;
+  }
+};
+
+const saveDraft = (draft: VentaDraft) => {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+  } catch (err) {
+    console.warn('No se pudo guardar borrador:', err);
+  }
+};
+
+const clearDraft = () => {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.removeItem(DRAFT_KEY);
+  } catch (err) {
+    console.warn('No se pudo limpiar borrador:', err);
+  }
+};
+
 interface CartItem extends ProductoRow {
   cantidad: number;
   descuento: number;
@@ -66,11 +109,12 @@ export default function NuevaVentaPage() {
   
   // Estado para la Calculadora de Precio Variable
   const [isCalcOpen, setIsCalcOpen] = useState(false);
-  const [calcData, setCalcData] = useState({
+  const [calcData, setCalcData] = useState<CalcData>({
     nombre: 'Producto por Peso/Medida',
     precioUnitario: 0,
     cantidad: 1,
   });
+  const [draftRestored, setDraftRestored] = useState(false);
 
   // Estado para Nuevo Cliente
   const [isClientModalOpen, setIsClientModalOpen] = useState(false);
@@ -133,6 +177,39 @@ export default function NuevaVentaPage() {
     fetchData();
   }, []);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const storedDraft = safeParseJson<VentaDraft>(window.localStorage.getItem(DRAFT_KEY));
+    if (!storedDraft) return;
+
+    if (Array.isArray(storedDraft.cart)) {
+      setCart(storedDraft.cart as CartItem[]);
+    }
+
+    setPaymentMethod(storedDraft.paymentMethod || 'efectivo');
+    setSelectedClientId(storedDraft.selectedClientId || '');
+    setSearch(storedDraft.search || '');
+    setCalcData(storedDraft.calcData || {
+      nombre: 'Producto por Peso/Medida',
+      precioUnitario: 0,
+      cantidad: 1,
+    });
+    setShowProductSearch(Boolean(storedDraft.search));
+    setDraftRestored(true);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    saveDraft({
+      cart,
+      paymentMethod,
+      selectedClientId,
+      search,
+      calcData,
+    });
+  }, [cart, paymentMethod, selectedClientId, search, calcData]);
+
   const applyPromotions = useCallback((items: CartItem[]) => {
     return items.map(item => {
       if (item.isVariable) return item; 
@@ -185,7 +262,9 @@ export default function NuevaVentaPage() {
   const [showCalcSearch, setShowCalcSearch] = useState(false);
 
   const addVariableItem = () => {
-    const totalCalc = calcData.precioUnitario * calcData.cantidad;
+    const precioUnitarioInt = normalizeAmount(calcData.precioUnitario);
+    const cantidadInt = normalizeAmount(calcData.cantidad);
+    const totalCalc = precioUnitarioInt * cantidadInt;
     if (totalCalc <= 0) {
       alert('El total debe ser mayor a 0');
       return;
@@ -195,9 +274,9 @@ export default function NuevaVentaPage() {
       id: `VAR_${Date.now()}`,
       codigo_barra: 'VARIABLE',
       nombre: normalizeText(calcData.nombre),
-      precio_venta_publico: calcData.precioUnitario,
+      precio_venta_publico: precioUnitarioInt,
       stock_actual: 999999, 
-      cantidad: calcData.cantidad,
+      cantidad: cantidadInt,
       descuento: 0,
       subtotal: totalCalc,
       isVariable: true,
@@ -218,8 +297,9 @@ export default function NuevaVentaPage() {
   };
 
   const updateQuantity = (id: string, qty: number) => {
+    const qtyNorm = normalizeAmount(qty);
     const newCart = cart.map(item => 
-      item.id === id ? { ...item, cantidad: Math.max(0.01, qty) } : item
+      item.id === id ? { ...item, cantidad: Math.max(1, qtyNorm) } : item
     );
     updateCartWithPromos(newCart);
   };
@@ -235,15 +315,21 @@ export default function NuevaVentaPage() {
     }
   }, [paymentMethod]);
 
-  const subtotalVenta = cart.reduce((acc, curr) => acc + curr.subtotal, 0);
+  useEffect(() => {
+    if (!draftRestored) return;
+    const timer = window.setTimeout(() => setDraftRestored(false), 3500);
+    return () => window.clearTimeout(timer);
+  }, [draftRestored]);
+
+  const subtotalVenta = Math.round(cart.reduce((acc, curr) => acc + curr.subtotal, 0));
   const selectedClient = useMemo(() => clientes.find(c => c.id === selectedClientId), [clientes, selectedClientId]);
   
-  // Cálculo de Recargo (0.15% para tarjeta)
-  const recargoTarjeta = paymentMethod === 'tarjeta' ? subtotalVenta * 0.0015 : 0;
+  // Cálculo de Recargo (0.15% para tarjeta) - normalizado a entero
+  const recargoTarjeta = normalizeAmount(paymentMethod === 'tarjeta' ? subtotalVenta * 0.0015 : 0);
   
-  // Cálculo de Wallet / Saldo a Favor
-  const saldoFavorAplicado = selectedClient ? Math.min(selectedClient.saldo_favor || 0, subtotalVenta + recargoTarjeta) : 0;
-  const totalFinal = subtotalVenta + recargoTarjeta - saldoFavorAplicado;
+  // Cálculo de Wallet / Saldo a Favor - normalizado
+  const saldoFavorAplicado = normalizeAmount(selectedClient ? Math.min(selectedClient.saldo_favor || 0, subtotalVenta + recargoTarjeta) : 0);
+  const totalFinal = normalizeAmount(subtotalVenta + recargoTarjeta - saldoFavorAplicado);
 
   const filteredProducts = useMemo(() => {
     const term = search.toLowerCase().trim();
@@ -286,11 +372,11 @@ export default function NuevaVentaPage() {
       const ventaPayload: any = {
         id_usuario_cajera: user.id,
         id_cliente: selectedClientId || null,
-        subtotal: subtotalVenta,
-        recargo: recargoTarjeta,
-        total_venta: totalFinal,
+        subtotal: normalizeAmount(subtotalVenta),
+        recargo: normalizeAmount(recargoTarjeta),
+        total_venta: normalizeAmount(totalFinal),
         forma_pago: paymentMethod,
-        iva: totalFinal * 0.19,
+        iva: normalizeAmount(totalFinal * 0.19),
         estado: 'cerrada',
         observacion: observacionNorm || null
       };
@@ -306,10 +392,10 @@ export default function NuevaVentaPage() {
       const detallesPayload: DetalleVentaInsert[] = cart.map(item => ({
         id_venta: venta.id_venta,
         id_producto: item.isVariable ? null : item.id,
-        cantidad: item.cantidad,
-        precio_unitario_venta: item.precio_venta_publico,
-        descuento_aplicado: item.descuento,
-        subtotal: item.subtotal
+        cantidad: normalizeAmount(item.cantidad),
+        precio_unitario_venta: normalizeAmount(item.precio_venta_publico),
+        descuento_aplicado: normalizeAmount(item.descuento),
+        subtotal: normalizeAmount(item.subtotal)
       }));
 
       const { error: dError } = await (supabase.from('DetalleVenta') as any).insert(detallesPayload);
@@ -325,7 +411,7 @@ export default function NuevaVentaPage() {
             .single();
           
           if (!pError && prod) {
-            const nuevoStock = (prod.stock_actual || 0) - item.cantidad;
+            const nuevoStock = normalizeAmount((prod.stock_actual || 0) - item.cantidad);
             await (supabase.from('Producto') as any)
               .update({ stock_actual: nuevoStock })
               .eq('id', item.id);
@@ -335,17 +421,17 @@ export default function NuevaVentaPage() {
 
       // 3. Lógica de Wallet y Deuda
       if (selectedClient) {
-        let nuevoSaldoFavor = (selectedClient.saldo_favor || 0) - saldoFavorAplicado;
-        let nuevaDeuda = (selectedClient.saldo_deudado || 0);
+        let nuevoSaldoFavor = normalizeAmount((selectedClient.saldo_favor || 0) - saldoFavorAplicado);
+        let nuevaDeuda = normalizeAmount((selectedClient.saldo_deudado || 0));
 
         if (paymentMethod === 'fiado') {
-          nuevaDeuda += totalFinal;
+          nuevaDeuda = normalizeAmount(nuevaDeuda + totalFinal);
           if (totalFinal > 0) {
             const creditoPayload: CreditoInsert = {
               cliente_id: selectedClientId,
               venta_id: venta.id_venta,
-              monto_inicial: totalFinal,
-              saldo_pendiente: totalFinal,
+              monto_inicial: normalizeAmount(totalFinal),
+              saldo_pendiente: normalizeAmount(totalFinal),
               estado: 'vigente'
             };
             await (supabase.from('Credito') as any).insert([creditoPayload]);
@@ -354,8 +440,8 @@ export default function NuevaVentaPage() {
 
         const { error: cliUpdateError } = await (supabase.from('Cliente') as any)
           .update({ 
-            saldo_favor: nuevoSaldoFavor,
-            saldo_deudado: nuevaDeuda
+            saldo_favor: normalizeAmount(nuevoSaldoFavor),
+            saldo_deudado: normalizeAmount(nuevaDeuda)
           })
           .eq('id', selectedClientId);
         
@@ -370,6 +456,8 @@ export default function NuevaVentaPage() {
       setSearch('');
       setPaymentMethod('efectivo');
       setShowProductSearch(false);
+      setCalcData({ nombre: 'Producto por Peso/Medida', precioUnitario: 0, cantidad: 1 });
+      clearDraft();
     } catch (err: any) {
       console.error('ERROR CRÍTICO EN VENTA:', err);
       
@@ -380,6 +468,19 @@ export default function NuevaVentaPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleCancelarVenta = () => {
+    setCart([]);
+    setSelectedClientId('');
+    setSearch('');
+    setPaymentMethod('efectivo');
+    setShowProductSearch(false);
+    setIsCalcOpen(false);
+    setCalcData({ nombre: 'Producto por Peso/Medida', precioUnitario: 0, cantidad: 1 });
+    setCalcSearch('');
+    setShowCalcSearch(false);
+    clearDraft();
   };
 
   const handleCreateClient = async (e: React.FormEvent) => {
@@ -433,6 +534,11 @@ export default function NuevaVentaPage() {
               onChange={(e) => { setSearch(e.target.value); setShowProductSearch(e.target.value.length > 0); }}
               className="w-full p-5 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none focus:ring-4 focus:ring-blue-600/20 font-bold text-lg"
             />
+            {draftRestored && (
+              <p className="mt-3 text-xs text-emerald-600 dark:text-emerald-300">
+                Borrador restaurado. Sigue trabajando donde lo dejaste.
+              </p>
+            )}
             {showProductSearch && (
               <div className="absolute top-full left-0 right-0 mt-3 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-[2rem] shadow-2xl z-50 max-h-[50vh] overflow-auto animate-in slide-in-from-top-2">
                 {filteredProducts.length === 0 ? (
@@ -620,6 +726,13 @@ export default function NuevaVentaPage() {
             >
               {loading ? 'PROCESANDO...' : totalFinal === 0 ? 'FINALIZAR (CON SALDO)' : 'COMPLETAR VENTA'}
             </button>
+            <button
+              type="button"
+              onClick={handleCancelarVenta}
+              className="w-full py-4 rounded-3xl font-black text-sm text-gray-600 border border-gray-200 hover:bg-gray-100 transition-all"
+            >
+              Cancelar venta
+            </button>
           </div>
         </div>
       </div>
@@ -670,14 +783,11 @@ export default function NuevaVentaPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Precio Unitario ($)</label>
-                  <input type="number" value={calcData.precioUnitario} onChange={e => { e.target.value = e.target.value.replace(/^0+(?=\d)/, ''); setCalcData({...calcData, precioUnitario: Number(e.target.value)}) }} className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl font-bold border-none" />
+                  <input type="number" step="1" min="0" value={calcData.precioUnitario} onChange={e => { const val = Math.floor(Number(e.target.value) || 0); setCalcData({...calcData, precioUnitario: Math.max(0, val)}) }} className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl font-bold border-none" />
                 </div>
                 <div>
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Cantidad / Peso</label>
-                  <input type="number" step="0.001" value={calcData.cantidad} onChange={e => { e.target.value = e.target.value.replace(/^0+(?=\d)/, ''); setCalcData({...calcData, cantidad: Number(e.target.value)}) }} className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl font-bold border-none" />
-                </div>
-              </div>
-
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Cantidad / Peso (Unidades)</label>
+                  <input type="number" step="1" min="0" value={calcData.cantidad} onChange={e => { const val = Math.floor(Number(e.target.value) || 0); setCalcData({...calcData, cantidad: Math.max(1, val)}) }} className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl font-bold border-none" />
               <div className="p-6 bg-blue-50 dark:bg-blue-900/20 rounded-3xl text-center border-2 border-blue-100 dark:border-blue-900/30">
                 <p className="text-blue-600 font-black uppercase text-[10px] tracking-widest mb-1">Total Calculado</p>
                 <p className="font-black text-4xl text-gray-900 dark:text-white tracking-tighter">

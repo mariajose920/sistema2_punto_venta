@@ -22,10 +22,32 @@ export function normalizeRUT(rut: string | null | undefined): string {
 }
 
 /**
- * Formatea un monto a moneda local CLP (sin decimales).
+ * Normaliza un monto a número entero positivo (sin decimales).
+ * - Redondea a entero con Math.round()
+ * - Retorna 0 si es null/undefined
+ * - Retorna 0 si es negativo
+ */
+export function normalizeAmount(amount: number | null | undefined): number {
+  const val = Number(amount || 0);
+  const rounded = Math.round(val);
+  return Math.max(0, rounded);
+}
+
+/**
+ * Redondea un monto monetario a entero (sin decimales).
+ * Ideal para agregaciones y cálculos antes de mostrar.
+ */
+export function roundMoney(amount: number | null | undefined): number {
+  return Math.round(amount || 0);
+}
+
+/**
+ * Formatea un monto a moneda local CLP.
+ * Garantiza que siempre muestra como entero (sin decimales).
  */
 export function formatCurrency(amount: number | null | undefined): string {
-  return (amount || 0).toLocaleString('es-CL', {
+  const rounded = Math.round(amount || 0);
+  return rounded.toLocaleString('es-CL', {
     style: 'currency',
     currency: 'CLP',
     minimumFractionDigits: 0,

@@ -5,7 +5,7 @@ export const maxDuration = 60;
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
-import { normalizeText, formatCurrency } from '@/lib/utils';
+import { normalizeText, formatCurrency, normalizeAmount } from '@/lib/utils';
 import { Database } from '@/types/database.types';
 
 type ProductoRow = Database['public']['Tables']['Producto']['Row'];
@@ -342,10 +342,14 @@ export default function ProductosClient({
               if (categoriaNorm !== original.categoria) finalData.categoria = categoriaNorm;
               if (codigoStr !== (original.codigo_barra || '')) finalData.codigo_barra = codigoStr || null;
             }
-            if (Number(formData.precio_compra) !== original.precio_compra) finalData.precio_compra = Number(formData.precio_compra);
-            if (Number(formData.precio_venta_publico) !== original.precio_venta_publico) finalData.precio_venta_publico = Number(formData.precio_venta_publico);
-            if (Number(formData.stock_actual) !== original.stock_actual) finalData.stock_actual = Number(formData.stock_actual);
-            if (Number(formData.stock_minimo) !== original.stock_minimo) finalData.stock_minimo = Number(formData.stock_minimo);
+            const normPrecioCompra = normalizeAmount(formData.precio_compra);
+            const normPrecioVenta = normalizeAmount(formData.precio_venta_publico);
+            const normStockActual = normalizeAmount(formData.stock_actual);
+            const normStockMinimo = normalizeAmount(formData.stock_minimo);
+            if (normPrecioCompra !== original.precio_compra) finalData.precio_compra = normPrecioCompra;
+            if (normPrecioVenta !== original.precio_venta_publico) finalData.precio_venta_publico = normPrecioVenta;
+            if (normStockActual !== original.stock_actual) finalData.stock_actual = normStockActual;
+            if (normStockMinimo !== original.stock_minimo) finalData.stock_minimo = normStockMinimo;
             if (formData.fuente_datos !== original.fuente_datos) finalData.fuente_datos = formData.fuente_datos;
             if (imageFile) {
               finalData.imagen_url = fotoFinal;
@@ -357,10 +361,10 @@ export default function ProductosClient({
             nombre: nombreNorm,
             categoria: categoriaNorm,
             codigo_barra: codigoStr || null,
-            precio_compra: Number(formData.precio_compra) || 0,
-            precio_venta_publico: Number(formData.precio_venta_publico) || 0,
-            stock_actual: Number(formData.stock_actual) || 0,
-            stock_minimo: Number(formData.stock_minimo) || 0,
+            precio_compra: normalizeAmount(formData.precio_compra),
+            precio_venta_publico: normalizeAmount(formData.precio_venta_publico),
+            stock_actual: normalizeAmount(formData.stock_actual),
+            stock_minimo: normalizeAmount(formData.stock_minimo),
             fuente_datos: formData.fuente_datos || 'manual',
             imagen_url: fotoFinal
           };
@@ -651,42 +655,50 @@ export default function ProductosClient({
                 </div>
 
                 <div>
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Precio Venta</label>
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Precio Venta ($)</label>
                   <input
                     required
                     type="number"
+                    step="1"
+                    min="0"
                     value={formData.precio_venta_publico || 0}
-                    onChange={e => { e.target.value = e.target.value.replace(/^0+(?=\d)/, ''); setFormData({ ...formData, precio_venta_publico: Number(e.target.value) }) }}
+                    onChange={e => { const cleaned = Math.floor(Number(e.target.value) || 0); setFormData({ ...formData, precio_venta_publico: Math.max(0, cleaned) }) }}
                     className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-black text-xl text-blue-600"
                   />
                 </div>
                 <div>
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Costo Compra</label>
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Costo Compra ($)</label>
                   <input
                     required
                     type="number"
+                    step="1"
+                    min="0"
                     value={formData.precio_compra || 0}
-                    onChange={e => { e.target.value = e.target.value.replace(/^0+(?=\d)/, ''); setFormData({ ...formData, precio_compra: Number(e.target.value) }) }}
+                    onChange={e => { const cleaned = Math.floor(Number(e.target.value) || 0); setFormData({ ...formData, precio_compra: Math.max(0, cleaned) }) }}
                     className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold text-xl"
                   />
                 </div>
                 <div>
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Stock Actual</label>
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Stock Actual (Unidades)</label>
                   <input
                     required
                     type="number"
+                    step="1"
+                    min="0"
                     value={formData.stock_actual || 0}
-                    onChange={e => { e.target.value = e.target.value.replace(/^0+(?=\d)/, ''); setFormData({ ...formData, stock_actual: Number(e.target.value) }) }}
+                    onChange={e => { const cleaned = Math.floor(Number(e.target.value) || 0); setFormData({ ...formData, stock_actual: Math.max(0, cleaned) }) }}
                     className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-black text-xl"
                   />
                 </div>
                 <div>
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Stock Mínimo</label>
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Stock Mínimo (Unidades)</label>
                   <input
                     required
                     type="number"
+                    step="1"
+                    min="0"
                     value={formData.stock_minimo || 0}
-                    onChange={e => { e.target.value = e.target.value.replace(/^0+(?=\d)/, ''); setFormData({ ...formData, stock_minimo: Number(e.target.value) }) }}
+                    onChange={e => { const cleaned = Math.floor(Number(e.target.value) || 0); setFormData({ ...formData, stock_minimo: Math.max(0, cleaned) }) }}
                     className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold text-xl text-red-500"
                   />
                 </div>
