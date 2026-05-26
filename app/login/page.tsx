@@ -99,41 +99,9 @@ export default function LoginPage() {
         throw new Error('No se pudo recuperar el usuario autenticado.');
       }
 
-      const cachedRoleEntry = getCachedRoleEntry();
-      if (cachedRoleEntry?.uid === authData.user.id && cachedRoleEntry.role) {
-        console.log('[LOGIN_TRACE] role_cache_hit_login', {
-          ms: Number((performance.now() - loginStart).toFixed(2)),
-          userId: authData.user.id,
-          role: cachedRoleEntry.role,
-        });
+      // Redundant role fetching removed. AuthContext handles role retrieval and navigation via its onAuthStateChange listener.
+// The useEffect at lines 40-44 will redirect once user and role are populated.
 
-        router.push(cachedRoleEntry.role === 'admin' ? '/admin' : '/cajera');
-        return;
-      }
-
-      const roleStart = performance.now();
-      const userRole = await getUserRole(authData.user.id);
-      const roleElapsed = performance.now() - roleStart;
-
-      console.log('[LOGIN_TRACE] role_query_login', {
-        ms: Number(roleElapsed.toFixed(2)),
-        userId: authData.user.id,
-        role: userRole,
-      });
-
-      if (!userRole) {
-        throw new Error('No se pudo validar el perfil del usuario o el rol no existe.');
-      }
-
-      saveCachedRoleEntry(authData.user.id, userRole);
-
-      const targetPath = userRole === 'admin' ? '/admin' : '/cajera';
-      console.log('[LOGIN_TRACE] router_push', {
-        ms: Number((performance.now() - loginStart).toFixed(2)),
-        target: targetPath,
-      });
-
-      router.push(targetPath);
     } catch (err: any) {
       const errMsg = err?.message ?? 'unknown';
       console.log('[LOGIN_TRACE] login_error', {

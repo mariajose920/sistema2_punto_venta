@@ -34,7 +34,10 @@ export const updateSession = async (request: NextRequest) => {
   );
 
   // Importante: no borrar. Esto refresca la sesión si ha expirado.
-  await supabase.auth.getUser();
+  const ssrStart = performance.now();
+      await supabase.auth.getUser();
+      const ssrEnd = performance.now();
+      console.log(`[PERF_AUTH] [SSR Middleware] getUser latency: ${(ssrEnd - ssrStart).toFixed(2)}ms`);
 
   return supabaseResponse;
 };
