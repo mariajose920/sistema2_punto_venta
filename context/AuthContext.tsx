@@ -2,7 +2,7 @@
 
 import React, { createContext, useEffect, useState, ReactNode, useRef } from 'react';
 import type { User } from '@supabase/supabase-js';
-import { supabase, isSupabaseConfigured } from '@/lib/supabase';
+import { supabase, isSupabaseConfigured, getUserRole } from '@/lib/supabase';
 import { debugLog, debugError } from '@/lib/utils';
 
 export type Role = 'admin' | 'cajera' | 'proveedor';
@@ -94,31 +94,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const fetchStart = performance.now();
     debugLog('[AuthContext] Verificando rol para UID:', uid);
 
-    const { data, error } = await supabase
-      .from('Usuario')
-      .select('rol')
-      .eq('id', uid)
-      .single();
+    const loadedRole = await getUserRole(uid) as Role | null;
 
     console.log('[AUTH_TRACE] role_query_authcontext', {
       uid,
       ms: Number((performance.now() - fetchStart).toFixed(2)),
-      hasError: Boolean(error),
-      errorMessage: error?.message ?? null,
-      role: (data as { rol?: Role } | null)?.rol ?? null,
+      role: loadedRole,
     });
 
-    if (error) {
-      debugError('[AuthContext] ERROR al obtener rol.', error);
+    if (!loadedRole) {
+      debugError('[AuthContext] No se encontró perfil para UID:', uid);
       return null;
     }
 
-    if (!data) {
-      debugLog('[AuthContext] No se encontró perfil para UID (data es null):', uid);
-      return null;
-    }
-
-    const loadedRole = (data as { rol: Role }).rol;
     roleCache.set(uid, loadedRole);
     saveCachedRoleEntry(uid, loadedRole);
     debugLog('[AuthContext] Rol cargado correctamente:', loadedRole);
@@ -128,11 +116,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let active = true;
-    setState(s => ({ ...s, isMounted: true }));
+    setTimeout(() => {
+      setState(s => ({ ...s, isMounted: true }));
+    }, 0);
 
     if (!isSupabaseConfigured) {
       debugError('[AuthContext] Supabase no configurado.');
-      setState(prev => ({ ...prev, loading: false }));
+      setTimeout(() => {
+        setState(prev => ({ ...prev, loading: false }));
+      }, 0);
       return;
     }
 
@@ -149,11 +141,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         });
 
         if (error || !session?.user) {
-          if (active) {
-            setState(prev => ({ ...prev, user: null, loading: false }));
+          if (active && !currentUserRef.current) {
+            setState(prev => ({ ...prev, user: null, role: null, loading: false }));
           }
           return;
         }
+
+        // Si ya fue procesado por onAuthStateChange, abortar
+        if (currentUserRef.current?.id === session.user.id) {
+          return;
+        }
+        currentUserRef.current = session.user;
 
         const cachedRoleEntry = getCachedRoleEntry(session.user.id);
         if (cachedRoleEntry) {
@@ -187,8 +185,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       } catch (err) {
         debugError('[AuthContext] Error en loadSession:', err);
-        if (active) {
-          setState(prev => ({ ...prev, user: null, loading: false }));
+        if (active && !currentUserRef.current) {
+          setState(prev => ({ ...prev, user: null, role: null, loading: false }));
         }
       }
     };
@@ -198,17 +196,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!active) return;
 
-      if (event === 'SIGNED_OUT') {
+      console.log('[AUTH_TRACE] onAuthStateChange event:', event, 'session:', session?.user?.id ?? null);
+
+      if (event === 'SIGNED_OUT' || !session?.user) {
+        currentUserRef.current = null;
         roleCache.clear();
         clearCachedRoleEntry();
         setState(prev => ({ ...prev, user: null, role: null, loading: false }));
         return;
       }
 
-      if (event === 'SIGNED_IN' && session?.user) {
+      if (session?.user) {
         if (currentUserRef.current?.id === session.user.id) {
           return;
         }
+        currentUserRef.current = session.user;
 
         const cachedRoleEntry = getCachedRoleEntry(session.user.id);
         if (cachedRoleEntry) {
@@ -222,7 +224,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return;
         }
 
+        const roleStart = performance.now();
         const fetchedRole = await fetchRole(session.user.id);
+        console.log('[AUTH_TRACE] role_bootstrap_after_onAuthStateChange', {
+          uid: session.user.id,
+          role: fetchedRole,
+          ms: Number((performance.now() - roleStart).toFixed(2)),
+        });
+
         if (active) {
           setState(prev => ({
             ...prev,

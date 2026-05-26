@@ -36,9 +36,24 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { role, user } = useAuth();
+  const { role, user, loading, isMounted } = useAuth();
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  if (!isMounted || loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-gray-950">
+        <div className="flex flex-col items-center gap-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-600 border-t-transparent"></div>
+          <p className="text-xs font-bold text-gray-400 uppercase tracking-widest animate-pulse">Cargando panel...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <AuthGuard />;
+  }
 
   // Instrumentación de rendimiento [PERF_WATERFALL]
   const startLayoutRender = performance.now();

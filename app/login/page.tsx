@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
+import { supabase, getUserRole } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
 
 type CachedRoleEntry = {
@@ -35,7 +35,7 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
-  const { user, role } = useAuth();
+  const { user, role, loading: authLoading } = useAuth();
 
   useEffect(() => {
     if (user && role) {
@@ -48,7 +48,9 @@ export default function LoginPage() {
 
     const params = new URLSearchParams(window.location.search);
     if (params.get('error') === 'no_role') {
-      setError('⚠️ Acceso restringido: Tu cuenta es válida, pero no tienes un perfil operativo asignado. Contacta al administrador para que te asigne un rol.');
+      setTimeout(() => {
+        setError('⚠️ Acceso restringido: Tu cuenta es válida, pero no tienes un perfil operativo asignado. Contacta al administrador para que te asigne un rol.');
+      }, 0);
     }
   }, []);
 
@@ -110,28 +112,17 @@ export default function LoginPage() {
       }
 
       const roleStart = performance.now();
-      const { data: roleData, error: roleError } = await supabase
-        .from('Usuario')
-        .select('rol')
-        .eq('id', authData.user.id)
-        .single();
+      const userRole = await getUserRole(authData.user.id);
       const roleElapsed = performance.now() - roleStart;
 
       console.log('[LOGIN_TRACE] role_query_login', {
         ms: Number(roleElapsed.toFixed(2)),
         userId: authData.user.id,
-        hasError: Boolean(roleError),
-        errorMessage: roleError?.message ?? null,
-        role: (roleData as { rol?: string | null } | null)?.rol ?? null,
+        role: userRole,
       });
 
-      if (roleError) {
-        throw new Error('No se pudo validar el perfil del usuario.');
-      }
-
-      const userRole = (roleData as { rol?: string | null } | null)?.rol;
       if (!userRole) {
-        throw new Error('Usuario sin perfil en la base de datos.');
+        throw new Error('No se pudo validar el perfil del usuario o el rol no existe.');
       }
 
       saveCachedRoleEntry(authData.user.id, userRole);
@@ -167,6 +158,14 @@ export default function LoginPage() {
       setLoading(false);
     }
   };
+
+  if (authLoading || (user && role)) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-gray-950">
+        <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-600 border-t-transparent"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-950 dark:to-gray-900 px-3 sm:px-4 py-6 sm:py-8">
