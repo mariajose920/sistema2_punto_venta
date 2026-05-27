@@ -119,13 +119,35 @@ export default function LoginPage() {
       let actualRole = authData.user.user_metadata?.rol;
 
       if (!actualRole) {
-        const { data: userProfile } = await (supabase.from('Usuario') as any)
-          .select('rol')
+        console.log(`[LOGIN_DEBUG] Fetching perfil para auth user id: ${authData.user.id}, email: ${authData.user.email}`);
+        
+        let { data: userProfile, error: profileError } = await (supabase.from('Usuario') as any)
+          .select('rol, id, email')
           .eq('id', authData.user.id)
           .single();
           
+        console.log(`[LOGIN_DEBUG] Resultado consulta por ID:`, { data: userProfile, error: profileError });
+
+        // Si falló por ID y tenemos email, intentamos buscar por email
+        if (!userProfile && authData.user.email) {
+          console.log(`[LOGIN_DEBUG] Buscando perfil alternativo por email: ${authData.user.email}`);
+          const { data: profileByEmail, error: emailError } = await (supabase.from('Usuario') as any)
+            .select('rol, id, email')
+            .eq('email', authData.user.email)
+            .single();
+            
+          console.log(`[LOGIN_DEBUG] Resultado consulta por EMAIL:`, { data: profileByEmail, error: emailError });
+          
+          if (profileByEmail) {
+            userProfile = profileByEmail;
+          }
+        }
+          
         if (userProfile && userProfile.rol) {
           actualRole = userProfile.rol;
+          console.log(`[LOGIN_DEBUG] Rol final obtenido: ${actualRole}`);
+        } else {
+          console.warn(`[LOGIN_DEBUG] No se encontró perfil válido ni por ID ni por Email.`);
         }
       }
 

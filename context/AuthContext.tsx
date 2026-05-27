@@ -75,9 +75,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         if (!userRole) {
           try {
-            const { data: profile } = await (supabase.from('Usuario') as any).select('rol').eq('id', session.user.id).single();
+            console.log(`[AUTH_DEBUG] Fetching perfil (loadSession) para id: ${session.user.id}, email: ${session.user.email}`);
+            let { data: profile, error: profileError } = await (supabase.from('Usuario') as any)
+              .select('rol, id, email')
+              .eq('id', session.user.id)
+              .single();
+              
+            console.log(`[AUTH_DEBUG] (loadSession) Resultado por ID:`, { data: profile, error: profileError });
+
+            if (!profile && session.user.email) {
+              console.log(`[AUTH_DEBUG] Buscando por email alternativo: ${session.user.email}`);
+              const { data: profileByEmail, error: emailError } = await (supabase.from('Usuario') as any)
+                .select('rol, id, email')
+                .eq('email', session.user.email)
+                .single();
+                
+              console.log(`[AUTH_DEBUG] (loadSession) Resultado por EMAIL:`, { data: profileByEmail, error: emailError });
+              
+              if (profileByEmail) profile = profileByEmail;
+            }
+
             if (profile && profile.rol) {
               userRole = profile.rol as Role;
+              console.log(`[AUTH_DEBUG] (loadSession) Rol final obtenido: ${userRole}`);
             }
           } catch (e) {
             debugError('[AuthContext] Error fetching profile:', e);
@@ -137,9 +157,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         if (!userRole) {
           try {
-            const { data: profile } = await (supabase.from('Usuario') as any).select('rol').eq('id', session.user.id).single();
+            console.log(`[AUTH_DEBUG] Fetching perfil (onAuthStateChange) para id: ${session.user.id}, email: ${session.user.email}`);
+            let { data: profile, error: profileError } = await (supabase.from('Usuario') as any)
+              .select('rol, id, email')
+              .eq('id', session.user.id)
+              .single();
+              
+            console.log(`[AUTH_DEBUG] (onAuthStateChange) Resultado por ID:`, { data: profile, error: profileError });
+
+            if (!profile && session.user.email) {
+              console.log(`[AUTH_DEBUG] Buscando por email alternativo: ${session.user.email}`);
+              const { data: profileByEmail, error: emailError } = await (supabase.from('Usuario') as any)
+                .select('rol, id, email')
+                .eq('email', session.user.email)
+                .single();
+                
+              console.log(`[AUTH_DEBUG] (onAuthStateChange) Resultado por EMAIL:`, { data: profileByEmail, error: emailError });
+              
+              if (profileByEmail) profile = profileByEmail;
+            }
+
             if (profile && profile.rol) {
               userRole = profile.rol as Role;
+              console.log(`[AUTH_DEBUG] (onAuthStateChange) Rol final obtenido: ${userRole}`);
             }
           } catch (e) {
             debugError('[AuthContext] Error fetching profile:', e);
