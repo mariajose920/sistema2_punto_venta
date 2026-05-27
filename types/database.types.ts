@@ -123,6 +123,7 @@ export interface Database {
           fecha_venta: string
           id_usuario_cajera: string
           id_cliente: string | null
+          id_caja: string | null
           forma_pago: 'efectivo' | 'tarjeta' | 'transferencia' | 'fiado'
           total_venta: number
           iva: number
@@ -136,6 +137,7 @@ export interface Database {
           fecha_venta?: string
           id_usuario_cajera: string
           id_cliente?: string | null
+          id_caja?: string | null
           forma_pago: 'efectivo' | 'tarjeta' | 'transferencia' | 'fiado'
           total_venta: number
           iva?: number
@@ -149,6 +151,7 @@ export interface Database {
           fecha_venta?: string
           id_usuario_cajera?: string
           id_cliente?: string | null
+          id_caja?: string | null
           forma_pago?: 'efectivo' | 'tarjeta' | 'transferencia' | 'fiado'
           total_venta?: number
           iva?: number
@@ -413,6 +416,117 @@ export interface Database {
         Update: {
           id?: string
           nombre?: string
+        }
+      }
+      Caja: {
+        Row: {
+          id: string
+          numero_caja: number
+          fecha_apertura: string
+          fecha_cierre: string | null
+          id_usuario_apertura: string
+          id_usuario_cierre: string | null
+          monto_inicial: number
+          monto_esperado: number | null
+          monto_declarado: number | null
+          diferencia: number | null
+          estado: 'abierta' | 'cerrada' | 'cerrada_con_descuadre'
+          observacion: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          numero_caja?: number
+          fecha_apertura?: string
+          fecha_cierre?: string | null
+          id_usuario_apertura: string
+          id_usuario_cierre?: string | null
+          monto_inicial?: number
+          monto_esperado?: number | null
+          monto_declarado?: number | null
+          diferencia?: number | null
+          estado?: 'abierta' | 'cerrada' | 'cerrada_con_descuadre'
+          observacion?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          numero_caja?: number
+          fecha_apertura?: string
+          fecha_cierre?: string | null
+          id_usuario_apertura?: string
+          id_usuario_cierre?: string | null
+          monto_inicial?: number
+          monto_esperado?: number | null
+          monto_declarado?: number | null
+          diferencia?: number | null
+          estado?: 'abierta' | 'cerrada' | 'cerrada_con_descuadre'
+          observacion?: string | null
+          created_at?: string
+        }
+      }
+      SolicitudCaja: {
+        Row: {
+          id: string
+          id_cajera: string
+          motivo: string
+          estado: 'pendiente' | 'aprobada' | 'rechazada'
+          id_admin_responde: string | null
+          id_caja_creada: string | null
+          respuesta_admin: string | null
+          created_at: string
+          responded_at: string | null
+        }
+        Insert: {
+          id?: string
+          id_cajera: string
+          motivo: string
+          estado?: 'pendiente' | 'aprobada' | 'rechazada'
+          id_admin_responde?: string | null
+          id_caja_creada?: string | null
+          respuesta_admin?: string | null
+          created_at?: string
+          responded_at?: string | null
+        }
+        Update: {
+          id?: string
+          id_cajera?: string
+          motivo?: string
+          estado?: 'pendiente' | 'aprobada' | 'rechazada'
+          id_admin_responde?: string | null
+          id_caja_creada?: string | null
+          respuesta_admin?: string | null
+          created_at?: string
+          responded_at?: string | null
+        }
+      }
+      NotificacionAdmin: {
+        Row: {
+          id: string
+          tipo: 'descuadre' | 'solicitud_caja' | 'alerta'
+          titulo: string
+          mensaje: string
+          leida: boolean
+          metadata: Record<string, unknown>
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          tipo: 'descuadre' | 'solicitud_caja' | 'alerta'
+          titulo: string
+          mensaje: string
+          leida?: boolean
+          metadata?: Record<string, unknown>
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          tipo?: 'descuadre' | 'solicitud_caja' | 'alerta'
+          titulo?: string
+          mensaje?: string
+          leida?: boolean
+          metadata?: Record<string, unknown>
+          created_at?: string
         }
       }
     }
