@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
-import { normalizeText, formatCurrency, normalizeAmount, formatRUTVisual } from '@/lib/utils';
+import { normalizeText, formatCurrency, normalizeAmount, formatRUTVisual, getProductSearchScore } from '@/lib/utils';
 import { saveCliente } from '@/lib/services/clientes';
 import { measureAsync } from '@/lib/perf';
 
@@ -342,12 +342,18 @@ export default function NuevaVentaPage() {
   const totalFinal = normalizeAmount(subtotalVenta + recargoTarjeta - saldoFavorAplicado);
 
   const filteredProducts = useMemo(() => {
-    const term = search.toLowerCase().trim();
+    const term = search.trim();
     if (!term) return [];
-    return productos.filter(p => 
-      (p.nombre || '').toLowerCase().includes(term) || 
-      (p.codigo_barra || '').toString().toLowerCase().includes(term)
-    );
+    
+    const scored = productos.map(p => ({
+      product: p,
+      score: getProductSearchScore(p, term)
+    }));
+
+    return scored
+      .filter(item => item.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .map(item => item.product);
   }, [search, productos]);
 
   const handleFinalizarVenta = async () => {

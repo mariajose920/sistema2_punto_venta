@@ -5,7 +5,7 @@ export const maxDuration = 60;
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
-import { normalizeText, formatCurrency, normalizeAmount } from '@/lib/utils';
+import { normalizeText, formatCurrency, normalizeAmount, getProductSearchScore } from '@/lib/utils';
 import { Database } from '@/types/database.types';
 
 type ProductoRow = Database['public']['Tables']['Producto']['Row'];
@@ -99,31 +99,51 @@ export default function ProductosClient({
   useEffect(() => {
     let result = [...productos];
 
-    // 1. Búsqueda parcial
-    const term = normalizeText(searchTerm);
-    if (term) {
-      result = result.filter(p =>
-        normalizeText(p.nombre || '').includes(term) ||
-        (p.codigo_barra || '').toString().toLowerCase().includes(term)
-      );
-    }
-
-    // 2. Filtro por Categoría
+    // 1. Filtro por Categoría
     if (categoryFilter !== 'todas') {
       result = result.filter(p => p.categoria === categoryFilter);
     }
 
-    // 3. Ordenamiento
-    result.sort((a, b) => {
-      switch (sortBy) {
-        case 'stock_asc': return (a.stock_actual || 0) - (b.stock_actual || 0);
-        case 'stock_desc': return (b.stock_actual || 0) - (a.stock_actual || 0);
-        case 'price_asc': return (a.precio_venta_publico || 0) - (b.precio_venta_publico || 0);
-        case 'price_desc': return (b.precio_venta_publico || 0) - (a.precio_venta_publico || 0);
-        case 'name_asc': return (a.nombre || '').localeCompare(b.nombre || '');
-        default: return 0;
-      }
-    });
+    // 2. Búsqueda por relevancia
+    const term = searchTerm.trim();
+    if (term) {
+      const scored = result.map(p => ({
+        product: p,
+        score: getProductSearchScore(p, term)
+      }));
+
+      // Mantener solo los que coinciden en algo
+      const matched = scored.filter(item => item.score > 0);
+
+      // Ordenar por relevancia, y en caso de empate por el sortBy seleccionado
+      matched.sort((a, b) => {
+        if (b.score !== a.score) {
+          return b.score - a.score;
+        }
+        switch (sortBy) {
+          case 'stock_asc': return (a.product.stock_actual || 0) - (b.product.stock_actual || 0);
+          case 'stock_desc': return (b.product.stock_actual || 0) - (a.product.stock_actual || 0);
+          case 'price_asc': return (a.product.precio_venta_publico || 0) - (b.product.precio_venta_publico || 0);
+          case 'price_desc': return (b.product.precio_venta_publico || 0) - (a.product.precio_venta_publico || 0);
+          case 'name_asc': return (a.product.nombre || '').localeCompare(b.product.nombre || '');
+          default: return 0;
+        }
+      });
+
+      result = matched.map(item => item.product);
+    } else {
+      // 3. Ordenamiento normal si no hay término de búsqueda
+      result.sort((a, b) => {
+        switch (sortBy) {
+          case 'stock_asc': return (a.stock_actual || 0) - (b.stock_actual || 0);
+          case 'stock_desc': return (b.stock_actual || 0) - (a.stock_actual || 0);
+          case 'price_asc': return (a.precio_venta_publico || 0) - (b.precio_venta_publico || 0);
+          case 'price_desc': return (b.precio_venta_publico || 0) - (a.precio_venta_publico || 0);
+          case 'name_asc': return (a.nombre || '').localeCompare(b.nombre || '');
+          default: return 0;
+        }
+      });
+    }
 
     setFiltrados(result);
   }, [searchTerm, categoryFilter, sortBy, productos]);
