@@ -11,6 +11,7 @@ const NAV_ITEMS = {
   ],
   admin: [
     { href: '/admin', label: 'Panel de Control', icon: '📊' },
+    { href: '/caja', label: 'Gestión de Caja', icon: '💰' },
     { href: '/usuarios', label: 'Gestión de Usuarios', icon: '👮' },
     { href: '/admin/calculadora', label: 'Calculadora de Costos', icon: '🧮' },
     { href: '/compras', label: 'Compras y Proveedores', icon: '📥' },
@@ -20,6 +21,7 @@ const NAV_ITEMS = {
   ],
   cajera: [
     { href: '/cajera', label: 'Inicio Caja', icon: '🏠' },
+    { href: '/caja', label: 'Gestión de Caja', icon: '💰' },
     { href: '/ventas/nueva', label: 'Nueva Venta', icon: '🛒' },
     { href: '/ventas/historial', label: 'Mi Historial', icon: '🧾' },
   ]
@@ -62,10 +64,10 @@ export default function Sidebar({ role, user, pathname }: SidebarProps) {
         <div>
           <p className="px-4 text-[11px] font-bold text-gray-400 uppercase tracking-[0.2em] mb-4">Ventas</p>
           <div className="space-y-1">
-            {role === 'admin' && NAV_ITEMS.admin.slice(5, 7).map(item => (
+            {role === 'admin' && NAV_ITEMS.admin.slice(6, 8).map(item => (
               <SidebarNavLink key={item.href} item={item} active={pathname === item.href} />
             ))}
-            {role === 'cajera' && NAV_ITEMS.cajera.slice(1).map(item => (
+            {role === 'cajera' && NAV_ITEMS.cajera.slice(2).map(item => (
               <SidebarNavLink key={item.href} item={item} active={pathname === item.href} />
             ))}
           </div>
@@ -82,7 +84,7 @@ export default function Sidebar({ role, user, pathname }: SidebarProps) {
           <div>
             <p className="px-4 text-[11px] font-bold text-gray-400 uppercase tracking-[0.2em] mb-4">Gestión</p>
             <div className="space-y-1">
-              {NAV_ITEMS.admin.slice(1, 5).map(item => (
+              {NAV_ITEMS.admin.slice(2, 6).map(item => (
                 <SidebarNavLink key={item.href} item={item} active={pathname === item.href} />
               ))}
             </div>

@@ -17,6 +17,7 @@ const NAV_ITEMS = {
   ],
   admin: [
     { href: '/admin', label: 'Panel de Control', icon: '📊' },
+    { href: '/caja', label: 'Gestión de Caja', icon: '💰' },
     { href: '/usuarios', label: 'Gestión de Usuarios', icon: '👮' },
     { href: '/admin/calculadora', label: 'Calculadora de Costos', icon: '🧮' },
     { href: '/compras', label: 'Compras y Proveedores', icon: '📥' },
@@ -26,6 +27,7 @@ const NAV_ITEMS = {
   ],
   cajera: [
     { href: '/cajera', label: 'Inicio Caja', icon: '🏠' },
+    { href: '/caja', label: 'Gestión de Caja', icon: '💰' },
     { href: '/ventas/nueva', label: 'Nueva Venta', icon: '🛒' },
     { href: '/ventas/historial', label: 'Mi Historial', icon: '🧾' },
   ]
@@ -68,14 +70,14 @@ export default function DashboardLayout({
   const quickNavItems = role === 'admin'
     ? [
         { href: '/admin', icon: '📊', label: 'Panel' },
+        { href: '/caja', icon: '💰', label: 'Caja' },
         { href: '/ventas/nueva', icon: '🛒', label: 'Venta' },
-        { href: '/clientes', icon: '👥', label: 'Clientes' },
         { href: '/productos', icon: '📦', label: 'Productos' },
       ]
     : [
         { href: '/cajera', icon: '🏠', label: 'Inicio' },
+        { href: '/caja', icon: '💰', label: 'Caja' },
         { href: '/ventas/nueva', icon: '🛒', label: 'Venta' },
-        { href: '/clientes', icon: '👥', label: 'Clientes' },
         { href: '/ventas/historial', icon: '🧾', label: 'Historial' },
       ];
 

@@ -373,6 +373,18 @@ export default function NuevaVentaPage() {
 
     try {
       setLoading(true);
+
+      // Obtener caja abierta (si existe) para vincular la venta
+      let idCajaActiva: string | null = null;
+      const { data: cajasAbiertas } = await (supabase as any)
+        .from('Caja')
+        .select('id')
+        .eq('estado', 'abierta')
+        .order('fecha_apertura', { ascending: true })
+        .limit(1);
+      if (cajasAbiertas && cajasAbiertas.length > 0) {
+        idCajaActiva = cajasAbiertas[0].id;
+      }
       
       // Verificación de productos vendidos sin stock para añadir advertencia
       const itemsSinStock = cart.filter(item => !item.isVariable && item.cantidad > (item.stock_actual || 0));
@@ -391,6 +403,7 @@ export default function NuevaVentaPage() {
       const ventaPayload: any = {
         id_usuario_cajera: user.id,
         id_cliente: selectedClientId || null,
+        id_caja: idCajaActiva,
         subtotal: normalizeAmount(subtotalVenta),
         recargo: normalizeAmount(recargoTarjeta),
         total_venta: normalizeAmount(totalFinal),
