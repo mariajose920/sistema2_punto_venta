@@ -53,10 +53,10 @@ export default function Sidebar({ role, user, pathname }: SidebarProps) {
         <div>
           <p className="px-4 text-[11px] font-bold text-gray-400 uppercase tracking-[0.2em] mb-4">Principal</p>
           <div className="space-y-1">
-            {role === 'admin' && NAV_ITEMS.admin.slice(0, 1).map(item => (
+            {role === 'admin' && NAV_ITEMS.admin.slice(0, 2).map(item => (
               <SidebarNavLink key={item.href} item={item} active={pathname === item.href} />
             ))}
-            {role === 'cajera' && NAV_ITEMS.cajera.slice(0, 1).map(item => (
+            {role === 'cajera' && NAV_ITEMS.cajera.slice(0, 2).map(item => (
               <SidebarNavLink key={item.href} item={item} active={pathname === item.href} />
             ))}
           </div>
