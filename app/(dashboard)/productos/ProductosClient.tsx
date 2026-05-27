@@ -444,9 +444,14 @@ export default function ProductosClient({
     }
 
     if (window.confirm('¿Eliminar este producto permanentemente?')) {
+      // Optimistic update para reflejar el borrado instantáneamente
+      setProductos(prev => prev.filter(p => p.id !== id));
+      
       const { error } = await (supabase.from('Producto') as any).delete().eq('id', id);
-      if (error) alert('Error: ' + error.message);
-      else fetchData();
+      if (error) {
+        alert('Error al eliminar (revisa ventas asociadas o relaciones): ' + error.message);
+        fetchData(); // Rollback si falla
+      }
     }
   };
 
