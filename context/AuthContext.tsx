@@ -71,7 +71,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
         currentUserRef.current = session.user;
 
-        const userRole = (session.user.user_metadata?.rol as Role) || null;
+        let userRole = (session.user.user_metadata?.rol as Role) || null;
+
+        if (!userRole) {
+          try {
+            const { data: profile } = await (supabase.from('Usuario') as any).select('rol').eq('id', session.user.id).single();
+            if (profile && profile.rol) {
+              userRole = profile.rol as Role;
+            }
+          } catch (e) {
+            debugError('[AuthContext] Error fetching profile:', e);
+          }
+        }
 
         if (!userRole) {
           await supabase.auth.signOut();
@@ -122,7 +133,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
         currentUserRef.current = session.user;
 
-        const userRole = (session.user.user_metadata?.rol as Role) || null;
+        let userRole = (session.user.user_metadata?.rol as Role) || null;
+
+        if (!userRole) {
+          try {
+            const { data: profile } = await (supabase.from('Usuario') as any).select('rol').eq('id', session.user.id).single();
+            if (profile && profile.rol) {
+              userRole = profile.rol as Role;
+            }
+          } catch (e) {
+            debugError('[AuthContext] Error fetching profile:', e);
+          }
+        }
 
         if (!userRole) {
           await supabase.auth.signOut();

@@ -116,7 +116,19 @@ export default function LoginPage() {
         throw new Error('USER_DATA_ERROR');
       }
 
-      const actualRole = authData.user.user_metadata?.rol;
+      let actualRole = authData.user.user_metadata?.rol;
+
+      if (!actualRole) {
+        const { data: userProfile } = await (supabase.from('Usuario') as any)
+          .select('rol')
+          .eq('id', authData.user.id)
+          .single();
+          
+        if (userProfile && userProfile.rol) {
+          actualRole = userProfile.rol;
+        }
+      }
+
       if (actualRole && actualRole !== selectedRole) {
         await supabase.auth.signOut();
         throw new Error('ROLE_MISMATCH');
