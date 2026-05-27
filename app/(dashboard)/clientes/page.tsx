@@ -195,7 +195,7 @@ export default function ClientesPage() {
         (supabase.from('Venta') as any)
           .select(`
             *,
-            DetalleVenta (
+            DetalleVenta:DetalleVenta!detalleventa_id_venta_fkey (
               cantidad,
               precio_unitario_venta,
               subtotal,
