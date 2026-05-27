@@ -1,5 +1,7 @@
 "use client";
 
+export const dynamic = 'force-dynamic';
+
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
@@ -33,33 +35,73 @@ export default function ReportesPage() {
       setLoading(true);
       setError(null);
 
+      const sessionInfo = await supabase.auth.getSession();
+      const hasSession = Boolean(sessionInfo.data?.session);
+      const userId = sessionInfo.data?.session?.user?.id ?? 'no_session';
+      console.log('🔍 REPORTES DIAGNÓSTICO — Sesión:', { hasSession, userId, error: sessionInfo.error?.message ?? null });
+
       // 1. Fetch Ventas en rango
+      const desde = `${fechaDesde}T00:00:00`;
+      const hasta = `${fechaHasta}T23:59:59`;
+      console.log('🔍 REPORTES DIAGNÓSTICO — Query Venta:', { desde, hasta });
       const { data: vData, error: vError } = await (supabase.from('Venta') as any)
         .select('*')
-        .gte('fecha_venta', `${fechaDesde}T00:00:00`)
-        .lte('fecha_venta', `${fechaHasta}T23:59:59`)
+        .gte('fecha_venta', desde)
+        .lte('fecha_venta', hasta)
         .order('fecha_venta', { ascending: false });
+
+      console.log('🔍 REPORTES DIAGNÓSTICO — Venta rows:', vData?.length ?? 0, 'error:', vError?.message ?? null);
+      if (vData && vData.length > 0) {
+        console.log('🔍 REPORTES DIAGNÓSTICO — Venta primera fila:', JSON.stringify(vData[0]));
+        console.log('🔍 REPORTES DIAGNÓSTICO — Venta última fila:', JSON.stringify(vData[vData.length - 1]));
+      }
 
       if (vError) throw vError;
 
       // 2. Fetch Detalles vinculados a esas ventas
       const ventaIds = (vData || []).map((v: any) => v.id_venta);
+      console.log('🔍 REPORTES DIAGNÓSTICO — ventaIds count:', ventaIds.length);
       let dData: any[] = [];
       if (ventaIds.length > 0) {
         const { data: detData, error: detError } = await (supabase.from('DetalleVenta') as any)
           .select('*, Producto(*)')
           .in('id_venta', ventaIds);
+        console.log('🔍 REPORTES DIAGNÓSTICO — DetalleVenta rows:', detData?.length ?? 0, 'error:', detError?.message ?? null);
+        if (detData && detData.length > 0) {
+          console.log('🔍 REPORTES DIAGNÓSTICO — DetalleVenta first row:', JSON.stringify(detData[0]));
+          // Verificar si Producto(*) nested se resolvió
+          if (detData[0].Producto) {
+            console.log('🔍 REPORTES DIAGNÓSTICO — Producto(*) nested OK, keys:', Object.keys(detData[0].Producto));
+          } else {
+            console.warn('🔍 REPORTES DIAGNÓSTICO — Producto(*) nested NULL — posible falta de FK o RLS');
+          }
+        }
         if (detError) throw detError;
         dData = detData || [];
       }
 
       // 3. Fetch Todos los productos (para stock y costos)
       const { data: pData, error: pError } = await (supabase.from('Producto') as any).select('*');
+      console.log('🔍 REPORTES DIAGNÓSTICO — Producto rows:', pData?.length ?? 0, 'error:', pError?.message ?? null);
+      if (pData && pData.length > 0) {
+        console.log('🔍 REPORTES DIAGNÓSTICO — Producto primer nombre:', pData[0].nombre);
+      }
       if (pError) throw pError;
 
       // 4. Fetch Usuarios
       const { data: uData, error: uError } = await (supabase.from('Usuario') as any).select('*');
+      console.log('🔍 REPORTES DIAGNÓSTICO — Usuario rows:', uData?.length ?? 0, 'error:', uError?.message ?? null);
+      if (uData && uData.length > 0) {
+        console.log('🔍 REPORTES DIAGNÓSTICO — Usuario first:', uData[0].nombre, uData[0].email);
+      }
       if (uError) throw uError;
+
+      console.log('🔍 REPORTES DIAGNÓSTICO — RESUMEN:', {
+        ventas: vData?.length ?? 0,
+        detalles: dData.length,
+        productos: pData?.length ?? 0,
+        usuarios: uData?.length ?? 0,
+      });
 
       setData({
         ventas: vData || [],
@@ -69,7 +111,7 @@ export default function ReportesPage() {
       });
 
     } catch (err: any) {
-      console.error('Error fetching report data:', err);
+      console.error('🔍 REPORTES DIAGNÓSTICO — ERROR en fetchData:', err.message ?? err);
       setError('Error al cargar los datos del reporte.');
     } finally {
       setLoading(false);
