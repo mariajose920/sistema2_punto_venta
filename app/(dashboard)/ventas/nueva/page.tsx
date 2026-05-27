@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
-import { normalizeText, formatCurrency, normalizeAmount, formatRUTVisual, getProductSearchScore } from '@/lib/utils';
+import { normalizeText, formatCurrency, normalizeAmount, formatRUTVisual, getProductSearchScore, normalizeRUT } from '@/lib/utils';
 import { saveCliente } from '@/lib/services/clientes';
 import { measureAsync } from '@/lib/perf';
 
@@ -23,6 +23,7 @@ type ProductoRow = {
 type ClienteRow = {
   id: string;
   nombre: string;
+  rut?: string | null;
   saldo_favor: number | null;
   saldo_deudado?: number | null;
 };
@@ -104,6 +105,8 @@ export default function NuevaVentaPage() {
   // Estados de búsqueda y UI
   const [search, setSearch] = useState('');
   const [showProductSearch, setShowProductSearch] = useState(false);
+  const [clientSearch, setClientSearch] = useState('');
+  const [showClientSearch, setShowClientSearch] = useState(false);
   const [loading, setLoading] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'efectivo' | 'transferencia' | 'tarjeta' | 'fiado'>('efectivo');
   const [selectedClientId, setSelectedClientId] = useState<string>('');
@@ -147,7 +150,7 @@ export default function NuevaVentaPage() {
             '[Venta] cargar clientes',
             async () =>
               (supabase.from('Cliente') as any)
-                .select('id, nombre, saldo_favor')
+                .select('id, nombre, rut, saldo_favor')
                 .order('nombre')
           ),
           measureAsync(
@@ -470,8 +473,10 @@ export default function NuevaVentaPage() {
       setCart([]);
       setSelectedClientId('');
       setSearch('');
+      setClientSearch('');
       setPaymentMethod('efectivo');
       setShowProductSearch(false);
+      setShowClientSearch(false);
       setCalcData({ nombre: 'Producto por Peso/Medida', precioUnitario: 0, cantidad: 1 });
       clearDraft();
     } catch (err: any) {
@@ -490,8 +495,10 @@ export default function NuevaVentaPage() {
     setCart([]);
     setSelectedClientId('');
     setSearch('');
+    setClientSearch('');
     setPaymentMethod('efectivo');
     setShowProductSearch(false);
+    setShowClientSearch(false);
     setIsCalcOpen(false);
     setCalcData({ nombre: 'Producto por Peso/Medida', precioUnitario: 0, cantidad: 1 });
     setCalcSearch('');
@@ -658,23 +665,64 @@ export default function NuevaVentaPage() {
                     + Nuevo Cliente
                   </button>
                 </div>
-                <select 
-                  value={selectedClientId} 
-                  onChange={(e) => setSelectedClientId(e.target.value)} 
-                  className={`w-full p-4 rounded-2xl font-bold text-sm border-none transition-colors ${
-                    !selectedClientId ? 'ring-2 ring-red-500 bg-red-50 text-red-900' :
-                    selectedClient?.saldo_favor && selectedClient.saldo_favor > 0 
-                      ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400' 
-                      : 'bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white'
-                  }`}
-                >
-                  <option value="">-- Seleccionar Cliente --</option>
-                  {clientes.map(c => (
-                    <option key={c.id} value={c.id}>
-                      {c.nombre} {(c.saldo_favor || 0) > 0 ? `(Saldo: $${(c.saldo_favor || 0).toLocaleString()})` : ''}
-                    </option>
-                  ))}
-                </select>
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Buscar por nombre o RUT..."
+                    value={selectedClientId ? selectedClient?.nombre || clientSearch : clientSearch}
+                    onChange={(e) => {
+                      setClientSearch(e.target.value);
+                      setShowClientSearch(true);
+                      if (selectedClientId) setSelectedClientId('');
+                    }}
+                    onFocus={() => setShowClientSearch(true)}
+                    className={`w-full p-4 rounded-2xl font-bold text-sm transition-colors ${
+                      !selectedClientId ? 'ring-2 ring-red-500 bg-red-50 text-red-900 border-none focus:ring-4 focus:ring-red-500/20' :
+                      selectedClient?.saldo_favor && selectedClient.saldo_favor > 0 
+                        ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 border-none' 
+                        : 'bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white border-none focus:ring-4 focus:ring-blue-600/20'
+                    }`}
+                  />
+                  {showClientSearch && (
+                    <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl shadow-2xl z-[110] max-h-60 overflow-auto">
+                      {clientes.filter(c => {
+                        if (!clientSearch) return true;
+                        const term = normalizeText(clientSearch);
+                        const termRut = normalizeRUT(clientSearch);
+                        const nNorm = normalizeText(c.nombre);
+                        const rNorm = normalizeRUT(c.rut);
+                        return nNorm.includes(term) || (rNorm && rNorm.includes(termRut));
+                      }).map(c => (
+                        <button
+                          key={c.id}
+                          onClick={() => {
+                            setSelectedClientId(c.id);
+                            setClientSearch(c.nombre);
+                            setShowClientSearch(false);
+                          }}
+                          className="w-full p-4 text-left hover:bg-blue-50 dark:hover:bg-blue-900/20 border-b last:border-0 border-gray-50 dark:border-gray-700 transition-colors"
+                        >
+                          <div className="flex justify-between items-center">
+                            <span className="font-bold text-sm text-gray-900 dark:text-white truncate">
+                              {c.nombre} {c.rut && <span className="text-gray-400 font-normal text-xs ml-1">({formatRUTVisual(c.rut)})</span>}
+                            </span>
+                            {(c.saldo_favor || 0) > 0 && <span className="text-xs font-black text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 px-2 py-1 rounded-lg">Saldo: ${ (c.saldo_favor || 0).toLocaleString() }</span>}
+                          </div>
+                        </button>
+                      ))}
+                      {clientes.filter(c => {
+                        if (!clientSearch) return true;
+                        const term = normalizeText(clientSearch);
+                        const termRut = normalizeRUT(clientSearch);
+                        const nNorm = normalizeText(c.nombre);
+                        const rNorm = normalizeRUT(c.rut);
+                        return nNorm.includes(term) || (rNorm && rNorm.includes(termRut));
+                      }).length === 0 && (
+                        <div className="p-6 text-gray-400 text-sm font-bold text-center italic">No se encontraron clientes</div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 
