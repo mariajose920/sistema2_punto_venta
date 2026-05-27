@@ -199,7 +199,7 @@ export default function ClientesPage() {
               cantidad,
               precio_unitario_venta,
               subtotal,
-              Producto (
+              Producto:Producto!detalleventa_id_producto_fkey (
                 nombre
               )
             )
