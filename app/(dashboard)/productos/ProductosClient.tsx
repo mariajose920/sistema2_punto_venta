@@ -438,10 +438,6 @@ export default function ProductosClient({
   };
 
   const handleEliminar = async (id: string) => {
-    if (role !== 'admin') {
-      alert('Acción restringida.');
-      return;
-    }
 
     if (window.confirm('¿Eliminar este producto permanentemente?')) {
       // Optimistic update para reflejar el borrado instantáneamente
@@ -583,15 +579,13 @@ export default function ProductosClient({
                 <button onClick={() => openEdit(p)} className="flex-1 py-3 bg-gray-900 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-gray-800 transition-all min-h-[44px]">
                   Editar
                 </button>
-                {role === 'admin' && (
-                  <button 
-                    onClick={() => handleEliminar(p.id)} 
-                    className="w-[44px] shrink-0 bg-red-50 text-red-600 rounded-xl hover:bg-red-600 hover:text-white transition-all text-lg flex items-center justify-center min-h-[44px]"
-                    title="Eliminar producto"
-                  >
-                    🗑️
-                  </button>
-                )}
+                <button 
+                  onClick={() => handleEliminar(p.id)} 
+                  className="w-[44px] shrink-0 bg-red-50 text-red-600 rounded-xl hover:bg-red-600 hover:text-white transition-all text-lg flex items-center justify-center min-h-[44px]"
+                  title="Eliminar producto"
+                >
+                  🗑️
+                </button>
               </div>
             </div>
           ))}
