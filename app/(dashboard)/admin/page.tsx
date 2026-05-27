@@ -20,6 +20,15 @@ interface DashboardStats {
   totalVentasCredito: number;
 }
 
+interface NotificacionAdminRow {
+  id: string;
+  tipo: 'descuadre' | 'solicitud_caja' | 'alerta';
+  titulo: string;
+  mensaje: string;
+  leida: boolean;
+  created_at: string;
+}
+
 /**
  * Propiedades del componente MetricBox
  */
@@ -49,6 +58,7 @@ interface DashLinkProps {
 export default function AdminDashboardPage() {
   const { role, isMounted } = useAuth();
   const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [notificaciones, setNotificaciones] = useState<NotificacionAdminRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -83,11 +93,12 @@ export default function AdminDashboardPage() {
         }
 
         // FALLBACK: cada query se maneja individualmente
-        const [v, c, cr, p] = await Promise.allSettled([
+        const [v, c, cr, p, n] = await Promise.allSettled([
           supabase.from('Venta').select('total_venta, forma_pago'),
           supabase.from('Compra').select('total_compra'),
           supabase.from('Credito').select('saldo_pendiente'),
-          supabase.from('Producto').select('stock_actual, stock_minimo, precio_compra')
+          supabase.from('Producto').select('stock_actual, stock_minimo, precio_compra'),
+          supabase.from('NotificacionAdmin').select('*').eq('leida', false).order('created_at', { ascending: false }).limit(5)
         ]);
 
         function extractData<T>(result: PromiseSettledResult<any>, table: string): T[] {
@@ -96,7 +107,7 @@ export default function AdminDashboardPage() {
             return [];
           }
           if (result.value.error) {
-            console.error(`[PanelControl] Query ${table} error:`, result.value.error.message, result.value.error.code, result.value.error.hint, result.value.error.details);
+            console.error(`[PanelControl] Query ${table} error:`, result.value.error.message);
             return [];
           }
           return (result.value.data || []) as T[];
@@ -106,6 +117,9 @@ export default function AdminDashboardPage() {
         const compras = extractData<CompraRow>(c, 'Compra');
         const creditos = extractData<CreditoRow>(cr, 'Credito');
         const productos = extractData<ProductoRow>(p, 'Producto');
+        const notifs = extractData<NotificacionAdminRow>(n, 'NotificacionAdmin');
+        
+        setNotificaciones(notifs);
 
         const ingresos = roundMoney(ventas.reduce((acc, val) => acc + (val.total_venta || 0), 0));
         const gastos = roundMoney(compras.reduce((acc, val) => acc + (val.total_compra || 0), 0));
@@ -143,11 +157,19 @@ export default function AdminDashboardPage() {
     fetchAnalytics();
   }, [role, isMounted]);
 
-  // Indicador de Eficiencia (Cálculo derivado memorizado)
   const eficienciaCobro = useMemo(() => {
     if (!stats || stats.ingresos === 0) return 0;
     return Math.round((stats.totalVentasContado / stats.ingresos) * 100);
   }, [stats]);
+
+  const marcarNotificacionLeida = async (id: string) => {
+    try {
+      await (supabase as any).from('NotificacionAdmin').update({ leida: true }).eq('id', id);
+      setNotificaciones(prev => prev.filter(n => n.id !== id));
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   if (role !== 'admin') {
     return (
@@ -271,6 +293,28 @@ export default function AdminDashboardPage() {
 
         {/* Acciones Rápidas y Alertas */}
         <div className="space-y-6">
+          
+          {notificaciones.length > 0 && (
+            <div className="bg-amber-50 dark:bg-amber-900/10 border-2 border-amber-200 dark:border-amber-800 p-5 sm:p-8 rounded-[2rem] sm:rounded-[3rem] shadow-sm">
+              <h3 className="text-xs font-black uppercase tracking-[0.2em] mb-4 text-amber-700 dark:text-amber-500 flex items-center gap-2">
+                <span className="w-2 h-2 bg-amber-500 rounded-full animate-pulse"></span>
+                Alertas Activas ({notificaciones.length})
+              </h3>
+              <div className="space-y-3">
+                {notificaciones.map(n => (
+                  <div key={n.id} className="bg-white dark:bg-gray-800 p-4 rounded-2xl border border-amber-100 dark:border-gray-700 flex flex-col gap-2">
+                    <div className="flex justify-between items-start">
+                      <p className="font-bold text-gray-900 dark:text-white text-sm">{n.titulo}</p>
+                      <button onClick={() => marcarNotificacionLeida(n.id)} className="text-[10px] uppercase font-black text-amber-600 hover:text-amber-800 tracking-widest shrink-0 ml-2">Descartar</button>
+                    </div>
+                    <p className="text-xs text-gray-500 font-bold">{n.mensaje}</p>
+                    <Link href="/caja" className="text-[10px] font-black text-blue-600 uppercase tracking-widest mt-1">Ir a Caja →</Link>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="bg-red-600 p-5 sm:p-8 lg:p-10 rounded-[2rem] sm:rounded-[3rem] shadow-2xl shadow-red-200 dark:shadow-none text-white relative overflow-hidden group">
             <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -mr-8 -mt-8 blur-xl group-hover:scale-150 transition-transform duration-700"></div>
             <h3 className="text-xs font-black uppercase tracking-[0.2em] mb-4 text-red-100">Alerta de Inventario</h3>
