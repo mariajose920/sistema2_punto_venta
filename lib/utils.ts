@@ -109,8 +109,12 @@ export const formatRUTVisual = (rut: string) => {
 
 /**
  * Calcula un puntaje de relevancia/similitud entre un producto y un término de búsqueda.
- * Retorna > 0 si hay coincidencia relevante, priorizando coincidencias exactas,
- * de inicio de palabra y similitudes difusas (tolerancia a errores).
+ * Retorna > 0 si hay coincidencia relevante, priorizando:
+ * 1. Coincidencia exacta
+ * 2. Comienza con
+ * 3. Palabra comienza con
+ * 4. Contiene en cualquier otra parte
+ * 5. Similitud difusa
  */
 export function getProductSearchScore(
   product: { nombre?: string | null; codigo_barra?: string | null },
@@ -122,29 +126,25 @@ export function getProductSearchScore(
   const name = (product.nombre || "").trim().toLowerCase();
   const code = String(product.codigo_barra || "").trim().toLowerCase();
 
-  // 1. Coincidencias exactas (Prioridad máxima)
-  if (code === q) return 10000;
-  if (name === q) return 9000;
+  // Relación de longitud como desempate dentro de cada grupo (nombres más cortos o matches proporcionalmente mayores primero)
+  const lengthRatio = q.length / name.length;
 
-  // 2. Coincidencias en código de barra
-  if (code && code.startsWith(q)) return 8000;
-  if (code && code.includes(q)) return 7000;
+  // 1. Coincidencia exacta
+  if (code === q) return 100000 + lengthRatio * 100;
+  if (name === q) return 90000 + lengthRatio * 100;
 
-  let score = 0;
+  // 2. Productos cuyo nombre comienza con el texto buscado
+  if (name.startsWith(q)) return 80000 + lengthRatio * 100;
 
-  // 3. Coincidencias de segmento del nombre (Inicia con, palabra inicia con, contiene)
-  if (name.startsWith(q)) {
-    score += 5000;
-  } else {
-    const words = name.split(/\s+/);
-    if (words.some(w => w.startsWith(q))) {
-      score += 4000;
-    } else if (name.includes(q)) {
-      score += 3000;
-    }
-  }
+  // 3. Productos donde alguna palabra comienza con el texto buscado
+  const words = name.split(/\s+/);
+  if (words.some(w => w.startsWith(q))) return 70000 + lengthRatio * 100;
 
-  // 4. Coincidencia basada en tokens (Multi-palabra con tolerancia a errores/typos)
+  // 4. Productos donde el texto aparece en cualquier otra parte (contiene)
+  if (name.includes(q)) return 60000 + lengthRatio * 100;
+  if (code && code.includes(q)) return 50000 + lengthRatio * 100;
+
+  // 5. Coincidencia difusa (tolerancia a errores leves)
   const qTokens = q.split(/\s+/).filter(Boolean);
   const nameTokens = name.split(/\s+/).filter(Boolean);
 
@@ -161,7 +161,6 @@ export function getProductSearchScore(
       } else if (nTok.includes(qTok)) {
         bestTokScore = Math.max(bestTokScore, 500);
       } else {
-        // Tolerancia a pequeños errores tipográficos (distancia Levenshtein <= 2 en tokens de largo > 2)
         if (qTok.length > 2) {
           const editDist = getEditDistance(qTok, nTok);
           const maxLen = Math.max(qTok.length, nTok.length);
@@ -180,10 +179,10 @@ export function getProductSearchScore(
 
   if (matchedTokens > 0) {
     const tokenMatchRatio = matchedTokens / qTokens.length;
-    score += tokenScore * tokenMatchRatio;
+    return Math.round(tokenScore * tokenMatchRatio) + lengthRatio * 10;
   }
 
-  return score;
+  return 0;
 }
 
 // Implementación rápida y optimizada de distancia de Levenshtein para typos
