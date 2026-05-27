@@ -75,30 +75,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         if (!userRole) {
           try {
-            console.log(`[AUTH_DEBUG] Fetching perfil (loadSession) para id: ${session.user.id}, email: ${session.user.email}`);
-            let { data: profile, error: profileError } = await (supabase.from('Usuario') as any)
-              .select('rol, id, email')
-              .eq('id', session.user.id)
-              .single();
+            console.log(`\n\n=== [AUTH_CONTEXT] DIAGNÓSTICO DE LOGIN START ===`);
+            console.log(`[AUTH_CONTEXT] User ID: ${session.user.id}`);
+            console.log(`[AUTH_CONTEXT] Email: ${session.user.email}`);
+
+            let { data: idData, error: idError, status: idStatus, statusText: idStatusText } = await (supabase.from('Usuario') as any)
+              .select('*')
+              .eq('id', session.user.id);
               
-            console.log(`[AUTH_DEBUG] (loadSession) Resultado por ID:`, { data: profile, error: profileError });
+            console.log(`[AUTH_CONTEXT][QUERY_ID] Status: ${idStatus} ${idStatusText}`);
+            console.log(`[AUTH_CONTEXT][QUERY_ID] Error:`, idError);
+            console.log(`[AUTH_CONTEXT][QUERY_ID] Filas encontradas: ${idData ? idData.length : 0}`);
+            console.log(`[AUTH_CONTEXT][QUERY_ID] Data devuelta:`, idData);
+
+            let profile = idData && idData.length > 0 ? idData[0] : null;
 
             if (!profile && session.user.email) {
-              console.log(`[AUTH_DEBUG] Buscando por email alternativo: ${session.user.email}`);
-              const { data: profileByEmail, error: emailError } = await (supabase.from('Usuario') as any)
-                .select('rol, id, email')
-                .eq('email', session.user.email)
-                .single();
+              console.log(`[AUTH_CONTEXT][INFO] Intentando rescate por EMAIL...`);
+              const { data: emailData, error: emailError, status: emailStatus, statusText: emailStatusText } = await (supabase.from('Usuario') as any)
+                .select('*')
+                .eq('email', session.user.email);
                 
-              console.log(`[AUTH_DEBUG] (loadSession) Resultado por EMAIL:`, { data: profileByEmail, error: emailError });
+              console.log(`[AUTH_CONTEXT][QUERY_EMAIL] Status: ${emailStatus} ${emailStatusText}`);
+              console.log(`[AUTH_CONTEXT][QUERY_EMAIL] Error:`, emailError);
+              console.log(`[AUTH_CONTEXT][QUERY_EMAIL] Filas encontradas: ${emailData ? emailData.length : 0}`);
+              console.log(`[AUTH_CONTEXT][QUERY_EMAIL] Data devuelta:`, emailData);
               
-              if (profileByEmail) profile = profileByEmail;
+              if (emailData && emailData.length > 0) profile = emailData[0];
             }
 
             if (profile && profile.rol) {
               userRole = profile.rol as Role;
-              console.log(`[AUTH_DEBUG] (loadSession) Rol final obtenido: ${userRole}`);
+              console.log(`[AUTH_CONTEXT][EXITO] Rol final obtenido: ${userRole}`);
+            } else {
+              console.warn(`[AUTH_CONTEXT][FALLO] No se encontró perfil válido ni por ID ni por Email.`);
             }
+            console.log(`=== [AUTH_CONTEXT] DIAGNÓSTICO DE LOGIN END ===\n\n`);
           } catch (e) {
             debugError('[AuthContext] Error fetching profile:', e);
           }
@@ -157,30 +169,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         if (!userRole) {
           try {
-            console.log(`[AUTH_DEBUG] Fetching perfil (onAuthStateChange) para id: ${session.user.id}, email: ${session.user.email}`);
-            let { data: profile, error: profileError } = await (supabase.from('Usuario') as any)
-              .select('rol, id, email')
-              .eq('id', session.user.id)
-              .single();
+            console.log(`\n\n=== [AUTH_CONTEXT_CHANGE] DIAGNÓSTICO DE LOGIN START ===`);
+            console.log(`[AUTH_CONTEXT_CHANGE] User ID: ${session.user.id}`);
+            console.log(`[AUTH_CONTEXT_CHANGE] Email: ${session.user.email}`);
+
+            let { data: idData, error: idError, status: idStatus, statusText: idStatusText } = await (supabase.from('Usuario') as any)
+              .select('*')
+              .eq('id', session.user.id);
               
-            console.log(`[AUTH_DEBUG] (onAuthStateChange) Resultado por ID:`, { data: profile, error: profileError });
+            console.log(`[AUTH_CONTEXT_CHANGE][QUERY_ID] Status: ${idStatus} ${idStatusText}`);
+            console.log(`[AUTH_CONTEXT_CHANGE][QUERY_ID] Error:`, idError);
+            console.log(`[AUTH_CONTEXT_CHANGE][QUERY_ID] Filas encontradas: ${idData ? idData.length : 0}`);
+            console.log(`[AUTH_CONTEXT_CHANGE][QUERY_ID] Data devuelta:`, idData);
+
+            let profile = idData && idData.length > 0 ? idData[0] : null;
 
             if (!profile && session.user.email) {
-              console.log(`[AUTH_DEBUG] Buscando por email alternativo: ${session.user.email}`);
-              const { data: profileByEmail, error: emailError } = await (supabase.from('Usuario') as any)
-                .select('rol, id, email')
-                .eq('email', session.user.email)
-                .single();
+              console.log(`[AUTH_CONTEXT_CHANGE][INFO] Intentando rescate por EMAIL...`);
+              const { data: emailData, error: emailError, status: emailStatus, statusText: emailStatusText } = await (supabase.from('Usuario') as any)
+                .select('*')
+                .eq('email', session.user.email);
                 
-              console.log(`[AUTH_DEBUG] (onAuthStateChange) Resultado por EMAIL:`, { data: profileByEmail, error: emailError });
+              console.log(`[AUTH_CONTEXT_CHANGE][QUERY_EMAIL] Status: ${emailStatus} ${emailStatusText}`);
+              console.log(`[AUTH_CONTEXT_CHANGE][QUERY_EMAIL] Error:`, emailError);
+              console.log(`[AUTH_CONTEXT_CHANGE][QUERY_EMAIL] Filas encontradas: ${emailData ? emailData.length : 0}`);
+              console.log(`[AUTH_CONTEXT_CHANGE][QUERY_EMAIL] Data devuelta:`, emailData);
               
-              if (profileByEmail) profile = profileByEmail;
+              if (emailData && emailData.length > 0) profile = emailData[0];
             }
 
             if (profile && profile.rol) {
               userRole = profile.rol as Role;
-              console.log(`[AUTH_DEBUG] (onAuthStateChange) Rol final obtenido: ${userRole}`);
+              console.log(`[AUTH_CONTEXT_CHANGE][EXITO] Rol final obtenido: ${userRole}`);
+            } else {
+              console.warn(`[AUTH_CONTEXT_CHANGE][FALLO] No se encontró perfil válido ni por ID ni por Email.`);
             }
+            console.log(`=== [AUTH_CONTEXT_CHANGE] DIAGNÓSTICO DE LOGIN END ===\n\n`);
           } catch (e) {
             debugError('[AuthContext] Error fetching profile:', e);
           }

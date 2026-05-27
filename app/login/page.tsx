@@ -119,36 +119,46 @@ export default function LoginPage() {
       let actualRole = authData.user.user_metadata?.rol;
 
       if (!actualRole) {
-        console.log(`[LOGIN_DEBUG] Fetching perfil para auth user id: ${authData.user.id}, email: ${authData.user.email}`);
+        console.log(`\n\n=== DIAGNÓSTICO DE LOGIN START ===`);
+        console.log(`[AUTH] User ID: ${authData.user.id}`);
+        console.log(`[AUTH] Email: ${authData.user.email}`);
         
-        let { data: userProfile, error: profileError } = await (supabase.from('Usuario') as any)
-          .select('rol, id, email')
-          .eq('id', authData.user.id)
-          .single();
+        // 1. Consulta por ID sin .single()
+        let { data: idData, error: idError, status: idStatus, statusText: idStatusText } = await (supabase.from('Usuario') as any)
+          .select('*')
+          .eq('id', authData.user.id);
           
-        console.log(`[LOGIN_DEBUG] Resultado consulta por ID:`, { data: userProfile, error: profileError });
+        console.log(`[QUERY_ID] Status: ${idStatus} ${idStatusText}`);
+        console.log(`[QUERY_ID] Error:`, idError);
+        console.log(`[QUERY_ID] Filas encontradas: ${idData ? idData.length : 0}`);
+        console.log(`[QUERY_ID] Data devuelta:`, idData);
 
-        // Si falló por ID y tenemos email, intentamos buscar por email
+        let userProfile = idData && idData.length > 0 ? idData[0] : null;
+
+        // 2. Si falla por ID, buscamos por Email sin .single()
         if (!userProfile && authData.user.email) {
-          console.log(`[LOGIN_DEBUG] Buscando perfil alternativo por email: ${authData.user.email}`);
-          const { data: profileByEmail, error: emailError } = await (supabase.from('Usuario') as any)
-            .select('rol, id, email')
-            .eq('email', authData.user.email)
-            .single();
+          console.log(`[INFO] Intentando rescate por EMAIL...`);
+          const { data: emailData, error: emailError, status: emailStatus, statusText: emailStatusText } = await (supabase.from('Usuario') as any)
+            .select('*')
+            .eq('email', authData.user.email);
             
-          console.log(`[LOGIN_DEBUG] Resultado consulta por EMAIL:`, { data: profileByEmail, error: emailError });
+          console.log(`[QUERY_EMAIL] Status: ${emailStatus} ${emailStatusText}`);
+          console.log(`[QUERY_EMAIL] Error:`, emailError);
+          console.log(`[QUERY_EMAIL] Filas encontradas: ${emailData ? emailData.length : 0}`);
+          console.log(`[QUERY_EMAIL] Data devuelta:`, emailData);
           
-          if (profileByEmail) {
-            userProfile = profileByEmail;
+          if (emailData && emailData.length > 0) {
+            userProfile = emailData[0];
           }
         }
           
         if (userProfile && userProfile.rol) {
           actualRole = userProfile.rol;
-          console.log(`[LOGIN_DEBUG] Rol final obtenido: ${actualRole}`);
+          console.log(`[EXITO] Rol final obtenido: ${actualRole}`);
         } else {
-          console.warn(`[LOGIN_DEBUG] No se encontró perfil válido ni por ID ni por Email.`);
+          console.warn(`[FALLO] No se encontró perfil válido ni por ID ni por Email.`);
         }
+        console.log(`=== DIAGNÓSTICO DE LOGIN END ===\n\n`);
       }
 
       if (actualRole && actualRole !== selectedRole) {
