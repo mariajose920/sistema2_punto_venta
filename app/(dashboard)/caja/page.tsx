@@ -22,6 +22,7 @@ interface SolicitudConCajera extends SolicitudRow {
 interface VentaResumen {
   forma_pago: string;
   total_venta: number;
+  saldo_favor_usado?: number;
 }
 
 export default function CajaPage() {
@@ -120,13 +121,14 @@ export default function CajaPage() {
   const resumenPorMetodo = useMemo(() => {
     const map: Record<string, number> = {};
     for (const v of ventasCaja) {
-      map[v.forma_pago] = (map[v.forma_pago] || 0) + (v.total_venta || 0);
+      const pagadoFisico = (v.total_venta || 0) - (v.saldo_favor_usado || 0);
+      map[v.forma_pago] = (map[v.forma_pago] || 0) + pagadoFisico;
     }
     return map;
   }, [ventasCaja]);
 
   const totalVentasEfectivo = resumenPorMetodo['efectivo'] || 0;
-  const totalVentasGeneral = ventasCaja.reduce((s, v) => s + (v.total_venta || 0), 0);
+  const totalVentasGeneral = ventasCaja.reduce((s, v) => s + ((v.total_venta || 0) - (v.saldo_favor_usado || 0)), 0);
 
   // ─── Abrir Caja ───────────────────────────────────────────
   const handleAbrirCaja = async () => {

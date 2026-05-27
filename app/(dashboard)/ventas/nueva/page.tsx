@@ -342,7 +342,8 @@ export default function NuevaVentaPage() {
   
   // Cálculo de Wallet / Saldo a Favor - normalizado
   const saldoFavorAplicado = normalizeAmount(selectedClient ? Math.min(selectedClient.saldo_favor || 0, subtotalVenta + recargoTarjeta) : 0);
-  const totalFinal = normalizeAmount(subtotalVenta + recargoTarjeta - saldoFavorAplicado);
+  const totalVentaReal = normalizeAmount(subtotalVenta + recargoTarjeta);
+  const aPagarAhora = normalizeAmount(totalVentaReal - saldoFavorAplicado);
 
   const filteredProducts = useMemo(() => {
     const term = search.trim();
@@ -406,9 +407,10 @@ export default function NuevaVentaPage() {
         id_caja: idCajaActiva,
         subtotal: normalizeAmount(subtotalVenta),
         recargo: normalizeAmount(recargoTarjeta),
-        total_venta: normalizeAmount(totalFinal),
+        total_venta: totalVentaReal, // Guardamos el monto REAL de los productos
+        saldo_favor_usado: saldoFavorAplicado, // Guardamos cuánto saldo se usó
         forma_pago: paymentMethod,
-        iva: normalizeAmount(totalFinal * 0.19),
+        iva: normalizeAmount(totalVentaReal * 0.19),
         estado: 'cerrada',
         observacion: observacionNorm || null
       };
@@ -457,13 +459,14 @@ export default function NuevaVentaPage() {
         let nuevaDeuda = normalizeAmount((selectedClient.saldo_deudado || 0));
 
         if (paymentMethod === 'fiado') {
-          nuevaDeuda = normalizeAmount(nuevaDeuda + totalFinal);
-          if (totalFinal > 0) {
+          // El cliente asume como deuda solo lo que no cubrió su saldo a favor
+          nuevaDeuda = normalizeAmount(nuevaDeuda + aPagarAhora);
+          if (aPagarAhora > 0) {
             const creditoPayload: CreditoInsert = {
               cliente_id: selectedClientId,
               venta_id: venta.id_venta,
-              monto_inicial: normalizeAmount(totalFinal),
-              saldo_pendiente: normalizeAmount(totalFinal),
+              monto_inicial: normalizeAmount(aPagarAhora),
+              saldo_pendiente: normalizeAmount(aPagarAhora),
               estado: 'vigente'
             };
             await (supabase.from('Credito') as any).insert([creditoPayload]);
@@ -779,8 +782,13 @@ export default function NuevaVentaPage() {
               <div className="pt-3 border-t border-gray-200 dark:border-gray-700">
                 <p className="text-blue-600 font-black uppercase text-[10px] tracking-widest mb-1 text-center">Total a Cobrar</p>
                 <p className="font-black text-3xl lg:text-5xl text-gray-900 dark:text-white tracking-tighter text-center">
-                  ${totalFinal.toLocaleString()}
+                  ${aPagarAhora.toLocaleString()}
                 </p>
+                {saldoFavorAplicado > 0 && (
+                  <p className="text-center text-xs font-bold text-gray-400 mt-2">
+                    (Valor original: ${totalVentaReal.toLocaleString()})
+                  </p>
+                )}
               </div>
             </div>
 
@@ -793,7 +801,7 @@ export default function NuevaVentaPage() {
                   : 'bg-blue-600 text-white shadow-blue-200 dark:shadow-none hover:bg-blue-700'
               }`}
             >
-              {loading ? 'PROCESANDO...' : totalFinal === 0 ? 'FINALIZAR (CON SALDO)' : 'COMPLETAR VENTA'}
+              {loading ? 'PROCESANDO...' : aPagarAhora === 0 ? 'FINALIZAR (CON SALDO)' : 'COMPLETAR VENTA'}
             </button>
             <button
               type="button"
