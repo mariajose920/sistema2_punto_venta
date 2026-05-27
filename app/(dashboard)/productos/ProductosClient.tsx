@@ -682,7 +682,11 @@ export default function ProductosClient({
                     step="1"
                     min="0"
                     value={formData.precio_venta_publico || 0}
-                    onChange={e => { const cleaned = Math.floor(Number(e.target.value) || 0); setFormData({ ...formData, precio_venta_publico: Math.max(0, cleaned) }) }}
+                    onChange={e => {
+                      e.target.value = e.target.value.replace(/^0+(?=\d)/, '');
+                      const cleaned = Math.floor(Number(e.target.value) || 0);
+                      setFormData({ ...formData, precio_venta_publico: Math.max(0, cleaned) });
+                    }}
                     className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-black text-xl text-blue-600"
                   />
                 </div>
@@ -694,7 +698,11 @@ export default function ProductosClient({
                     step="1"
                     min="0"
                     value={formData.precio_compra || 0}
-                    onChange={e => { const cleaned = Math.floor(Number(e.target.value) || 0); setFormData({ ...formData, precio_compra: Math.max(0, cleaned) }) }}
+                    onChange={e => {
+                      e.target.value = e.target.value.replace(/^0+(?=\d)/, '');
+                      const cleaned = Math.floor(Number(e.target.value) || 0);
+                      setFormData({ ...formData, precio_compra: Math.max(0, cleaned) });
+                    }}
                     className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold text-xl"
                   />
                 </div>
@@ -706,7 +714,11 @@ export default function ProductosClient({
                     step="1"
                     min="0"
                     value={formData.stock_actual || 0}
-                    onChange={e => { const cleaned = Math.floor(Number(e.target.value) || 0); setFormData({ ...formData, stock_actual: Math.max(0, cleaned) }) }}
+                    onChange={e => {
+                      e.target.value = e.target.value.replace(/^0+(?=\d)/, '');
+                      const cleaned = Math.floor(Number(e.target.value) || 0);
+                      setFormData({ ...formData, stock_actual: Math.max(0, cleaned) });
+                    }}
                     className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-black text-xl"
                   />
                 </div>
@@ -718,7 +730,11 @@ export default function ProductosClient({
                     step="1"
                     min="0"
                     value={formData.stock_minimo || 0}
-                    onChange={e => { const cleaned = Math.floor(Number(e.target.value) || 0); setFormData({ ...formData, stock_minimo: Math.max(0, cleaned) }) }}
+                    onChange={e => {
+                      e.target.value = e.target.value.replace(/^0+(?=\d)/, '');
+                      const cleaned = Math.floor(Number(e.target.value) || 0);
+                      setFormData({ ...formData, stock_minimo: Math.max(0, cleaned) });
+                    }}
                     className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold text-xl text-red-500"
                   />
                 </div>
