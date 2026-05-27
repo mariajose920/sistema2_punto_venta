@@ -94,10 +94,10 @@ export default function ReportesPage() {
     const ticketPromedio = cantidadVentas > 0 ? roundMoney(totalVentas / cantidadVentas) : 0;
 
     const porMetodo = {
-      efectivo: roundMoney(ventas.filter(v => v.forma_pago === 'efectivo').reduce((acc, v) => acc + (v.total_venta || 0), 0)),
-      transferencia: roundMoney(ventas.filter(v => v.forma_pago === 'transferencia').reduce((acc, v) => acc + (v.total_venta || 0), 0)),
-      tarjeta: roundMoney(ventas.filter(v => v.forma_pago === 'tarjeta').reduce((acc, v) => acc + (v.total_venta || 0), 0)),
-      fiado: roundMoney(ventas.filter(v => v.forma_pago === 'fiado').reduce((acc, v) => acc + (v.total_venta || 0), 0)),
+      efectivo: roundMoney(ventas.filter(v => v.forma_pago?.toLowerCase() === 'efectivo').reduce((acc, v) => acc + (v.total_venta || 0), 0)),
+      transferencia: roundMoney(ventas.filter(v => v.forma_pago?.toLowerCase() === 'transferencia').reduce((acc, v) => acc + (v.total_venta || 0), 0)),
+      tarjeta: roundMoney(ventas.filter(v => v.forma_pago?.toLowerCase() === 'tarjeta').reduce((acc, v) => acc + (v.total_venta || 0), 0)),
+      fiado: roundMoney(ventas.filter(v => v.forma_pago?.toLowerCase() === 'fiado').reduce((acc, v) => acc + (v.total_venta || 0), 0)),
     };
 
     // B. Análisis de Productos (con redondeo de ganancias)
@@ -105,30 +105,35 @@ export default function ReportesPage() {
     detalles.forEach(d => {
       if (!d.id_producto) return;
       if (!prodStats[d.id_producto]) {
-        prodStats[d.id_producto] = { cant: 0, ganancia: 0, nombre: d.Producto?.nombre || 'Producto Desconocido' };
+        prodStats[d.id_producto] = { cant: 0, ganancia: 0, nombre: d.Producto?.nombre || 'Producto Eliminado' };
       }
-      prodStats[d.id_producto].cant += d.cantidad;
+      prodStats[d.id_producto].cant += (d.cantidad || 0);
+      
       const costo = d.Producto?.precio_compra || 0;
       const venta = d.precio_unitario_venta || 0;
-      prodStats[d.id_producto].ganancia += roundMoney((venta - costo) * d.cantidad);
+      prodStats[d.id_producto].ganancia += (venta - costo) * (d.cantidad || 0);
     });
 
-    const sortedByCant = Object.values(prodStats).sort((a, b) => b.cant - a.cant);
-    const sortedByProfit = Object.values(prodStats).sort((a, b) => b.ganancia - a.ganancia);
+    const validProds = Object.values(prodStats).filter(p => p.cant > 0);
+    validProds.forEach(p => p.ganancia = roundMoney(p.ganancia));
 
-    const stockBajo = productos.filter(p => p.stock_actual > 0 && p.stock_actual <= p.stock_minimo);
+    const sortedByCant = [...validProds].sort((a, b) => b.cant - a.cant);
+    const sortedByProfit = [...validProds].sort((a, b) => b.ganancia - a.ganancia);
+
+    const stockBajo = productos.filter(p => p.stock_actual > 0 && p.stock_actual <= (p.stock_minimo || 5));
     const sinStock = productos.filter(p => p.stock_actual <= 0);
 
     // C. Rendimiento Cajeras (con redondeo de montos)
     const cajeraStats: Record<string, { monto: number; cant: number; nombre: string }> = {};
     ventas.forEach(v => {
-      const u = usuarios.find(user => user.id === v.id_usuario_cajera);
-      const nombre = u ? `${u.nombre} ${u.apellido || ''}` : 'Cajera Desconocida';
-      if (!cajeraStats[v.id_usuario_cajera]) {
-        cajeraStats[v.id_usuario_cajera] = { monto: 0, cant: 0, nombre };
+      const cajeraId = v.id_usuario_cajera || 'unknown';
+      if (!cajeraStats[cajeraId]) {
+        const u = usuarios.find(user => user.id === cajeraId);
+        const nombre = u ? `${u.nombre} ${u.apellido || ''}`.trim() : 'Cajera Desconocida';
+        cajeraStats[cajeraId] = { monto: 0, cant: 0, nombre };
       }
-      cajeraStats[v.id_usuario_cajera].monto += (v.total_venta || 0);
-      cajeraStats[v.id_usuario_cajera].cant += 1;
+      cajeraStats[cajeraId].monto += (v.total_venta || 0);
+      cajeraStats[cajeraId].cant += 1;
     });
     
     // Redondear montos finales de cada cajera
