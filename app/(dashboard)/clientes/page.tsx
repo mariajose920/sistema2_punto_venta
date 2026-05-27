@@ -20,6 +20,17 @@ interface Movimiento {
   referencia: string;
 }
 
+interface DetalleVentaConProducto {
+  cantidad: number;
+  precio_unitario_venta: number;
+  subtotal: number;
+  Producto: { nombre: string } | null;
+}
+
+interface VentaConDetalles extends VentaRow {
+  DetalleVenta: DetalleVentaConProducto[];
+}
+
 export default function ClientesPage() {
   const { role } = useAuth();
   const canManageClientes = role === 'admin' || role === 'cajera';
@@ -37,6 +48,10 @@ export default function ClientesPage() {
 
   const [selectedCliente, setSelectedCliente] = useState<ClienteRow | null>(null);
   const [historial, setHistorial] = useState<Movimiento[]>([]);
+
+  // Tabs de Historial
+  const [activeTab, setActiveTab] = useState<'movimientos' | 'compras'>('movimientos');
+  const [historialCompras, setHistorialCompras] = useState<VentaConDetalles[]>([]);
 
   // Formulario Abono
   const [montoAbono, setMontoAbono] = useState<number>(0);
@@ -171,15 +186,31 @@ export default function ClientesPage() {
     const clienteNorm = { ...cliente, saldo_deudado: deuda, saldo_favor: favor };
     setSelectedCliente(clienteNorm);
     setIsStatementOpen(true);
+    setActiveTab('movimientos');
 
     try {
-      const [ventasRes, pagosRes] = await Promise.all([
+      const [ventasRes, pagosRes, comprasRes] = await Promise.all([
         (supabase.from('Venta') as any).select('*').eq('id_cliente', cliente.id).eq('forma_pago', 'fiado'),
-        (supabase.from('Pago') as any).select('*').eq('cliente_id', cliente.id)
+        (supabase.from('Pago') as any).select('*').eq('cliente_id', cliente.id),
+        (supabase.from('Venta') as any)
+          .select(`
+            *,
+            DetalleVenta (
+              cantidad,
+              precio_unitario_venta,
+              subtotal,
+              Producto (
+                nombre
+              )
+            )
+          `)
+          .eq('id_cliente', cliente.id)
+          .order('fecha_venta', { ascending: false })
       ]);
 
       const ventas = (ventasRes.data as VentaRow[]) || [];
       const pagos = (pagosRes.data as PagoRow[]) || [];
+      setHistorialCompras(comprasRes.data || []);
 
       const movs: Movimiento[] = [
         ...ventas.map(v => ({
@@ -562,7 +593,7 @@ export default function ClientesPage() {
       {isStatementOpen && selectedCliente && (
         <div className="fixed inset-0 z-[150] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/70 backdrop-blur-md">
           <div className="bg-white dark:bg-gray-800 w-full max-w-3xl rounded-t-[2rem] sm:rounded-[3.5rem] p-4 sm:p-12 shadow-2xl max-h-[90vh] overflow-hidden flex flex-col animate-in slide-in-from-bottom sm:zoom-in-95">
-            <div className="flex justify-between items-start mb-6 sm:mb-10">
+            <div className="flex justify-between items-start mb-6 sm:mb-8">
               <div className="min-w-0 flex-1 mr-4">
                 <h2 className="text-2xl sm:text-4xl font-black text-gray-900 dark:text-white tracking-tighter italic">Historial de Cuenta</h2>
                 <p className="text-gray-400 font-black uppercase text-[10px] tracking-[0.3em] mt-1 truncate">{selectedCliente.nombre} • RUT {selectedCliente.rut}</p>
@@ -570,39 +601,100 @@ export default function ClientesPage() {
               <button onClick={() => setIsStatementOpen(false)} className="w-10 h-10 sm:w-14 sm:h-14 bg-gray-50 dark:bg-gray-900 rounded-full flex items-center justify-center text-2xl sm:text-3xl hover:rotate-90 transition-transform shrink-0">✕</button>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 sm:gap-8 mb-6 sm:mb-10">
-              <div className="p-4 sm:p-8 bg-red-50 dark:bg-red-900/10 rounded-[1.5rem] sm:rounded-[2.5rem] border-2 border-red-100 dark:border-red-900/30 text-center">
-                <p className="text-[10px] font-black text-red-600 uppercase tracking-widest mb-1 sm:mb-2">Deuda Pendiente</p>
-                <p className="text-2xl sm:text-4xl font-black text-red-600 tracking-tighter">{formatCurrency(selectedCliente.saldo_deudado)}</p>
-              </div>
-              <div className="p-4 sm:p-8 bg-emerald-50 dark:bg-emerald-900/10 rounded-[1.5rem] sm:rounded-[2.5rem] border-2 border-emerald-100 dark:border-emerald-900/30 text-center">
-                <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-1 sm:mb-2">Monto a favor (Billetera)</p>
-                <p className="text-2xl sm:text-4xl font-black text-emerald-600 tracking-tighter">{formatCurrency(selectedCliente.saldo_favor)}</p>
-              </div>
+            {/* Selector de Pestañas */}
+            <div className="flex gap-4 border-b border-gray-100 dark:border-gray-800 mb-6 sm:mb-8 shrink-0 overflow-x-auto custom-scrollbar pb-1">
+              <button 
+                onClick={() => setActiveTab('movimientos')}
+                className={`pb-3 font-black text-[10px] uppercase tracking-widest whitespace-nowrap transition-colors border-b-2 ${activeTab === 'movimientos' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`}
+              >
+                Movimientos Financieros
+              </button>
+              <button 
+                onClick={() => setActiveTab('compras')}
+                className={`pb-3 font-black text-[10px] uppercase tracking-widest whitespace-nowrap transition-colors border-b-2 ${activeTab === 'compras' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`}
+              >
+                Historial de Compras (Detallado)
+              </button>
             </div>
 
-            <div className="flex-1 overflow-auto space-y-3 sm:space-y-4 pr-2 sm:pr-4 custom-scrollbar">
-              {historial.map((mov, idx) => (
-                <div key={mov.id + idx} className="p-6 bg-gray-50/50 dark:bg-gray-900/50 rounded-[2rem] flex justify-between items-center border border-transparent hover:border-blue-500/30 transition-all">
-                  <div className="flex items-center gap-6">
-                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-2xl shadow-sm ${mov.tipo === 'venta' ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-600'}`}>
-                      {mov.tipo === 'venta' ? '📉' : '📈'}
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">{new Date(mov.fecha).toLocaleDateString()} • {new Date(mov.fecha).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
-                      <p className="font-black text-gray-900 dark:text-white text-lg italic">{mov.referencia.toUpperCase()}</p>
-                    </div>
+            {activeTab === 'movimientos' ? (
+              <>
+                <div className="grid grid-cols-2 gap-3 sm:gap-8 mb-6 sm:mb-8 shrink-0">
+                  <div className="p-4 sm:p-6 bg-red-50 dark:bg-red-900/10 rounded-[1.5rem] sm:rounded-[2rem] border-2 border-red-100 dark:border-red-900/30 text-center">
+                    <p className="text-[10px] font-black text-red-600 uppercase tracking-widest mb-1 sm:mb-2">Deuda Pendiente</p>
+                    <p className="text-2xl sm:text-3xl font-black text-red-600 tracking-tighter">{formatCurrency(selectedCliente.saldo_deudado)}</p>
                   </div>
-                  <div className="text-right">
-                    <p className={`text-2xl font-black tracking-tighter ${mov.tipo === 'venta' ? 'text-red-600' : 'text-emerald-600'}`}>
-                      {mov.tipo === 'venta' ? '-' : '+'}{formatCurrency(mov.monto)}
-                    </p>
-                    <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Movimiento Confirmado</p>
+                  <div className="p-4 sm:p-6 bg-emerald-50 dark:bg-emerald-900/10 rounded-[1.5rem] sm:rounded-[2rem] border-2 border-emerald-100 dark:border-emerald-900/30 text-center">
+                    <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-1 sm:mb-2">Monto a favor</p>
+                    <p className="text-2xl sm:text-3xl font-black text-emerald-600 tracking-tighter">{formatCurrency(selectedCliente.saldo_favor)}</p>
                   </div>
                 </div>
-              ))}
-              {historial.length === 0 && <div className="p-20 text-center text-gray-300 font-bold italic opacity-40 uppercase tracking-widest">Sin registros históricos.</div>}
-            </div>
+
+                <div className="flex-1 overflow-auto space-y-3 sm:space-y-4 pr-2 sm:pr-4 custom-scrollbar">
+                  {historial.length === 0 ? (
+                    <div className="p-8 text-center text-gray-400 font-bold uppercase tracking-widest text-xs">
+                      Sin movimientos financieros
+                    </div>
+                  ) : (
+                    historial.map((mov, idx) => (
+                      <div key={mov.id + idx} className="p-5 sm:p-6 bg-gray-50/50 dark:bg-gray-900/50 rounded-[2rem] flex justify-between items-center border border-transparent hover:border-blue-500/30 transition-all">
+                        <div className="flex items-center gap-4 sm:gap-6">
+                          <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center text-xl sm:text-2xl shadow-sm ${mov.tipo === 'venta' ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-600'}`}>
+                            {mov.tipo === 'venta' ? '📉' : '📈'}
+                          </div>
+                          <div>
+                            <p className="text-[9px] sm:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">{new Date(mov.fecha).toLocaleDateString()} • {new Date(mov.fecha).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                            <p className="font-black text-gray-900 dark:text-white text-base sm:text-lg italic">{mov.referencia.toUpperCase()}</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className={`text-xl sm:text-2xl font-black tracking-tighter ${mov.tipo === 'venta' ? 'text-red-600' : 'text-emerald-600'}`}>
+                            {mov.tipo === 'venta' ? '-' : '+'}{formatCurrency(mov.monto)}
+                          </p>
+                          <p className="text-[8px] sm:text-[9px] font-black text-gray-400 uppercase tracking-widest">Movimiento Confirmado</p>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </>
+            ) : (
+              <div className="flex-1 overflow-auto space-y-4 pr-2 sm:pr-4 custom-scrollbar">
+                {historialCompras.length === 0 ? (
+                  <div className="p-12 text-center text-gray-400 font-bold uppercase tracking-widest text-xs">
+                    No hay compras registradas para este cliente
+                  </div>
+                ) : (
+                  historialCompras.map((compra) => (
+                    <div key={compra.id_venta} className="p-5 sm:p-6 bg-gray-50/50 dark:bg-gray-900/50 rounded-[2rem] border border-gray-100 dark:border-gray-800 transition-all hover:border-blue-500/30">
+                      <div className="flex justify-between items-start mb-4 border-b border-gray-200 dark:border-gray-700 pb-4">
+                        <div>
+                          <p className="font-black text-gray-900 dark:text-white text-base sm:text-lg">Venta #{(compra.id_venta || '').slice(0, 8).toUpperCase()}</p>
+                          <p className="text-[9px] sm:text-[10px] font-bold text-gray-500 uppercase tracking-widest mt-1">{new Date(compra.fecha_venta || '').toLocaleString()}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xl sm:text-2xl font-black text-blue-600 tracking-tighter">{formatCurrency(compra.total_venta || 0)}</p>
+                          <p className="text-[8px] sm:text-[9px] font-black text-gray-500 uppercase tracking-widest mt-1">
+                            Pago: {compra.forma_pago}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="space-y-2 mt-2">
+                        {compra.DetalleVenta?.map((d, i) => (
+                          <div key={i} className="flex justify-between text-xs sm:text-sm items-center bg-white dark:bg-gray-800 p-3 sm:p-4 rounded-[1rem] border border-gray-100 dark:border-gray-700">
+                            <span className="font-bold text-gray-700 dark:text-gray-300 flex items-center gap-3">
+                              <span className="bg-gray-100 dark:bg-gray-700 text-[10px] font-black text-gray-500 px-2 py-1 rounded-lg shrink-0 w-8 text-center">{d.cantidad}x</span>
+                              <span className="truncate max-w-[150px] sm:max-w-xs block">{d.Producto?.nombre || 'Producto eliminado'}</span>
+                            </span>
+                            <span className="font-black text-gray-900 dark:text-white shrink-0">{formatCurrency(d.subtotal)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}

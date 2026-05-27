@@ -69,10 +69,18 @@ export default function CajaPage() {
       // 2. Ventas de cajas abiertas (para resumen)
       if (abiertas && abiertas.length > 0) {
         const cajaIds = abiertas.map((c: CajaRow) => c.id);
-        const { data: ventas } = await (supabase as any)
+        
+        let query = (supabase as any)
           .from('Venta')
           .select('forma_pago, total_venta')
           .in('id_caja', cajaIds);
+
+        // Control real por rol: La cajera solo descarga ventas en efectivo
+        if (role !== 'admin') {
+          query = query.eq('forma_pago', 'efectivo');
+        }
+
+        const { data: ventas } = await query;
         setVentasCaja(ventas || []);
       } else {
         setVentasCaja([]);
@@ -443,28 +451,32 @@ export default function CajaPage() {
 
               {/* Resumen de Ventas */}
               <div className="p-6 sm:p-8 space-y-4">
-                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Resumen de Ventas</p>
-                <div className="grid grid-cols-2 gap-3">
-                  {[
-                    { label: 'Efectivo', key: 'efectivo', color: 'text-emerald-600', bg: 'bg-emerald-50 dark:bg-emerald-900/20' },
-                    { label: 'Tarjeta', key: 'tarjeta', color: 'text-blue-600', bg: 'bg-blue-50 dark:bg-blue-900/20' },
-                    { label: 'Transferencia', key: 'transferencia', color: 'text-indigo-600', bg: 'bg-indigo-50 dark:bg-indigo-900/20' },
-                    { label: 'Fiado', key: 'fiado', color: 'text-amber-600', bg: 'bg-amber-50 dark:bg-amber-900/20' },
-                  ].map(m => (
-                    <div key={m.key} className={`${m.bg} p-4 rounded-2xl`}>
-                      <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">{m.label}</p>
-                      <p className={`text-lg font-black ${m.color}`}>{formatCurrency(resumenPorMetodo[m.key] || 0)}</p>
+                {role === 'admin' && (
+                  <>
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Resumen de Ventas</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      {[
+                        { label: 'Efectivo', key: 'efectivo', color: 'text-emerald-600', bg: 'bg-emerald-50 dark:bg-emerald-900/20' },
+                        { label: 'Tarjeta', key: 'tarjeta', color: 'text-blue-600', bg: 'bg-blue-50 dark:bg-blue-900/20' },
+                        { label: 'Transferencia', key: 'transferencia', color: 'text-indigo-600', bg: 'bg-indigo-50 dark:bg-indigo-900/20' },
+                        { label: 'Fiado', key: 'fiado', color: 'text-amber-600', bg: 'bg-amber-50 dark:bg-amber-900/20' },
+                      ].map(m => (
+                        <div key={m.key} className={`${m.bg} p-4 rounded-2xl`}>
+                          <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">{m.label}</p>
+                          <p className={`text-lg font-black ${m.color}`}>{formatCurrency(resumenPorMetodo[m.key] || 0)}</p>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
+                  </>
+                )}
 
                 <div className="mt-4 p-4 bg-gray-50 dark:bg-gray-900/50 rounded-2xl flex justify-between items-center">
                   <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Fondo Inicial</span>
                   <span className="font-black text-gray-900 dark:text-white">{formatCurrency(caja.monto_inicial || 0)}</span>
                 </div>
                 <div className="p-4 bg-gray-900 dark:bg-white/10 rounded-2xl flex justify-between items-center">
-                  <span className="text-[10px] font-black text-white/60 uppercase tracking-widest">Total en Caja (Efectivo + Fondo)</span>
-                  <span className="font-black text-white text-xl">{formatCurrency((caja.monto_inicial || 0) + totalVentasEfectivo)}</span>
+                  <span className="text-[10px] font-black text-white/60 uppercase tracking-widest">Total Efectivo Esperado en Caja</span>
+                  <span className="font-black text-emerald-400 text-xl">{formatCurrency((caja.monto_inicial || 0) + totalVentasEfectivo)}</span>
                 </div>
               </div>
             </div>
@@ -621,7 +633,7 @@ export default function CajaPage() {
                 </div>
                 <div className="pt-3 border-t border-gray-200 dark:border-gray-700 flex justify-between">
                   <span className="font-black text-gray-900 dark:text-white uppercase text-xs">Monto Esperado en Caja</span>
-                  <span className="font-black text-blue-600 text-lg">{formatCurrency((cajaACerrar.monto_inicial || 0) + totalVentasEfectivo)}</span>
+                  <span className="font-black text-emerald-600 text-lg">{formatCurrency((cajaACerrar.monto_inicial || 0) + totalVentasEfectivo)}</span>
                 </div>
               </div>
 
