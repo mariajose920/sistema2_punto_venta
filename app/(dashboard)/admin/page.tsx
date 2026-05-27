@@ -70,55 +70,70 @@ export default function AdminDashboardPage() {
         setLoading(true);
         setError(null);
 
-        // Intento de carga rápida vía RPC (si existe) o fallback optimizado
+        // RPC: si no existe, rpcError es truthy y vamos al fallback
         const { data: rpcData, error: rpcError } = await (supabase as any).rpc('get_dashboard_metrics');
 
         if (!rpcError && rpcData) {
           setStats(rpcData);
-        } else {
-          // FALLBACK: Consultas paralelas optimizadas limitando columnas
-          const [v, c, cr, p] = await Promise.all([
-            supabase.from('Venta').select('total_venta, forma_pago'),
-            supabase.from('Compra').select('total_compra'),
-            supabase.from('Credito').select('saldo_pendiente'),
-            supabase.from('Producto').select('stock_actual, stock_minimo, precio_compra')
-          ]);
-
-          if (v.error || c.error || cr.error || p.error) throw new Error('Error de sincronización.');
-
-          const ventas = (v.data || []) as unknown as VentaRow[];
-          const compras = (c.data || []) as unknown as CompraRow[];
-          const creditos = (cr.data || []) as unknown as CreditoRow[];
-          const productos = (p.data || []) as unknown as ProductoRow[];
-
-          // Agregación eficiente en una sola pasada (con redondeo de montos)
-          const ingresos = roundMoney(ventas.reduce((acc, val) => acc + (val.total_venta || 0), 0));
-          const gastos = roundMoney(compras.reduce((acc, val) => acc + (val.total_compra || 0), 0));
-          const cuentasPorCobrar = roundMoney(creditos.reduce((acc, val) => acc + (val.saldo_pendiente || 0), 0));
-          const vContado = roundMoney(ventas.filter(v => v.forma_pago !== 'fiado').reduce((acc, val) => acc + (val.total_venta || 0), 0));
-          const vCredito = roundMoney(ventas.filter(v => v.forma_pago === 'fiado').reduce((acc, val) => acc + (val.total_venta || 0), 0));
-
-          let valorInv = 0;
-          let sBajo = 0;
-          for (let i = 0; i < productos.length; i++) {
-            const prod = productos[i];
-            valorInv += Math.round((prod.stock_actual || 0) * (prod.precio_compra || 0));
-            if (prod.stock_actual <= prod.stock_minimo) sBajo++;
-          }
-          valorInv = roundMoney(valorInv);
-
-          setStats({
-            ingresos,
-            gastos,
-            balance: roundMoney(ingresos - gastos),
-            cuentasPorCobrar,
-            valorInventario: valorInv,
-            productosStockBajo: sBajo,
-            totalVentasContado: vContado,
-            totalVentasCredito: vCredito
-          });
+          return;
         }
+
+        if (rpcError) {
+          console.warn('[PanelControl] RPC no disponible, usando fallback:', rpcError.message ?? rpcError);
+        }
+
+        // FALLBACK: cada query se maneja individualmente
+        const [v, c, cr, p] = await Promise.allSettled([
+          supabase.from('Venta').select('total_venta, forma_pago'),
+          supabase.from('Compra').select('total_compra'),
+          supabase.from('Credito').select('saldo_pendiente'),
+          supabase.from('Producto').select('stock_actual, stock_minimo, precio_compra')
+        ]);
+
+        function extractData<T>(result: PromiseSettledResult<any>, table: string): T[] {
+          if (result.status === 'rejected') {
+            console.error(`[PanelControl] Query ${table} rechazada:`, result.reason);
+            return [];
+          }
+          if (result.value.error) {
+            console.error(`[PanelControl] Query ${table} error:`, result.value.error.message, result.value.error.code, result.value.error.hint, result.value.error.details);
+            return [];
+          }
+          return (result.value.data || []) as T[];
+        }
+
+        const ventas = extractData<VentaRow>(v, 'Venta');
+        const compras = extractData<CompraRow>(c, 'Compra');
+        const creditos = extractData<CreditoRow>(cr, 'Credito');
+        const productos = extractData<ProductoRow>(p, 'Producto');
+
+        const ingresos = roundMoney(ventas.reduce((acc, val) => acc + (val.total_venta || 0), 0));
+        const gastos = roundMoney(compras.reduce((acc, val) => acc + (val.total_compra || 0), 0));
+        const cuentasPorCobrar = roundMoney(creditos.reduce((acc, val) => acc + (val.saldo_pendiente || 0), 0));
+        const vContado = roundMoney(ventas.filter(v => v.forma_pago !== 'fiado').reduce((acc, val) => acc + (val.total_venta || 0), 0));
+        const vCredito = roundMoney(ventas.filter(v => v.forma_pago === 'fiado').reduce((acc, val) => acc + (val.total_venta || 0), 0));
+
+        let valorInv = 0;
+        let sBajo = 0;
+        for (let i = 0; i < productos.length; i++) {
+          const prod = productos[i];
+          valorInv += Math.round((prod.stock_actual || 0) * (prod.precio_compra || 0));
+          if (prod.stock_actual <= prod.stock_minimo) sBajo++;
+        }
+        valorInv = roundMoney(valorInv);
+
+        setStats({
+          ingresos,
+          gastos,
+          balance: roundMoney(ingresos - gastos),
+          cuentasPorCobrar,
+          valorInventario: valorInv,
+          productosStockBajo: sBajo,
+          totalVentasContado: vContado,
+          totalVentasCredito: vCredito
+        });
       } catch (err: any) {
+        console.error('[PanelControl] Error fatal en fetchAnalytics:', err.message ?? err, err.details ?? '', err.hint ?? '', err.code ?? '');
         setError('Error al procesar métricas. Por favor reintente.');
       } finally {
         setLoading(false);
