@@ -30,6 +30,7 @@ export default function CajeraDashboardPage() {
   const [productos, setProductos] = useState<ProductBrief[]>([]);
   const [clientesFiado, setClientesFiado] = useState<ClientCredit[]>([]);
   const [promociones, setPromociones] = useState<Promotion[]>([]);
+  const [stockBajo, setStockBajo] = useState<ProductBrief[]>([]);
   const [actividadReciente, setActividadReciente] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -44,18 +45,21 @@ export default function CajeraDashboardPage() {
           { data: prods },
           { data: clients },
           { data: promos },
-          { data: sales }
+          { data: sales },
+          { data: lowStock }
         ] = await Promise.all([
           supabase.from('Producto').select('id, nombre, precio_venta_publico, stock_actual').order('stock_actual', { ascending: false }).limit(6),
           supabase.from('Cliente').select('id, nombre, saldo_deudado').gt('saldo_deudado', 0).limit(4),
           supabase.from('Promocion').select('id, nombre, tipo, valor').eq('activa', true).limit(3),
-          supabase.from('Venta').select('id_venta, total_venta, fecha_venta, forma_pago').eq('id_usuario_cajera', user.id).order('fecha_venta', { ascending: false }).limit(5)
+          supabase.from('Venta').select('id_venta, total_venta, fecha_venta, forma_pago').eq('id_usuario_cajera', user.id).order('fecha_venta', { ascending: false }).limit(5),
+          supabase.from('Producto').select('id, nombre, precio_venta_publico, stock_actual').lte('stock_actual', 5).order('stock_actual', { ascending: true }).limit(4)
         ]);
 
         setProductos(prods || []);
         setClientesFiado(clients || []);
         setPromociones(promos || []);
         setActividadReciente(sales || []);
+        setStockBajo(lowStock || []);
       } catch (error) {
         console.error('Error cargando datos de cajera:', error);
       } finally {
@@ -188,6 +192,31 @@ export default function CajeraDashboardPage() {
 
         {/* Columna Lateral: Alertas y Promociones */}
         <div className="space-y-6 sm:space-y-8">
+          
+          {/* Alertas de Stock Bajo */}
+          <section className="bg-red-50 dark:bg-red-900/10 p-4 sm:p-8 rounded-[2rem] sm:rounded-[2.5rem] border border-red-100 dark:border-red-900/30">
+            <h2 className="text-[10px] sm:text-xs font-black text-red-600 uppercase tracking-widest mb-4 sm:mb-6">Alerta: Stock Crítico</h2>
+            <div className="space-y-3 sm:space-y-4">
+              {loading
+                ? Array.from({ length: 2 }).map((_, index) => (
+                    <div key={`stock-skeleton-${index}`} className="p-4 bg-white dark:bg-gray-800 rounded-2xl animate-pulse">
+                      <div className="h-4 bg-gray-100 dark:bg-gray-700 rounded-full w-2/3 mb-3"></div>
+                      <div className="h-5 bg-gray-100 dark:bg-gray-700 rounded-full w-24"></div>
+                    </div>
+                  ))
+                : stockBajo.length > 0 ? (
+                    stockBajo.map(p => (
+                      <div key={`low-${p.id}`} className="p-4 bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-red-100 dark:border-red-900/30">
+                        <p className="font-bold text-gray-900 dark:text-white text-sm break-words">{p.nombre}</p>
+                        <p className="text-sm font-black text-red-600 tracking-tighter mt-1">{p.stock_actual} {p.stock_actual === 1 ? 'unidad' : 'unidades'}</p>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-red-600/50 text-sm font-bold italic">Stock en niveles seguros.</p>
+                  )}
+            </div>
+            <Link href="/productos" className="mt-6 block text-center py-3 bg-red-600 text-white rounded-xl font-bold text-xs uppercase tracking-widest shadow-lg shadow-red-200 dark:shadow-none">Revisar Inventario</Link>
+          </section>
           
           {/* Monitor de Créditos / Fiados */}
           <section className="bg-amber-50 dark:bg-amber-900/10 p-4 sm:p-8 rounded-[2rem] sm:rounded-[2.5rem] border border-amber-100 dark:border-amber-900/30">
