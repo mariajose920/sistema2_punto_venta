@@ -18,7 +18,7 @@ interface Venta {
 }
 
 interface Detalle {
-  id_detalle: string;
+  id_detalle_venta: string;
   id_producto: string;
   cantidad: number;
   precio_unitario_venta: number;
@@ -68,7 +68,7 @@ export default function HistorialVentasPage() {
         .from('DetalleVenta')
         .select(`
           *,
-          producto:id_producto(nombre)
+          producto:Producto(nombre)
         `)
         .eq('id_venta', venta.id_venta);
 
@@ -251,11 +251,11 @@ export default function HistorialVentasPage() {
                 </thead>
                 <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
                   {detalles.map(d => (
-                    <tr key={d.id_detalle}>
+                    <tr key={d.id_detalle_venta}>
                       <td className="py-4 font-bold text-sm text-gray-900 dark:text-white">{d.producto?.nombre || 'Producto Variable'}</td>
                       <td className="py-4 text-center font-black text-sm">{d.cantidad}</td>
-                      <td className="py-4 text-right text-gray-500 font-bold text-sm">${d.precio_unitario_venta.toLocaleString()}</td>
-                      <td className="py-4 text-right font-black text-sm">${d.subtotal.toLocaleString()}</td>
+                      <td className="py-4 text-right text-gray-500 font-bold text-sm">${(d.precio_unitario_venta || 0).toLocaleString()}</td>
+                      <td className="py-4 text-right font-black text-sm">${(d.subtotal || 0).toLocaleString()}</td>
                     </tr>
                   ))}
                 </tbody>
