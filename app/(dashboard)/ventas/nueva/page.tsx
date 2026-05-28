@@ -381,6 +381,7 @@ export default function NuevaVentaPage() {
         .from('Caja')
         .select('id')
         .eq('estado', 'abierta')
+        .eq('id_usuario_apertura', user.id)
         .order('fecha_apertura', { ascending: true })
         .limit(1);
       if (cajasAbiertas && cajasAbiertas.length > 0) {

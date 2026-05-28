@@ -58,11 +58,12 @@ export default function CajaPage() {
     try {
       setLoading(true);
 
-      // 1. Cajas abiertas
+      // 1. Cajas abiertas del usuario actual (cada uno ve la suya)
       const { data: abiertas } = await (supabase as any)
         .from('Caja')
         .select('*, usuario_apertura:Usuario!Caja_id_usuario_apertura_fkey(nombre, email)')
         .eq('estado', 'abierta')
+        .eq('id_usuario_apertura', user?.id)
         .order('fecha_apertura', { ascending: false });
 
       setCajasAbiertas(abiertas || []);
@@ -97,11 +98,12 @@ export default function CajaPage() {
         setSolicitudes(sols || []);
       }
 
-      // 4. Historial de cajas cerradas (últimas 20)
+      // 4. Historial de cajas cerradas del usuario actual (últimas 20)
       const { data: historial } = await (supabase as any)
         .from('Caja')
         .select('*, usuario_apertura:Usuario!Caja_id_usuario_apertura_fkey(nombre, email), usuario_cierre:Usuario!Caja_id_usuario_cierre_fkey(nombre, email)')
         .neq('estado', 'abierta')
+        .eq('id_usuario_apertura', user?.id)
         .order('fecha_cierre', { ascending: false })
         .limit(20);
       setHistorialCajas(historial || []);
@@ -117,18 +119,17 @@ export default function CajaPage() {
     if (isMounted && user) fetchData();
   }, [isMounted, user, fetchData]);
 
-  // ─── Resumen de Ventas ────────────────────────────────────
-  const resumenPorMetodo = useMemo(() => {
+  // ─── Resumen de Ventas por Caja ────────────────────────────────────
+  const getResumenCaja = useCallback((id_caja: string) => {
+    const ventas = ventasCaja.filter(v => (v as any).id_caja === id_caja);
     const map: Record<string, number> = {};
-    for (const v of ventasCaja) {
+    for (const v of ventas) {
       const pagadoFisico = (v.total_venta || 0) - (v.saldo_favor_usado || 0);
       map[v.forma_pago] = (map[v.forma_pago] || 0) + pagadoFisico;
     }
-    return map;
+    const totalEfectivo = map['efectivo'] || 0;
+    return { map, totalEfectivo };
   }, [ventasCaja]);
-
-  const totalVentasEfectivo = resumenPorMetodo['efectivo'] || 0;
-  const totalVentasGeneral = ventasCaja.reduce((s, v) => s + ((v.total_venta || 0) - (v.saldo_favor_usado || 0)), 0);
 
   // ─── Abrir Caja ───────────────────────────────────────────
   const handleAbrirCaja = async () => {
@@ -465,7 +466,7 @@ export default function CajaPage() {
                       ].map(m => (
                         <div key={m.key} className={`${m.bg} p-4 rounded-2xl`}>
                           <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">{m.label}</p>
-                          <p className={`text-lg font-black ${m.color}`}>{formatCurrency(resumenPorMetodo[m.key] || 0)}</p>
+                          <p className={`text-lg font-black ${m.color}`}>{formatCurrency(getResumenCaja(caja.id).map[m.key] || 0)}</p>
                         </div>
                       ))}
                     </div>
@@ -478,7 +479,7 @@ export default function CajaPage() {
                 </div>
                 <div className="p-4 bg-gray-900 dark:bg-white/10 rounded-2xl flex justify-between items-center">
                   <span className="text-[10px] font-black text-white/60 uppercase tracking-widest">Total Efectivo Esperado en Caja</span>
-                  <span className="font-black text-emerald-400 text-xl">{formatCurrency((caja.monto_inicial || 0) + totalVentasEfectivo)}</span>
+                  <span className="font-black text-emerald-400 text-xl">{formatCurrency((caja.monto_inicial || 0) + getResumenCaja(caja.id).totalEfectivo)}</span>
                 </div>
               </div>
             </div>
@@ -631,11 +632,11 @@ export default function CajaPage() {
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="font-bold text-gray-500">Ventas Efectivo</span>
-                  <span className="font-black text-emerald-600">{formatCurrency(totalVentasEfectivo)}</span>
+                  <span className="font-black text-emerald-600">{formatCurrency(getResumenCaja(cajaACerrar.id).totalEfectivo)}</span>
                 </div>
                 <div className="pt-3 border-t border-gray-200 dark:border-gray-700 flex justify-between">
                   <span className="font-black text-gray-900 dark:text-white uppercase text-xs">Monto Esperado en Caja</span>
-                  <span className="font-black text-emerald-600 text-lg">{formatCurrency((cajaACerrar.monto_inicial || 0) + totalVentasEfectivo)}</span>
+                  <span className="font-black text-emerald-600 text-lg">{formatCurrency((cajaACerrar.monto_inicial || 0) + getResumenCaja(cajaACerrar.id).totalEfectivo)}</span>
                 </div>
               </div>
 
@@ -658,19 +659,19 @@ export default function CajaPage() {
               {/* Diferencia preview */}
               {montoDeclarado > 0 && (
                 <div className={`p-4 rounded-2xl ${
-                  montoDeclarado === (cajaACerrar.monto_inicial || 0) + totalVentasEfectivo
+                  montoDeclarado === (cajaACerrar.monto_inicial || 0) + getResumenCaja(cajaACerrar.id).totalEfectivo
                     ? 'bg-emerald-50 border-2 border-emerald-200'
                     : 'bg-red-50 border-2 border-red-200'
                 }`}>
                   <div className="flex justify-between items-center">
                     <span className="text-xs font-black uppercase">Diferencia</span>
                     <span className={`text-lg font-black ${
-                      montoDeclarado === (cajaACerrar.monto_inicial || 0) + totalVentasEfectivo ? 'text-emerald-600' : 'text-red-600'
+                      montoDeclarado === (cajaACerrar.monto_inicial || 0) + getResumenCaja(cajaACerrar.id).totalEfectivo ? 'text-emerald-600' : 'text-red-600'
                     }`}>
-                      {formatCurrency(montoDeclarado - ((cajaACerrar.monto_inicial || 0) + totalVentasEfectivo))}
+                      {formatCurrency(montoDeclarado - ((cajaACerrar.monto_inicial || 0) + getResumenCaja(cajaACerrar.id).totalEfectivo))}
                     </span>
                   </div>
-                  {montoDeclarado === (cajaACerrar.monto_inicial || 0) + totalVentasEfectivo
+                  {montoDeclarado === (cajaACerrar.monto_inicial || 0) + getResumenCaja(cajaACerrar.id).totalEfectivo
                     ? <p className="text-xs font-bold text-emerald-600 mt-1">✓ Los montos cuadran perfectamente</p>
                     : <p className="text-xs font-bold text-red-600 mt-1">⚠️ Hay un descuadre. Se notificará al administrador.</p>
                   }
