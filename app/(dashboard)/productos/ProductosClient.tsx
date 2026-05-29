@@ -19,7 +19,7 @@ export default function ProductosClient({
   initialProductos: ProductoRow[], 
   initialCategorias: CategoriaRow[] 
 }) {
-  const { role } = useAuth();
+  const { role, user } = useAuth();
 
   // Instrumentación de Hidratación
   const mountTime = useRef(performance.now());
@@ -60,6 +60,12 @@ export default function ProductosClient({
   const [isSaving, setIsSaving] = useState(false);
   const [saveProgress, setSaveProgress] = useState(0);
   const lastOpId = useRef(0);
+
+  // Estado para ajuste de stock (modo edición)
+  const [ajusteStock, setAjusteStock] = useState<string>('');
+  const [isSolicitudAjusteOpen, setIsSolicitudAjusteOpen] = useState(false);
+  const [motivoSolicitud, setMotivoSolicitud] = useState('');
+  const [solicitudEnviada, setSolicitudEnviada] = useState(false);
 
   // 1. Cargar datos desde Supabase (Solo usado post-mutaciones)
   const fetchData = useCallback(async () => {
@@ -239,6 +245,9 @@ export default function ProductosClient({
     setEditingId(null);
     setImageFile(null);
     setShowNewCategoryInput(false);
+    setAjusteStock('');
+    setMotivoSolicitud('');
+    setSolicitudEnviada(false);
     setFormData({
       codigo_barra: '',
       nombre: '',
@@ -354,6 +363,12 @@ export default function ProductosClient({
         // Si estamos editando, construimos el payload únicamente con los campos modificados para optimizar velocidad y consistencia
         let finalData: any = {};
 
+        // Variables de ajuste (compartidas en el scope del processPromise)
+        let ajuste = 0;
+        let stockAntes = 0;
+        let stockDespues = 0;
+        let ajusteAplicado = false;
+
         if (editingId) {
           const original = productos.find(p => p.id === editingId);
           if (original) {
@@ -364,19 +379,58 @@ export default function ProductosClient({
             }
             const normPrecioCompra = normalizeAmount(formData.precio_compra);
             const normPrecioVenta = normalizeAmount(formData.precio_venta_publico);
-            const normStockActual = normalizeAmount(formData.stock_actual);
             const normStockMinimo = normalizeAmount(formData.stock_minimo);
             if (normPrecioCompra !== original.precio_compra) finalData.precio_compra = normPrecioCompra;
             if (normPrecioVenta !== original.precio_venta_publico) finalData.precio_venta_publico = normPrecioVenta;
-            if (normStockActual !== original.stock_actual) finalData.stock_actual = normStockActual;
             if (normStockMinimo !== original.stock_minimo) finalData.stock_minimo = normStockMinimo;
             if (formData.fuente_datos !== original.fuente_datos) finalData.fuente_datos = formData.fuente_datos;
             if (imageFile) {
               finalData.imagen_url = fotoFinal;
             }
           }
+
+          // ── Lógica de Ajuste de Stock (modo edición) ──
+          const rawAjuste = ajusteStock.trim();
+          if (rawAjuste !== '' && rawAjuste !== '0') {
+            const parsed = parseInt(rawAjuste, 10);
+            if (isNaN(parsed) || String(parsed) !== rawAjuste.replace(/^[+-]/, s => s) && rawAjuste.replace(/^[+-]/, '').length > 0) {
+              throw new Error('El ajuste de stock debe ser un número entero. Ejemplo: +30, -10, 5');
+            }
+            ajuste = parsed;
+
+            // Si es negativo y la cajera no tiene permiso temporal, bloquear
+            if (ajuste < 0 && role === 'cajera') {
+              const { data: permisos } = await (supabase.from('SolicitudAjusteStock') as any)
+                .select('id')
+                .eq('cajera_id', user?.id)
+                .eq('estado', 'aprobada')
+                .eq('tipo_aprobacion', 'temporal')
+                .gte('expira_en', new Date().toISOString())
+                .limit(1);
+              if (!permisos || permisos.length === 0) {
+                throw new Error('PERMISO_REQUERIDO');
+              }
+            }
+
+            // Leer stock real desde la BD (datos frescos)
+            const { data: freshProd, error: freshErr } = await (supabase.from('Producto') as any)
+              .select('stock_actual')
+              .eq('id', editingId)
+              .single();
+            if (freshErr || !freshProd) throw new Error('No se pudo leer el stock actual del producto.');
+
+            stockAntes = freshProd.stock_actual ?? 0;
+            stockDespues = stockAntes + ajuste;
+
+            if (stockDespues < 0) {
+              throw new Error(`Este ajuste dejaría el stock en ${stockDespues}. El stock no puede quedar negativo.`);
+            }
+
+            finalData.stock_actual = stockDespues;
+            ajusteAplicado = true;
+          }
         } else {
-          // Modo creación: Todo el payload completo
+          // Modo creación: Todo el payload completo (sin cambios)
           finalData = {
             nombre: nombreNorm,
             categoria: categoriaNorm,
@@ -406,6 +460,19 @@ export default function ProductosClient({
 
         if (error) throw error;
 
+        // Registrar auditoría de ajuste si hubo uno
+        if (ajusteAplicado && editingId && user?.id) {
+          const tipo = role === 'cajera' ? 'autorizado_temporal' : 'directo';
+          await (supabase.from('AjusteStock') as any).insert([{
+            producto_id: editingId,
+            usuario_id: user.id,
+            ajuste,
+            stock_antes: stockAntes,
+            stock_despues: stockDespues,
+            tipo,
+          }]);
+        }
+
         // Etapa 4: Sincronización (100%)
         setSaveProgress(95);
         await fetchData(); // Esperar actualización real antes de cerrar
@@ -425,6 +492,9 @@ export default function ProductosClient({
       if (currentId === lastOpId.current) {
         if (err.name === 'TimeoutError') {
           alert(`El proceso tardó demasiado en responder (60s). Inténtalo de nuevo.`);
+        } else if (err.message === 'PERMISO_REQUERIDO') {
+          // Cajera necesita permiso del admin para descuento de stock
+          setIsSolicitudAjusteOpen(true);
         } else {
           alert('⚠️ No se pudo guardar el producto:\n\n' + (err.message || 'Error desconocido'));
         }
@@ -454,12 +524,41 @@ export default function ProductosClient({
   const openEdit = (p: ProductoRow) => {
     setEditingId(p.id);
     setImageFile(null);
+    setAjusteStock('');
+    setMotivoSolicitud('');
+    setSolicitudEnviada(false);
     setFormData({
       ...p,
       categoria: normalizeText(p.categoria || ''),
       codigo_barra: (p.codigo_barra || '').trim()
     });
     setIsModalOpen(true);
+  };
+
+  // Enviar solicitud de permiso para ajuste negativo
+  const handleEnviarSolicitudAjuste = async () => {
+    if (!user?.id || !editingId) return;
+    try {
+      const productoNombre = productos.find(p => p.id === editingId)?.nombre || editingId;
+      const { error } = await (supabase.from('SolicitudAjusteStock') as any).insert([{
+        cajera_id: user.id,
+        producto_id: editingId,
+        ajuste: parseInt(ajusteStock, 10) || 0,
+        motivo: motivoSolicitud.trim() || null,
+        estado: 'pendiente',
+      }]);
+      if (error) throw error;
+      setSolicitudEnviada(true);
+      // Intentar notificación del navegador (si el admin está fuera)
+      if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification('⚠️ Solicitud de ajuste de stock', {
+          body: `${user.email} solicita ajustar ${productoNombre} en ${ajusteStock}`,
+          icon: '/favicon.ico'
+        });
+      }
+    } catch (err: any) {
+      alert('Error al enviar solicitud: ' + err.message);
+    }
   };
 
   return (
@@ -714,20 +813,61 @@ export default function ProductosClient({
                   />
                 </div>
                 <div>
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Stock Actual (Unidades)</label>
-                  <input
-                    required
-                    type="number"
-                    step="1"
-                    min="0"
-                    value={formData.stock_actual || 0}
-                    onChange={e => {
-                      e.target.value = e.target.value.replace(/^0+(?=\d)/, '');
-                      const cleaned = Math.floor(Number(e.target.value) || 0);
-                      setFormData({ ...formData, stock_actual: Math.max(0, cleaned) });
-                    }}
-                    className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-black text-xl"
-                  />
+                  {editingId ? (
+                    // MODO EDICIÓN: Campo de ajuste por signo (+/-)
+                    <>
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">
+                        Ajuste de Stock
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          placeholder="Ej: +30, -10, 5"
+                          value={ajusteStock}
+                          onChange={e => {
+                            const val = e.target.value;
+                            // Solo permitir enteros con signo opcional
+                            if (/^[+-]?\d*$/.test(val)) setAjusteStock(val);
+                          }}
+                          className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-black text-xl"
+                        />
+                        {ajusteStock && (() => {
+                          const n = parseInt(ajusteStock, 10);
+                          const stockBase = productos.find(p => p.id === editingId)?.stock_actual ?? 0;
+                          const resultado = !isNaN(n) ? stockBase + n : null;
+                          return resultado !== null ? (
+                            <span className={`absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-black uppercase tracking-widest ${
+                              resultado < 0 ? 'text-red-500' : 'text-emerald-600'
+                            }`}>
+                              {stockBase} → {resultado}
+                            </span>
+                          ) : null;
+                        })()}
+                      </div>
+                      <p className="text-[9px] font-bold text-gray-400 mt-1 px-1 italic">
+                        Stock actual: <strong>{productos.find(p => p.id === editingId)?.stock_actual ?? 0}</strong>.
+                        {role === 'cajera' && ' Ajustes negativos requieren aprobación del administrador.'}
+                      </p>
+                    </>
+                  ) : (
+                    // MODO CREACIÓN: Campo de stock absoluto (sin cambios)
+                    <>
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Stock Inicial (Unidades)</label>
+                      <input
+                        required
+                        type="number"
+                        step="1"
+                        min="0"
+                        value={formData.stock_actual || 0}
+                        onChange={e => {
+                          e.target.value = e.target.value.replace(/^0+(?=\d)/, '');
+                          const cleaned = Math.floor(Number(e.target.value) || 0);
+                          setFormData({ ...formData, stock_actual: Math.max(0, cleaned) });
+                        }}
+                        className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-black text-xl"
+                      />
+                    </>
+                  )}
                 </div>
                 <div>
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Stock Mínimo (Unidades)</label>
@@ -858,6 +998,76 @@ export default function ProductosClient({
                 Cerrar Gestor
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal: Solicitud de Permiso para Ajuste Negativo (Cajera) ── */}
+      {isSolicitudAjusteOpen && editingId && (
+        <div className="fixed inset-0 z-[130] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+          <div className="bg-white dark:bg-gray-800 w-full max-w-md rounded-[2.5rem] p-8 shadow-2xl animate-in zoom-in-95 duration-200">
+            {!solicitudEnviada ? (
+              <>
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-12 h-12 bg-amber-100 rounded-2xl flex items-center justify-center text-2xl shrink-0">🔐</div>
+                  <div>
+                    <h2 className="text-xl font-black text-gray-900 dark:text-white tracking-tighter">Permiso Requerido</h2>
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Ajuste negativo de stock</p>
+                  </div>
+                </div>
+
+                <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-2xl p-4 mb-6">
+                  <p className="text-sm font-bold text-amber-800 dark:text-amber-300">
+                    Producto: <span className="font-black">{productos.find(p => p.id === editingId)?.nombre}</span>
+                  </p>
+                  <p className="text-sm font-bold text-amber-800 dark:text-amber-300 mt-1">
+                    Ajuste solicitado: <span className="font-black text-red-600">{ajusteStock}</span>
+                  </p>
+                  <p className="text-xs text-amber-700 dark:text-amber-400 mt-2">
+                    Solo el administrador puede autorizar descuentos de stock. Envía la solicitud y espera la aprobación.
+                  </p>
+                </div>
+
+                <div className="mb-6">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Motivo (Opcional)</label>
+                  <textarea
+                    value={motivoSolicitud}
+                    onChange={e => setMotivoSolicitud(e.target.value)}
+                    placeholder="Explica por qué necesitas descontar este stock..."
+                    className="w-full p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold text-sm resize-none h-20"
+                  />
+                </div>
+
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => { setIsSolicitudAjusteOpen(false); setMotivoSolicitud(''); }}
+                    className="flex-1 py-4 font-black text-gray-400 uppercase tracking-widest text-xs"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={handleEnviarSolicitudAjuste}
+                    className="flex-[2] py-4 bg-amber-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-amber-600 transition-all shadow-lg active:scale-95"
+                  >
+                    Enviar Solicitud al Admin
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div className="text-center py-4">
+                <div className="text-5xl mb-4">✅</div>
+                <h3 className="text-xl font-black text-gray-900 dark:text-white mb-2">Solicitud Enviada</h3>
+                <p className="text-sm text-gray-500 font-bold mb-6">
+                  El administrador recibirá una notificación. Cuando apruebe, podrás realizar el ajuste.
+                </p>
+                <button
+                  onClick={() => { setIsSolicitudAjusteOpen(false); setMotivoSolicitud(''); setSolicitudEnviada(false); }}
+                  className="w-full py-4 bg-gray-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-black transition-all"
+                >
+                  Entendido
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

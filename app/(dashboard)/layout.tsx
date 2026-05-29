@@ -1,8 +1,9 @@
 "use client";
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { useState } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
+import { useState, useEffect, useRef } from 'react';
+import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
 import AuthGuard from '@/components/AuthGuard';
 import Sidebar from '@/components/Sidebar';
@@ -40,7 +41,128 @@ export default function DashboardLayout({
 }) {
   const { role, user, loading, isMounted } = useAuth();
   const pathname = usePathname();
+  const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  // Solicitudes de ajuste de stock pendientes (solo admin)
+  interface SolicitudAjuste {
+    id: string;
+    cajera_id: string;
+    producto_id: string;
+    ajuste: number;
+    motivo: string | null;
+    estado: string;
+    created_at: string;
+    cajera?: { nombre?: string | null; email: string } | null;
+    producto?: { nombre: string } | null;
+  }
+  const [solicitudesAjuste, setSolicitudesAjuste] = useState<SolicitudAjuste[]>([]);
+  const [duracionMap, setDuracionMap] = useState<Record<string, string>>({});
+  const [procesandoId, setProcesandoId] = useState<string | null>(null);
+  const solicitudesRef = useRef<SolicitudAjuste[]>([]);
+
+  // Solicitar permiso de notificaciones del navegador (solo admin)
+  useEffect(() => {
+    if (role === 'admin' && 'Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+  }, [role]);
+
+  // Polling cada 20 segundos para detectar solicitudes nuevas (solo admin)
+  useEffect(() => {
+    if (role !== 'admin') return;
+
+    const fetchSolicitudes = async () => {
+      const { data } = await (supabase.from('SolicitudAjusteStock') as any)
+        .select('*, cajera:Usuario!SolicitudAjusteStock_cajera_id_fkey(nombre, email), producto:Producto!SolicitudAjusteStock_producto_id_fkey(nombre)')
+        .eq('estado', 'pendiente')
+        .order('created_at', { ascending: false });
+
+      const nuevas = data || [];
+      setSolicitudesAjuste(nuevas);
+
+      // Notificación del navegador para solicitudes nuevas
+      const ids_antes = solicitudesRef.current.map((s: SolicitudAjuste) => s.id);
+      const nuevasNoVistas = nuevas.filter((s: SolicitudAjuste) => !ids_antes.includes(s.id));
+      if (nuevasNoVistas.length > 0 && 'Notification' in window && Notification.permission === 'granted') {
+        const s = nuevasNoVistas[0];
+        const n = new Notification('⚠️ Solicitud de ajuste de stock pendiente', {
+          body: `${s.cajera?.nombre || s.cajera?.email || 'Cajera'} solicita ajustar ${s.producto?.nombre || 'producto'} en ${s.ajuste > 0 ? '+' : ''}${s.ajuste}`,
+          icon: '/favicon.ico',
+          tag: 'solicitud-ajuste',
+          requireInteraction: true,
+        });
+        n.onclick = () => {
+          window.focus();
+          router.push('/admin');
+          n.close();
+        };
+      }
+      solicitudesRef.current = nuevas;
+    };
+
+    fetchSolicitudes();
+    const interval = setInterval(fetchSolicitudes, 20000);
+    return () => clearInterval(interval);
+  }, [role, router]);
+
+  const handleResponderSolicitud = async (solicitud: SolicitudAjuste, accion: 'una_vez' | 'rechazar' | 'temporal') => {
+    if (procesandoId) return;
+    setProcesandoId(solicitud.id);
+    try {
+      if (accion === 'rechazar') {
+        await (supabase.from('SolicitudAjusteStock') as any)
+          .update({ estado: 'rechazada', admin_id: user?.id, responded_at: new Date().toISOString() })
+          .eq('id', solicitud.id);
+      } else if (accion === 'una_vez') {
+        // Aprobar y aplicar el ajuste directamente desde el admin
+        const { data: prod } = await (supabase.from('Producto') as any)
+          .select('stock_actual')
+          .eq('id', solicitud.producto_id)
+          .single();
+        if (prod) {
+          const nuevoStock = (prod.stock_actual ?? 0) + solicitud.ajuste;
+          if (nuevoStock >= 0) {
+            await (supabase.from('Producto') as any)
+              .update({ stock_actual: nuevoStock })
+              .eq('id', solicitud.producto_id);
+            await (supabase.from('AjusteStock') as any).insert([{
+              producto_id: solicitud.producto_id,
+              usuario_id: user?.id,
+              ajuste: solicitud.ajuste,
+              stock_antes: prod.stock_actual ?? 0,
+              stock_despues: nuevoStock,
+              tipo: 'autorizado_una_vez',
+              solicitud_id: solicitud.id,
+            }]);
+          }
+        }
+        await (supabase.from('SolicitudAjusteStock') as any)
+          .update({ estado: 'aprobada', admin_id: user?.id, tipo_aprobacion: 'una_vez', responded_at: new Date().toISOString() })
+          .eq('id', solicitud.id);
+      } else if (accion === 'temporal') {
+        const minStr = duracionMap[solicitud.id] || '30';
+        const minutos = Math.max(1, parseInt(minStr, 10) || 30);
+        const expira = new Date(Date.now() + minutos * 60 * 1000).toISOString();
+        await (supabase.from('SolicitudAjusteStock') as any)
+          .update({
+            estado: 'aprobada',
+            admin_id: user?.id,
+            tipo_aprobacion: 'temporal',
+            duracion_minutos: minutos,
+            expira_en: expira,
+            responded_at: new Date().toISOString()
+          })
+          .eq('id', solicitud.id);
+      }
+      // Refrescar lista
+      setSolicitudesAjuste(prev => prev.filter(s => s.id !== solicitud.id));
+    } catch (err: any) {
+      alert('Error al procesar solicitud: ' + err.message);
+    } finally {
+      setProcesandoId(null);
+    }
+  };
 
   if (!isMounted || loading) {
     return (
@@ -204,6 +326,68 @@ export default function DashboardLayout({
               </div>
             </div>
           </header>
+
+          {/* ── Banda de notificaciones: Solicitudes de Ajuste de Stock Pendientes (solo admin) ── */}
+          {role === 'admin' && solicitudesAjuste.length > 0 && (
+            <div className="bg-amber-50 dark:bg-amber-900/20 border-b-2 border-amber-200 dark:border-amber-700 px-4 lg:px-8 py-3 space-y-2">
+              <p className="text-[10px] font-black text-amber-700 dark:text-amber-400 uppercase tracking-widest flex items-center gap-2">
+                <span className="w-2 h-2 bg-amber-500 rounded-full animate-pulse inline-block"></span>
+                {solicitudesAjuste.length} solicitud(es) de ajuste de stock pendiente(s)
+              </p>
+              {solicitudesAjuste.map(s => (
+                <div key={s.id} className="bg-white dark:bg-gray-800 rounded-2xl p-3 sm:p-4 border border-amber-200 dark:border-amber-800 flex flex-col sm:flex-row sm:items-center gap-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-black text-gray-900 dark:text-white">
+                      👤 <span>{s.cajera?.nombre || s.cajera?.email || 'Cajera'}</span>
+                      <span className="mx-2 text-gray-400">•</span>
+                      📦 <span>{s.producto?.nombre || '...'}</span>
+                      <span className="mx-2 text-gray-400">•</span>
+                      <span className={`font-black ${s.ajuste < 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+                        {s.ajuste > 0 ? '+' : ''}{s.ajuste}
+                      </span>
+                    </p>
+                    {s.motivo && <p className="text-[10px] text-gray-500 italic mt-0.5">"{s.motivo}"</p>}
+                    <p className="text-[9px] font-bold text-gray-400 uppercase mt-0.5">
+                      {new Date(s.created_at).toLocaleString()}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 shrink-0">
+                    <button
+                      onClick={() => handleResponderSolicitud(s, 'una_vez')}
+                      disabled={!!procesandoId}
+                      className="px-3 py-2 bg-emerald-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-700 transition-all disabled:opacity-50 active:scale-95"
+                    >
+                      ✓ Aceptar (1 vez)
+                    </button>
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="number"
+                        min="1"
+                        placeholder="Min"
+                        value={duracionMap[s.id] || ''}
+                        onChange={e => setDuracionMap(prev => ({ ...prev, [s.id]: e.target.value }))}
+                        className="w-16 px-2 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg text-[10px] font-bold border-none text-center"
+                      />
+                      <button
+                        onClick={() => handleResponderSolicitud(s, 'temporal')}
+                        disabled={!!procesandoId}
+                        className="px-3 py-2 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 transition-all disabled:opacity-50 active:scale-95"
+                      >
+                        ⏱ Temporal
+                      </button>
+                    </div>
+                    <button
+                      onClick={() => handleResponderSolicitud(s, 'rechazar')}
+                      disabled={!!procesandoId}
+                      className="px-3 py-2 bg-red-100 text-red-700 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-200 transition-all disabled:opacity-50 active:scale-95"
+                    >
+                      ✕ Rechazar
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
 
           {/* Área de Página — pb-20 en mobile para no quedar bajo la barra inferior */}
           <main className="w-full max-w-full p-3 sm:p-4 lg:p-8 flex-1 pb-24 lg:pb-8 overflow-x-hidden min-w-0">
