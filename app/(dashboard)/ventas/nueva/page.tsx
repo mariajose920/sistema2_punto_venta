@@ -456,12 +456,23 @@ export default function NuevaVentaPage() {
 
       // 3. Lógica de Wallet y Deuda
       if (selectedClient) {
-        let nuevoSaldoFavor = normalizeAmount((selectedClient.saldo_favor || 0) - saldoFavorAplicado);
-        let nuevaDeuda = normalizeAmount((selectedClient.saldo_deudado || 0));
+        // [FIX CRÍTICO]: Fetch datos frescos del cliente justo antes de actualizar
+        // para evitar sobrescribir con estado viejo (stale state) en ventas secuenciales.
+        const { data: freshClient } = await (supabase.from('Cliente') as any)
+          .select('saldo_deudado, saldo_favor')
+          .eq('id', selectedClientId)
+          .single();
+          
+        let currentFavor = normalizeAmount(freshClient?.saldo_favor || 0);
+        let currentDeuda = normalizeAmount(freshClient?.saldo_deudado || 0);
+
+        let nuevoSaldoFavor = normalizeAmount(currentFavor - saldoFavorAplicado);
+        let nuevaDeuda = currentDeuda;
 
         if (paymentMethod === 'fiado') {
-          // El cliente asume como deuda solo lo que no cubrió su saldo a favor
-          nuevaDeuda = normalizeAmount(nuevaDeuda + aPagarAhora);
+          // El cliente asume como deuda acumulada lo nuevo + lo anterior
+          nuevaDeuda = normalizeAmount(currentDeuda + aPagarAhora);
+          
           if (aPagarAhora > 0) {
             const creditoPayload: CreditoInsert = {
               cliente_id: selectedClientId,
