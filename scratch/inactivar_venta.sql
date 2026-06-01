@@ -211,7 +211,7 @@ BEGIN
   END IF;
 
   UPDATE public."Venta"
-  SET estado = 'anulada',
+  SET estado = 'anulada'::public.estado_venta,
       estado_anterior = v_venta.estado::TEXT,
       motivo_inactivacion = v_motivo,
       inactivada_por = p_usuario_id,
@@ -245,7 +245,7 @@ BEGIN
     p_venta_id::TEXT,
     'Venta marcada como inactiva. Motivo: ' || v_motivo,
     jsonb_build_object('estado', v_venta.estado, 'total_venta', v_venta.total_venta, 'saldo_favor_revertido', v_saldo_favor_usado, 'monto_fiado_revertido', CASE WHEN v_venta.forma_pago::TEXT = 'fiado' THEN v_monto_fiado ELSE 0 END),
-    jsonb_build_object('estado', 'anulada', 'motivo_inactivacion', v_motivo, 'inactivada_por', p_usuario_id, 'inactivada_en', now())
+    jsonb_build_object('estado', 'anulada'::public.estado_venta, 'motivo_inactivacion', v_motivo, 'inactivada_por', p_usuario_id, 'inactivada_en', now())
   );
 
   INSERT INTO public."NotificacionAdmin" (
@@ -298,7 +298,7 @@ DECLARE
   v_usuario RECORD;
   v_credito RECORD;
   v_actor_nombre TEXT;
-  v_estado_nuevo TEXT;
+  v_estado_nuevo public.estado_venta;
   v_saldo_favor_revertido BIGINT := 0;
   v_monto_fiado_revertido BIGINT := 0;
   v_favor_actual BIGINT := 0;
@@ -337,9 +337,9 @@ BEGIN
     RAISE EXCEPTION 'Solo se pueden reactivar ventas inactivas.';
   END IF;
 
-  v_estado_nuevo := COALESCE(NULLIF(v_venta.estado_anterior, ''), 'cerrada');
-  IF v_estado_nuevo = 'anulada' THEN
-    v_estado_nuevo := 'cerrada';
+  v_estado_nuevo := COALESCE(NULLIF(v_venta.estado_anterior, ''), 'cerrada')::public.estado_venta;
+  IF v_estado_nuevo = 'anulada'::public.estado_venta THEN
+    v_estado_nuevo := 'cerrada'::public.estado_venta;
   END IF;
 
   v_saldo_favor_revertido := COALESCE((to_jsonb(v_venta)->>'saldo_favor_revertido')::BIGINT, 0);
