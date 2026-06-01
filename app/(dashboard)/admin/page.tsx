@@ -22,7 +22,7 @@ interface DashboardStats {
 
 interface NotificacionAdminRow {
   id: string;
-  tipo: 'descuadre' | 'solicitud_caja' | 'alerta';
+  tipo: 'descuadre' | 'solicitud_caja' | 'alerta' | 'venta_inactivada';
   titulo: string;
   mensaje: string;
   leida: boolean;
@@ -80,21 +80,9 @@ export default function AdminDashboardPage() {
         setLoading(true);
         setError(null);
 
-        // RPC: si no existe, rpcError es truthy y vamos al fallback
-        const { data: rpcData, error: rpcError } = await (supabase as any).rpc('get_dashboard_metrics');
-
-        if (!rpcError && rpcData) {
-          setStats(rpcData);
-          return;
-        }
-
-        if (rpcError) {
-          console.warn('[PanelControl] RPC no disponible, usando fallback:', rpcError.message ?? rpcError);
-        }
-
-        // FALLBACK: cada query se maneja individualmente
+        // Cada query se maneja individualmente para excluir ventas inactivas de las metricas.
         const [v, c, cr, p, n] = await Promise.allSettled([
-          supabase.from('Venta').select('total_venta, forma_pago'),
+          supabase.from('Venta').select('total_venta, forma_pago').neq('estado', 'anulada'),
           supabase.from('Compra').select('total_compra'),
           supabase.from('Credito').select('saldo_pendiente'),
           supabase.from('Producto').select('stock_actual, stock_minimo, precio_compra'),
@@ -308,7 +296,9 @@ export default function AdminDashboardPage() {
                       <button onClick={() => marcarNotificacionLeida(n.id)} className="text-[10px] uppercase font-black text-amber-600 hover:text-amber-800 tracking-widest shrink-0 ml-2">Descartar</button>
                     </div>
                     <p className="text-xs text-gray-500 font-bold">{n.mensaje}</p>
-                    <Link href="/caja" className="text-[10px] font-black text-blue-600 uppercase tracking-widest mt-1">Ir a Caja →</Link>
+                    <Link href={n.tipo === 'venta_inactivada' ? '/ventas/historial' : '/caja'} className="text-[10px] font-black text-blue-600 uppercase tracking-widest mt-1">
+                      {n.tipo === 'venta_inactivada' ? 'Ir a Historial ->' : 'Ir a Caja ->'}
+                    </Link>
                   </div>
                 ))}
               </div>

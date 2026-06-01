@@ -131,6 +131,11 @@ export interface Database {
           observacion: string | null
           recargo: number | null
           subtotal: number | null
+          saldo_favor_usado: number | null
+          motivo_inactivacion: string | null
+          inactivada_por: string | null
+          inactivada_en: string | null
+          estado_anterior: string | null
         }
         Insert: {
           id_venta?: string
@@ -145,6 +150,11 @@ export interface Database {
           observacion?: string | null
           recargo?: number | null
           subtotal?: number | null
+          saldo_favor_usado?: number | null
+          motivo_inactivacion?: string | null
+          inactivada_por?: string | null
+          inactivada_en?: string | null
+          estado_anterior?: string | null
         }
         Update: {
           id_venta?: string
@@ -159,6 +169,11 @@ export interface Database {
           observacion?: string | null
           recargo?: number | null
           subtotal?: number | null
+          saldo_favor_usado?: number | null
+          motivo_inactivacion?: string | null
+          inactivada_por?: string | null
+          inactivada_en?: string | null
+          estado_anterior?: string | null
         }
       }
       DetalleVenta: {
@@ -503,7 +518,7 @@ export interface Database {
       NotificacionAdmin: {
         Row: {
           id: string
-          tipo: 'descuadre' | 'solicitud_caja' | 'alerta'
+          tipo: 'descuadre' | 'solicitud_caja' | 'alerta' | 'venta_inactivada'
           titulo: string
           mensaje: string
           leida: boolean
@@ -512,7 +527,7 @@ export interface Database {
         }
         Insert: {
           id?: string
-          tipo: 'descuadre' | 'solicitud_caja' | 'alerta'
+          tipo: 'descuadre' | 'solicitud_caja' | 'alerta' | 'venta_inactivada'
           titulo: string
           mensaje: string
           leida?: boolean
@@ -521,7 +536,7 @@ export interface Database {
         }
         Update: {
           id?: string
-          tipo?: 'descuadre' | 'solicitud_caja' | 'alerta'
+          tipo?: 'descuadre' | 'solicitud_caja' | 'alerta' | 'venta_inactivada'
           titulo?: string
           mensaje?: string
           leida?: boolean

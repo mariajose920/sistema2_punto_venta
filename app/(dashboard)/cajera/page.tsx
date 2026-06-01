@@ -51,7 +51,7 @@ export default function CajeraDashboardPage() {
           supabase.from('Producto').select('id, nombre, precio_venta_publico, stock_actual').order('stock_actual', { ascending: false }).limit(6),
           supabase.from('Cliente').select('id, nombre, saldo_deudado').gt('saldo_deudado', 0).limit(4),
           supabase.from('Promocion').select('id, nombre, tipo, valor').eq('activa', true).limit(3),
-          supabase.from('Venta').select('id_venta, total_venta, fecha_venta, forma_pago').eq('id_usuario_cajera', user.id).order('fecha_venta', { ascending: false }).limit(5),
+          supabase.from('Venta').select('id_venta, total_venta, fecha_venta, forma_pago').eq('id_usuario_cajera', user.id).neq('estado', 'anulada').order('fecha_venta', { ascending: false }).limit(5),
           supabase.from('Producto').select('id, nombre, precio_venta_publico, stock_actual').lte('stock_actual', 5).order('stock_actual', { ascending: true }).limit(4)
         ]);
 

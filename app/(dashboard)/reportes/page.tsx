@@ -48,6 +48,7 @@ export default function ReportesPage() {
         .select('*')
         .gte('fecha_venta', desde)
         .lte('fecha_venta', hasta)
+        .neq('estado', 'anulada')
         .order('fecha_venta', { ascending: false });
 
       console.log('🔍 REPORTES DIAGNÓSTICO — Venta rows:', vData?.length ?? 0, 'error:', vError?.message ?? null);

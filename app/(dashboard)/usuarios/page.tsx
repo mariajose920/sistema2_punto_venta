@@ -101,6 +101,7 @@ export default function UsuariosPage() {
         .eq('id_usuario_cajera', user.id)
         .gte('fecha_venta', fechaDesde)
         .lte('fecha_venta', `${fechaHasta}T23:59:59`)
+        .neq('estado', 'anulada')
         .order('fecha_venta', { ascending: false });
 
       if (error) throw error;

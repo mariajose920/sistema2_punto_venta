@@ -190,7 +190,7 @@ export default function ClientesPage() {
 
     try {
       const [ventasRes, pagosRes, comprasRes] = await Promise.all([
-        (supabase.from('Venta') as any).select('*').eq('id_cliente', cliente.id).eq('forma_pago', 'fiado'),
+        (supabase.from('Venta') as any).select('*').eq('id_cliente', cliente.id).eq('forma_pago', 'fiado').neq('estado', 'anulada'),
         (supabase.from('Pago') as any).select('*').eq('cliente_id', cliente.id),
         (supabase.from('Venta') as any)
           .select(`
@@ -205,6 +205,7 @@ export default function ClientesPage() {
             )
           `)
           .eq('id_cliente', cliente.id)
+          .neq('estado', 'anulada')
           .order('fecha_venta', { ascending: false })
       ]);
 

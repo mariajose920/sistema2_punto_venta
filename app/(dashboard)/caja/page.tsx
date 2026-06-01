@@ -20,6 +20,7 @@ interface SolicitudConCajera extends SolicitudRow {
 }
 
 interface VentaResumen {
+  id_caja: string;
   forma_pago: string;
   total_venta: number;
   saldo_favor_usado?: number;
@@ -74,8 +75,9 @@ export default function CajaPage() {
         
         let query = (supabase as any)
           .from('Venta')
-          .select('forma_pago, total_venta')
-          .in('id_caja', cajaIds);
+          .select('id_caja, forma_pago, total_venta, saldo_favor_usado')
+          .in('id_caja', cajaIds)
+          .neq('estado', 'anulada');
 
         // Control real por rol: La cajera solo descarga ventas en efectivo
         if (role !== 'admin') {
@@ -176,12 +178,13 @@ export default function CajaPage() {
       // Calcular monto esperado: monto_inicial + ventas en efectivo de esa caja
       const { data: ventasEfectivo } = await (supabase as any)
         .from('Venta')
-        .select('total_venta')
+        .select('total_venta, saldo_favor_usado')
         .eq('id_caja', cajaACerrar.id)
-        .eq('forma_pago', 'efectivo');
+        .eq('forma_pago', 'efectivo')
+        .neq('estado', 'anulada');
 
       const totalEfectivoCaja = (ventasEfectivo || []).reduce(
-        (acc: number, v: { total_venta: number }) => acc + (v.total_venta || 0), 0
+        (acc: number, v: { total_venta: number; saldo_favor_usado?: number }) => acc + ((v.total_venta || 0) - (v.saldo_favor_usado || 0)), 0
       );
 
       const montoEsperado = (cajaACerrar.monto_inicial || 0) + totalEfectivoCaja;
