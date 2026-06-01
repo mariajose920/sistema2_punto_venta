@@ -393,7 +393,9 @@ export default function ProductosClient({
           const rawAjuste = ajusteStock.trim();
           if (rawAjuste !== '' && rawAjuste !== '0') {
             const parsed = parseInt(rawAjuste, 10);
-            if (isNaN(parsed) || String(parsed) !== rawAjuste.replace(/^[+-]/, s => s) && rawAjuste.replace(/^[+-]/, '').length > 0) {
+            // Acepta: enteros con o sin signo → "30", "+30", "-30", "-10"
+            // Rechaza: decimales, texto, solo signo, vacío inválido
+            if (isNaN(parsed) || !/^[+-]?\d+$/.test(rawAjuste)) {
               throw new Error('El ajuste de stock debe ser un número entero. Ejemplo: +30, -10, 5');
             }
             ajuste = parsed;
