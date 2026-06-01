@@ -9,7 +9,12 @@ ALTER TABLE public."Venta"
   ADD COLUMN IF NOT EXISTS motivo_inactivacion TEXT,
   ADD COLUMN IF NOT EXISTS inactivada_por UUID REFERENCES public."Usuario"(id),
   ADD COLUMN IF NOT EXISTS inactivada_en TIMESTAMPTZ,
-  ADD COLUMN IF NOT EXISTS estado_anterior TEXT;
+  ADD COLUMN IF NOT EXISTS estado_anterior TEXT,
+  ADD COLUMN IF NOT EXISTS saldo_favor_revertido BIGINT DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS monto_fiado_revertido BIGINT DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS motivo_reactivacion TEXT,
+  ADD COLUMN IF NOT EXISTS reactivada_por UUID REFERENCES public."Usuario"(id),
+  ADD COLUMN IF NOT EXISTS reactivada_en TIMESTAMPTZ;
 
 CREATE INDEX IF NOT EXISTS idx_venta_estado_fecha
   ON public."Venta"(estado, fecha_venta DESC);
@@ -93,7 +98,7 @@ END $$;
 
 ALTER TABLE public."NotificacionAdmin"
   ADD CONSTRAINT notificacionadmin_tipo_check
-  CHECK (tipo IN ('descuadre', 'solicitud_caja', 'alerta', 'venta_inactivada'));
+  CHECK (tipo IN ('descuadre', 'solicitud_caja', 'alerta', 'venta_inactivada', 'venta_reactivada'));
 
 -- 4. RLS minima para que admin/cajera puedan actualizar ventas por RPC/pantalla
 ALTER TABLE public."Venta" ENABLE ROW LEVEL SECURITY;
@@ -187,8 +192,10 @@ BEGIN
       FOR UPDATE;
 
       IF FOUND THEN
+        v_monto_fiado := COALESCE(v_credito.saldo_pendiente, 0);
+
         UPDATE public."Cliente"
-        SET saldo_deudado = GREATEST(COALESCE(saldo_deudado, 0) - COALESCE(v_credito.saldo_pendiente, 0), 0)
+        SET saldo_deudado = GREATEST(COALESCE(saldo_deudado, 0) - v_monto_fiado, 0)
         WHERE id = v_venta.id_cliente;
 
         UPDATE public."Credito"
@@ -209,6 +216,8 @@ BEGIN
       motivo_inactivacion = v_motivo,
       inactivada_por = p_usuario_id,
       inactivada_en = now(),
+      saldo_favor_revertido = v_saldo_favor_usado,
+      monto_fiado_revertido = CASE WHEN v_venta.forma_pago::TEXT = 'fiado' THEN v_monto_fiado ELSE 0 END,
       observacion = CONCAT_WS(' | ', NULLIF(observacion, ''), 'INACTIVA: ' || v_motivo)
   WHERE id_venta = p_venta_id;
 
@@ -235,7 +244,7 @@ BEGIN
     'Venta',
     p_venta_id::TEXT,
     'Venta marcada como inactiva. Motivo: ' || v_motivo,
-    jsonb_build_object('estado', v_venta.estado, 'total_venta', v_venta.total_venta),
+    jsonb_build_object('estado', v_venta.estado, 'total_venta', v_venta.total_venta, 'saldo_favor_revertido', v_saldo_favor_usado, 'monto_fiado_revertido', CASE WHEN v_venta.forma_pago::TEXT = 'fiado' THEN v_monto_fiado ELSE 0 END),
     jsonb_build_object('estado', 'anulada', 'motivo_inactivacion', v_motivo, 'inactivada_por', p_usuario_id, 'inactivada_en', now())
   );
 
@@ -271,3 +280,204 @@ END;
 $$;
 
 GRANT EXECUTE ON FUNCTION public.inactivar_venta(UUID, TEXT, UUID) TO authenticated;
+
+-- 6. Funcion transaccional de reactivacion
+-- Solo admin puede ejecutarla. Reaplica stock, saldos y creditos revertidos.
+CREATE OR REPLACE FUNCTION public.reactivar_venta(
+  p_venta_id UUID,
+  p_motivo TEXT,
+  p_usuario_id UUID
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_venta public."Venta"%ROWTYPE;
+  v_usuario RECORD;
+  v_credito RECORD;
+  v_actor_nombre TEXT;
+  v_estado_nuevo TEXT;
+  v_saldo_favor_revertido BIGINT := 0;
+  v_monto_fiado_revertido BIGINT := 0;
+  v_favor_actual BIGINT := 0;
+  v_favor_a_consumir BIGINT := 0;
+  v_favor_faltante BIGINT := 0;
+  v_motivo TEXT;
+BEGIN
+  v_motivo := NULLIF(btrim(COALESCE(p_motivo, '')), '');
+
+  IF auth.uid() IS NOT NULL AND auth.uid() <> p_usuario_id THEN
+    RAISE EXCEPTION 'El usuario autenticado no coincide con el usuario informado.';
+  END IF;
+
+  SELECT *
+  INTO v_usuario
+  FROM public."Usuario"
+  WHERE id = p_usuario_id
+    AND rol = 'admin'
+    AND COALESCE(activo, true) = true;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Solo un administrador activo puede reactivar ventas.';
+  END IF;
+
+  SELECT *
+  INTO v_venta
+  FROM public."Venta"
+  WHERE id_venta = p_venta_id
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Venta no encontrada.';
+  END IF;
+
+  IF v_venta.estado <> 'anulada' THEN
+    RAISE EXCEPTION 'Solo se pueden reactivar ventas inactivas.';
+  END IF;
+
+  v_estado_nuevo := COALESCE(NULLIF(v_venta.estado_anterior, ''), 'cerrada');
+  IF v_estado_nuevo = 'anulada' THEN
+    v_estado_nuevo := 'cerrada';
+  END IF;
+
+  v_saldo_favor_revertido := COALESCE((to_jsonb(v_venta)->>'saldo_favor_revertido')::BIGINT, 0);
+  IF v_saldo_favor_revertido = 0 THEN
+    v_saldo_favor_revertido := COALESCE((to_jsonb(v_venta)->>'saldo_favor_usado')::BIGINT, 0);
+  END IF;
+
+  v_monto_fiado_revertido := COALESCE((to_jsonb(v_venta)->>'monto_fiado_revertido')::BIGINT, 0);
+  IF v_monto_fiado_revertido = 0 AND v_venta.forma_pago::TEXT = 'fiado' THEN
+    v_monto_fiado_revertido := GREATEST(COALESCE(v_venta.total_venta, 0)::BIGINT - COALESCE((to_jsonb(v_venta)->>'saldo_favor_usado')::BIGINT, 0), 0);
+  END IF;
+
+  -- Reaplicar el descuento de stock original de la venta.
+  UPDATE public."Producto" p
+  SET stock_actual = COALESCE(p.stock_actual, 0) - d.cantidad
+  FROM public."DetalleVenta" d
+  WHERE d.id_venta = p_venta_id
+    AND d.id_producto IS NOT NULL
+    AND p.id = d.id_producto;
+
+  IF v_venta.id_cliente IS NOT NULL THEN
+    IF v_saldo_favor_revertido > 0 THEN
+      SELECT COALESCE(saldo_favor, 0)
+      INTO v_favor_actual
+      FROM public."Cliente"
+      WHERE id = v_venta.id_cliente
+      FOR UPDATE;
+
+      v_favor_a_consumir := LEAST(v_favor_actual, v_saldo_favor_revertido);
+      v_favor_faltante := v_saldo_favor_revertido - v_favor_a_consumir;
+
+      UPDATE public."Cliente"
+      SET saldo_favor = GREATEST(COALESCE(saldo_favor, 0) - v_favor_a_consumir, 0),
+          saldo_deudado = COALESCE(saldo_deudado, 0) + v_favor_faltante
+      WHERE id = v_venta.id_cliente;
+    END IF;
+
+    IF v_venta.forma_pago::TEXT = 'fiado' AND v_monto_fiado_revertido > 0 THEN
+      SELECT *
+      INTO v_credito
+      FROM public."Credito"
+      WHERE venta_id = p_venta_id
+      ORDER BY created_at DESC
+      LIMIT 1
+      FOR UPDATE;
+
+      IF FOUND THEN
+        UPDATE public."Credito"
+        SET saldo_pendiente = v_monto_fiado_revertido,
+            estado = 'vigente'
+        WHERE id = v_credito.id;
+      ELSE
+        INSERT INTO public."Credito" (
+          cliente_id,
+          venta_id,
+          monto_inicial,
+          saldo_pendiente,
+          estado
+        )
+        VALUES (
+          v_venta.id_cliente,
+          p_venta_id,
+          v_monto_fiado_revertido,
+          v_monto_fiado_revertido,
+          'vigente'
+        );
+      END IF;
+
+      UPDATE public."Cliente"
+      SET saldo_deudado = COALESCE(saldo_deudado, 0) + v_monto_fiado_revertido
+      WHERE id = v_venta.id_cliente;
+    END IF;
+  END IF;
+
+  UPDATE public."Venta"
+  SET estado = v_estado_nuevo,
+      motivo_reactivacion = v_motivo,
+      reactivada_por = p_usuario_id,
+      reactivada_en = now(),
+      observacion = CONCAT_WS(' | ', NULLIF(observacion, ''), 'REACTIVADA' || COALESCE(': ' || v_motivo, ''))
+  WHERE id_venta = p_venta_id;
+
+  v_actor_nombre := COALESCE(
+    NULLIF(trim(COALESCE(v_usuario.nombre, '') || ' ' || COALESCE(v_usuario.apellido, '')), ''),
+    v_usuario.email,
+    p_usuario_id::TEXT
+  );
+
+  INSERT INTO public."AuditLog" (
+    id_usuario,
+    modulo,
+    accion,
+    entidad_afectada,
+    id_entidad,
+    descripcion,
+    old_values,
+    new_values
+  )
+  VALUES (
+    p_usuario_id,
+    'ventas',
+    'activacion',
+    'Venta',
+    p_venta_id::TEXT,
+    'Venta reactivada por administrador' || COALESCE('. Motivo: ' || v_motivo, ''),
+    jsonb_build_object('estado', v_venta.estado, 'saldo_favor_revertido', v_saldo_favor_revertido, 'monto_fiado_revertido', v_monto_fiado_revertido),
+    jsonb_build_object('estado', v_estado_nuevo, 'motivo_reactivacion', v_motivo, 'reactivada_por', p_usuario_id, 'reactivada_en', now())
+  );
+
+  INSERT INTO public."NotificacionAdmin" (
+    tipo,
+    titulo,
+    mensaje,
+    metadata
+  )
+  VALUES (
+    'venta_reactivada',
+    'Venta reactivada',
+    'Venta #' || upper(left(p_venta_id::TEXT, 8)) || ' reactivada por ' || v_actor_nombre || COALESCE('. Motivo: ' || v_motivo, ''),
+    jsonb_build_object(
+      'id_venta', p_venta_id,
+      'folio', upper(left(p_venta_id::TEXT, 8)),
+      'usuario_id', p_usuario_id,
+      'usuario_nombre', v_actor_nombre,
+      'fecha_hora', now(),
+      'motivo', v_motivo,
+      'estado_anterior', v_venta.estado,
+      'estado_nuevo', v_estado_nuevo
+    )
+  );
+
+  RETURN jsonb_build_object(
+    'ok', true,
+    'id_venta', p_venta_id,
+    'estado_anterior', v_venta.estado,
+    'estado_nuevo', v_estado_nuevo
+  );
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.reactivar_venta(UUID, TEXT, UUID) TO authenticated;

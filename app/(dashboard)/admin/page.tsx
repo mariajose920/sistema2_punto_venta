@@ -22,7 +22,7 @@ interface DashboardStats {
 
 interface NotificacionAdminRow {
   id: string;
-  tipo: 'descuadre' | 'solicitud_caja' | 'alerta' | 'venta_inactivada';
+  tipo: 'descuadre' | 'solicitud_caja' | 'alerta' | 'venta_inactivada' | 'venta_reactivada';
   titulo: string;
   mensaje: string;
   leida: boolean;
@@ -296,8 +296,8 @@ export default function AdminDashboardPage() {
                       <button onClick={() => marcarNotificacionLeida(n.id)} className="text-[10px] uppercase font-black text-amber-600 hover:text-amber-800 tracking-widest shrink-0 ml-2">Descartar</button>
                     </div>
                     <p className="text-xs text-gray-500 font-bold">{n.mensaje}</p>
-                    <Link href={n.tipo === 'venta_inactivada' ? '/ventas/historial' : '/caja'} className="text-[10px] font-black text-blue-600 uppercase tracking-widest mt-1">
-                      {n.tipo === 'venta_inactivada' ? 'Ir a Historial ->' : 'Ir a Caja ->'}
+                    <Link href={n.tipo === 'venta_inactivada' || n.tipo === 'venta_reactivada' ? '/ventas/historial' : '/caja'} className="text-[10px] font-black text-blue-600 uppercase tracking-widest mt-1">
+                      {n.tipo === 'venta_inactivada' || n.tipo === 'venta_reactivada' ? 'Ir a Historial ->' : 'Ir a Caja ->'}
                     </Link>
                   </div>
                 ))}

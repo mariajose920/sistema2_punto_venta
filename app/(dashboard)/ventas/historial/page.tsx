@@ -37,6 +37,9 @@ export default function HistorialVentasPage() {
   const [isInactiveOpen, setIsInactiveOpen] = useState(false);
   const [ventaToInactive, setVentaToInactive] = useState<Venta | null>(null);
   const [inactiveReason, setInactiveReason] = useState('');
+  const [isReactivateOpen, setIsReactivateOpen] = useState(false);
+  const [ventaToReactivate, setVentaToReactivate] = useState<Venta | null>(null);
+  const [reactivateReason, setReactivateReason] = useState('');
   const [search, setSearch] = useState('');
 
   const fetchVentas = useCallback(async () => {
@@ -116,6 +119,40 @@ export default function HistorialVentasPage() {
       await fetchVentas();
     } catch (err: any) {
       alert('No se pudo inactivar la venta: ' + (err?.message || err));
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const openReactivateModal = (venta: Venta) => {
+    if (role !== 'admin') return;
+    setVentaToReactivate(venta);
+    setReactivateReason('');
+    setIsReactivateOpen(true);
+  };
+
+  const handleReactivarVenta = async () => {
+    if (!ventaToReactivate || !user || role !== 'admin') return;
+
+    try {
+      setActionLoading(true);
+      const { error } = await (supabase as any).rpc('reactivar_venta', {
+        p_venta_id: ventaToReactivate.id_venta,
+        p_motivo: reactivateReason.trim() || null,
+        p_usuario_id: user.id
+      });
+
+      if (error) throw error;
+
+      alert('Venta reactivada correctamente.');
+      setIsReactivateOpen(false);
+      setVentaToReactivate(null);
+      setReactivateReason('');
+      setIsDetailOpen(false);
+      setSelectedVenta(null);
+      await fetchVentas();
+    } catch (err: any) {
+      alert('No se pudo reactivar la venta: ' + (err?.message || err));
     } finally {
       setActionLoading(false);
     }
@@ -202,6 +239,14 @@ export default function HistorialVentasPage() {
                           Inactivar
                         </button>
                       )}
+                      {role === 'admin' && v.estado === 'anulada' && (
+                        <button
+                          onClick={() => openReactivateModal(v)}
+                          className="bg-emerald-50 text-emerald-700 px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-600 hover:text-white transition-all active:scale-95"
+                        >
+                          Reactivar
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -262,6 +307,14 @@ export default function HistorialVentasPage() {
                     className="w-full bg-red-50 text-red-700 px-4 py-3 rounded-xl text-sm font-black uppercase tracking-widest active:scale-95"
                   >
                     Inactivar
+                  </button>
+                )}
+                {role === 'admin' && v.estado === 'anulada' && (
+                  <button
+                    onClick={() => openReactivateModal(v)}
+                    className="w-full bg-emerald-50 text-emerald-700 px-4 py-3 rounded-xl text-sm font-black uppercase tracking-widest active:scale-95"
+                  >
+                    Reactivar
                   </button>
                 )}
               </div>
@@ -365,6 +418,14 @@ export default function HistorialVentasPage() {
                   Inactivar venta
                 </button>
               )}
+              {role === 'admin' && selectedVenta.estado === 'anulada' && (
+                <button
+                  onClick={() => openReactivateModal(selectedVenta)}
+                  className="w-full mt-3 py-4 bg-emerald-50 text-emerald-700 font-black rounded-2xl text-[10px] uppercase tracking-[0.2em] hover:bg-emerald-600 hover:text-white transition-all"
+                >
+                  Reactivar venta
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -403,6 +464,46 @@ export default function HistorialVentasPage() {
                   className="flex-[2] py-4 bg-red-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest disabled:opacity-50"
                 >
                   {actionLoading ? 'Procesando...' : 'Confirmar inactivación'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isReactivateOpen && ventaToReactivate && role === 'admin' && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white dark:bg-gray-800 w-full max-w-lg rounded-[2.5rem] p-8 shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="mb-6">
+              <h2 className="text-2xl font-black text-gray-900 dark:text-white tracking-tighter">Reactivar venta</h2>
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mt-1">
+                Folio #{ventaToReactivate.id_venta.slice(0, 8).toUpperCase()} - {new Date(ventaToReactivate.fecha_venta).toLocaleString()}
+              </p>
+            </div>
+            <div className="space-y-4">
+              <p className="text-sm font-bold text-gray-500">
+                Se volverá a aplicar el efecto de la venta en stock, reportes, caja y saldos asociados. Esta acción solo puede ejecutarla un administrador.
+              </p>
+              <textarea
+                value={reactivateReason}
+                onChange={e => setReactivateReason(e.target.value)}
+                placeholder="Motivo u observación de reactivación (opcional)..."
+                className="w-full h-28 p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl border-none font-bold text-sm resize-none focus:ring-4 focus:ring-emerald-600/10"
+              />
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={() => setIsReactivateOpen(false)}
+                  className="flex-1 py-4 font-black text-gray-400 uppercase text-[10px] tracking-widest"
+                  disabled={actionLoading}
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleReactivarVenta}
+                  disabled={actionLoading}
+                  className="flex-[2] py-4 bg-emerald-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest disabled:opacity-50"
+                >
+                  {actionLoading ? 'Procesando...' : 'Confirmar reactivación'}
                 </button>
               </div>
             </div>

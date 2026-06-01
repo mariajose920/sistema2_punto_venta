@@ -136,6 +136,11 @@ export interface Database {
           inactivada_por: string | null
           inactivada_en: string | null
           estado_anterior: string | null
+          saldo_favor_revertido: number | null
+          monto_fiado_revertido: number | null
+          motivo_reactivacion: string | null
+          reactivada_por: string | null
+          reactivada_en: string | null
         }
         Insert: {
           id_venta?: string
@@ -155,6 +160,11 @@ export interface Database {
           inactivada_por?: string | null
           inactivada_en?: string | null
           estado_anterior?: string | null
+          saldo_favor_revertido?: number | null
+          monto_fiado_revertido?: number | null
+          motivo_reactivacion?: string | null
+          reactivada_por?: string | null
+          reactivada_en?: string | null
         }
         Update: {
           id_venta?: string
@@ -174,6 +184,11 @@ export interface Database {
           inactivada_por?: string | null
           inactivada_en?: string | null
           estado_anterior?: string | null
+          saldo_favor_revertido?: number | null
+          monto_fiado_revertido?: number | null
+          motivo_reactivacion?: string | null
+          reactivada_por?: string | null
+          reactivada_en?: string | null
         }
       }
       DetalleVenta: {
@@ -518,7 +533,7 @@ export interface Database {
       NotificacionAdmin: {
         Row: {
           id: string
-          tipo: 'descuadre' | 'solicitud_caja' | 'alerta' | 'venta_inactivada'
+          tipo: 'descuadre' | 'solicitud_caja' | 'alerta' | 'venta_inactivada' | 'venta_reactivada'
           titulo: string
           mensaje: string
           leida: boolean
@@ -527,7 +542,7 @@ export interface Database {
         }
         Insert: {
           id?: string
-          tipo: 'descuadre' | 'solicitud_caja' | 'alerta' | 'venta_inactivada'
+          tipo: 'descuadre' | 'solicitud_caja' | 'alerta' | 'venta_inactivada' | 'venta_reactivada'
           titulo: string
           mensaje: string
           leida?: boolean
@@ -536,7 +551,7 @@ export interface Database {
         }
         Update: {
           id?: string
-          tipo?: 'descuadre' | 'solicitud_caja' | 'alerta' | 'venta_inactivada'
+          tipo?: 'descuadre' | 'solicitud_caja' | 'alerta' | 'venta_inactivada' | 'venta_reactivada'
           titulo?: string
           mensaje?: string
           leida?: boolean
