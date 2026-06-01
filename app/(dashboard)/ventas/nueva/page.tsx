@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { normalizeText, formatCurrency, normalizeAmount, formatRUTVisual, getProductSearchScore, normalizeRUT } from '@/lib/utils';
 import { saveCliente } from '@/lib/services/clientes';
 import { measureAsync } from '@/lib/perf';
+import { BoletaDocumento, printBoleta } from '@/lib/boletas';
 
 type ProductoRow = {
   id: string;
@@ -54,6 +55,10 @@ type VentaDraft = {
   selectedClientId: string;
   search: string;
   calcData: CalcData;
+};
+
+type CompletedSale = BoletaDocumento & {
+  venta: BoletaDocumento['venta'] & { requiere_boleta?: boolean };
 };
 
 const DRAFT_KEY = 'pos:nueva-venta:borrador';
@@ -108,8 +113,11 @@ export default function NuevaVentaPage() {
   const [clientSearch, setClientSearch] = useState('');
   const [showClientSearch, setShowClientSearch] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [boletaLoading, setBoletaLoading] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'efectivo' | 'transferencia' | 'tarjeta' | 'fiado'>('efectivo');
   const [selectedClientId, setSelectedClientId] = useState<string>('');
+  const [completedSale, setCompletedSale] = useState<CompletedSale | null>(null);
+  const [boletaPreview, setBoletaPreview] = useState<BoletaDocumento | null>(null);
   
   // Estado para la Calculadora de Precio Variable
   const [isCalcOpen, setIsCalcOpen] = useState(false);
@@ -495,7 +503,31 @@ export default function NuevaVentaPage() {
         if (cliUpdateError) throw cliUpdateError;
       }
 
-      alert('Venta completada con éxito');
+      const ventaDocumento: CompletedSale = {
+        venta: {
+          id_venta: venta.id_venta,
+          fecha_venta: venta.fecha_venta,
+          total_venta: venta.total_venta,
+          forma_pago: venta.forma_pago,
+          subtotal: venta.subtotal,
+          recargo: venta.recargo,
+          iva: venta.iva,
+          estado_boleta: venta.estado_boleta || 'pendiente',
+          requiere_boleta: venta.requiere_boleta || false,
+          cliente: selectedClient ? { nombre: selectedClient.nombre } : null,
+          usuario: { nombre: user.email || 'Usuario' }
+        },
+        detalles: cart.map(item => ({
+          id_producto: item.isVariable ? null : item.id,
+          cantidad: normalizeAmount(item.cantidad),
+          precio_unitario_venta: normalizeAmount(item.precio_venta_publico),
+          subtotal: normalizeAmount(item.subtotal),
+          nombre: item.nombre,
+          producto: { nombre: item.nombre }
+        }))
+      };
+
+      setCompletedSale(ventaDocumento);
       
       // Limpiar estados para la siguiente venta inmediata
       setCart([]);
@@ -516,6 +548,39 @@ export default function NuevaVentaPage() {
       alert('⚠️ No se pudo completar la venta:\n\n' + message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleEmitirBoleta = async (sale: CompletedSale) => {
+    try {
+      setBoletaLoading(true);
+      const response = await fetch('/api/boletas/emitir', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ventaId: sale.venta.id_venta })
+      });
+
+      const result = await response.json().catch(() => ({}));
+
+      if (!response.ok || !result.ok) {
+        throw new Error(result?.message || 'No se pudo emitir la boleta.');
+      }
+
+      const documento: BoletaDocumento = {
+        venta: {
+          ...sale.venta,
+          ...result.boleta
+        },
+        detalles: result.detalles?.length ? result.detalles : sale.detalles
+      };
+
+      setCompletedSale(null);
+      setBoletaPreview(documento);
+      window.setTimeout(() => printBoleta(documento), 350);
+    } catch (err: any) {
+      alert('No se pudo emitir la boleta:\n\n' + (err?.message || err));
+    } finally {
+      setBoletaLoading(false);
     }
   };
 
@@ -825,6 +890,79 @@ export default function NuevaVentaPage() {
           </div>
         </div>
       </div>
+
+      {completedSale && (
+        <div className="fixed inset-0 z-[140] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white dark:bg-gray-800 w-full max-w-md rounded-[2.5rem] p-8 shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="space-y-2 mb-6">
+              <h2 className="text-2xl font-black text-gray-900 dark:text-white tracking-tighter">Venta completada</h2>
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">
+                Folio #{completedSale.venta.id_venta.slice(0, 8).toUpperCase()} - {formatCurrency(completedSale.venta.total_venta)}
+              </p>
+            </div>
+            <div className="space-y-3">
+              <button
+                type="button"
+                onClick={() => handleEmitirBoleta(completedSale)}
+                disabled={boletaLoading}
+                className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-blue-700 transition-all disabled:opacity-50"
+              >
+                {boletaLoading ? 'Emitiendo boleta...' : 'Emitir boleta'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setCompletedSale(null)}
+                disabled={boletaLoading}
+                className="w-full py-3 text-gray-400 font-black text-[10px] uppercase tracking-widest"
+              >
+                Omitir por ahora
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {boletaPreview && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white dark:bg-gray-800 w-full max-w-md rounded-[2.5rem] p-8 shadow-2xl animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-auto">
+            <div className="text-center border-b border-gray-100 dark:border-gray-700 pb-5 mb-5">
+              <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Boleta electronica</p>
+              <h2 className="text-2xl font-black text-gray-900 dark:text-white mt-1">Folio {boletaPreview.venta.folio_boleta}</h2>
+              {boletaPreview.venta.track_id_sii && (
+                <p className="text-[10px] font-bold text-gray-400 uppercase mt-1">Track ID {boletaPreview.venta.track_id_sii}</p>
+              )}
+            </div>
+            <div className="space-y-2">
+              {boletaPreview.detalles.map((d, index) => (
+                <div key={`${d.id_detalle_venta || d.id_producto || index}`} className="flex justify-between gap-3 text-sm py-2 border-b border-gray-50 dark:border-gray-700">
+                  <span className="font-bold text-gray-700 dark:text-gray-200">{d.producto?.nombre || d.nombre || 'Producto'}</span>
+                  <span className="font-black text-gray-900 dark:text-white whitespace-nowrap">${(d.subtotal || 0).toLocaleString()}</span>
+                </div>
+              ))}
+            </div>
+            <div className="flex justify-between items-center pt-5 mt-5 border-t border-gray-100 dark:border-gray-700">
+              <span className="text-xs font-black text-gray-400 uppercase tracking-widest">Total</span>
+              <span className="text-3xl font-black text-blue-600">${boletaPreview.venta.total_venta.toLocaleString()}</span>
+            </div>
+            <div className="grid grid-cols-2 gap-3 mt-6">
+              <button
+                type="button"
+                onClick={() => setBoletaPreview(null)}
+                className="py-4 text-gray-400 font-black text-[10px] uppercase tracking-widest"
+              >
+                Cerrar
+              </button>
+              <button
+                type="button"
+                onClick={() => printBoleta(boletaPreview)}
+                className="py-4 bg-gray-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest"
+              >
+                Imprimir
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {isCalcOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">

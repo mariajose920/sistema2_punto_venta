@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
+import { BoletaDocumento, printBoleta } from '@/lib/boletas';
 
 interface Venta {
   id_venta: string;
@@ -13,6 +14,14 @@ interface Venta {
   observacion: string;
   subtotal: number;
   recargo: number;
+  requiere_boleta?: boolean;
+  estado_boleta?: 'pendiente' | 'emitida' | 'rechazada' | null;
+  folio_boleta?: string | null;
+  track_id_sii?: string | null;
+  respuesta_sii?: unknown;
+  fecha_emision_boleta?: string | null;
+  url_pdf_boleta?: string | null;
+  xml_boleta?: string | null;
   cliente?: { nombre: string };
   usuario?: { nombre: string };
 }
@@ -40,6 +49,7 @@ export default function HistorialVentasPage() {
   const [isReactivateOpen, setIsReactivateOpen] = useState(false);
   const [ventaToReactivate, setVentaToReactivate] = useState<Venta | null>(null);
   const [reactivateReason, setReactivateReason] = useState('');
+  const [boletaPreview, setBoletaPreview] = useState<BoletaDocumento | null>(null);
   const [search, setSearch] = useState('');
 
   const fetchVentas = useCallback(async () => {
@@ -83,6 +93,37 @@ export default function HistorialVentasPage() {
       setDetalles(data || []);
     } catch (err: any) {
       console.error('Error al cargar detalle:', err);
+    }
+  };
+
+  const loadBoletaDocument = async (venta: Venta, shouldPrint = false) => {
+    if (!venta.requiere_boleta || venta.estado_boleta !== 'emitida') {
+      alert('La venta no tiene una boleta emitida para mostrar.');
+      return;
+    }
+
+    try {
+      const { data, error } = await (supabase as any)
+        .from('DetalleVenta')
+        .select(`
+          *,
+          producto:Producto!detalleventa_id_producto_fkey(nombre)
+        `)
+        .eq('id_venta', venta.id_venta);
+
+      if (error) throw error;
+
+      const documento: BoletaDocumento = {
+        venta,
+        detalles: data || []
+      };
+
+      setBoletaPreview(documento);
+      if (shouldPrint) {
+        window.setTimeout(() => printBoleta(documento), 200);
+      }
+    } catch (err: any) {
+      alert('No se pudo cargar la boleta: ' + (err?.message || err));
     }
   };
 
@@ -194,15 +235,16 @@ export default function HistorialVentasPage() {
                 <th className="px-8 py-5">Folio / Fecha</th>
                 <th className="px-8 py-5">Cliente / Cajera</th>
                 <th className="px-8 py-5">Forma de Pago</th>
+                <th className="px-8 py-5">Boleta</th>
                 <th className="px-8 py-5 text-right">Total</th>
                 <th className="px-8 py-5 text-center">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
               {loading ? (
-                <tr><td colSpan={5} className="p-20 text-center animate-pulse font-bold text-gray-400 uppercase tracking-widest">Cargando Historial...</td></tr>
+                <tr><td colSpan={6} className="p-20 text-center animate-pulse font-bold text-gray-400 uppercase tracking-widest">Cargando Historial...</td></tr>
               ) : filteredVentas.length === 0 ? (
-                <tr><td colSpan={5} className="p-20 text-center font-bold text-gray-400 italic">No se encontraron ventas.</td></tr>
+                <tr><td colSpan={6} className="p-20 text-center font-bold text-gray-400 italic">No se encontraron ventas.</td></tr>
               ) : filteredVentas.map(v => (
                 <tr key={v.id_venta} className="hover:bg-blue-50/30 dark:hover:bg-blue-900/10 transition-colors group">
                   <td className="px-8 py-6">
@@ -219,6 +261,18 @@ export default function HistorialVentasPage() {
                     }`}>
                       {v.estado === 'anulada' ? 'inactiva' : v.forma_pago}
                     </span>
+                  </td>
+                  <td className="px-8 py-6">
+                    <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${
+                      v.requiere_boleta && v.estado_boleta === 'emitida'
+                        ? 'bg-emerald-100 text-emerald-700'
+                        : v.requiere_boleta && v.estado_boleta === 'rechazada'
+                          ? 'bg-red-100 text-red-700'
+                          : 'bg-gray-100 text-gray-500'
+                    }`}>
+                      {v.requiere_boleta ? (v.estado_boleta || 'pendiente') : 'sin boleta'}
+                    </span>
+                    {v.folio_boleta && <p className="text-[10px] font-bold text-gray-400 mt-1">Folio {v.folio_boleta}</p>}
                   </td>
                   <td className="px-8 py-6 text-right">
                     <p className={`font-black text-lg ${v.estado === 'anulada' ? 'text-gray-400 line-through' : 'text-gray-900 dark:text-white'}`}>${v.total_venta.toLocaleString()}</p>
@@ -246,6 +300,22 @@ export default function HistorialVentasPage() {
                         >
                           Reactivar
                         </button>
+                      )}
+                      {v.requiere_boleta && v.estado_boleta === 'emitida' && (
+                        <>
+                          <button
+                            onClick={() => loadBoletaDocument(v)}
+                            className="bg-blue-50 text-blue-700 px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-600 hover:text-white transition-all active:scale-95"
+                          >
+                            Ver boleta
+                          </button>
+                          <button
+                            onClick={() => loadBoletaDocument(v, true)}
+                            className="bg-gray-50 text-gray-700 px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-900 hover:text-white transition-all active:scale-95"
+                          >
+                            Reimprimir
+                          </button>
+                        </>
                       )}
                     </div>
                   </td>
@@ -287,6 +357,18 @@ export default function HistorialVentasPage() {
                   <p className="text-xs font-bold text-gray-400 uppercase">Cajera</p>
                   <p className="font-bold text-blue-600">{v.usuario?.nombre || '---'}</p>
                 </div>
+                <div>
+                  <p className="text-xs font-bold text-gray-400 uppercase">Boleta</p>
+                  <p className={`font-black uppercase ${
+                    v.requiere_boleta && v.estado_boleta === 'emitida'
+                      ? 'text-emerald-600'
+                      : v.requiere_boleta && v.estado_boleta === 'rechazada'
+                        ? 'text-red-600'
+                        : 'text-gray-400'
+                  }`}>
+                    {v.requiere_boleta ? (v.estado_boleta || 'pendiente') : 'sin boleta'} {v.folio_boleta ? `- Folio ${v.folio_boleta}` : ''}
+                  </p>
+                </div>
               </div>
               
               <div className="pt-3 border-t border-gray-200 dark:border-gray-700 flex justify-between items-center">
@@ -316,6 +398,22 @@ export default function HistorialVentasPage() {
                   >
                     Reactivar
                   </button>
+                )}
+                {v.requiere_boleta && v.estado_boleta === 'emitida' && (
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => loadBoletaDocument(v)}
+                      className="w-full bg-blue-50 text-blue-700 px-4 py-3 rounded-xl text-xs font-black uppercase tracking-widest active:scale-95"
+                    >
+                      Ver boleta
+                    </button>
+                    <button
+                      onClick={() => loadBoletaDocument(v, true)}
+                      className="w-full bg-gray-100 text-gray-700 px-4 py-3 rounded-xl text-xs font-black uppercase tracking-widest active:scale-95"
+                    >
+                      Reimprimir
+                    </button>
+                  </div>
                 )}
               </div>
             </div>
@@ -403,6 +501,18 @@ export default function HistorialVentasPage() {
                   <span className="text-xl font-black text-gray-900 dark:text-white uppercase tracking-tighter">Total Cobrado</span>
                   <span className="text-4xl font-black text-blue-600">${selectedVenta.total_venta.toLocaleString()}</span>
                 </div>
+                <div className="flex justify-between items-center pt-2">
+                  <span className="text-xs font-black text-gray-400 uppercase tracking-widest">Estado boleta</span>
+                  <span className={`text-xs font-black uppercase tracking-widest ${
+                    selectedVenta.requiere_boleta && selectedVenta.estado_boleta === 'emitida'
+                      ? 'text-emerald-600'
+                      : selectedVenta.requiere_boleta && selectedVenta.estado_boleta === 'rechazada'
+                        ? 'text-red-600'
+                        : 'text-gray-400'
+                  }`}>
+                    {selectedVenta.requiere_boleta ? (selectedVenta.estado_boleta || 'pendiente') : 'sin boleta'} {selectedVenta.folio_boleta ? `- Folio ${selectedVenta.folio_boleta}` : ''}
+                  </span>
+                </div>
               </div>
               <button 
                 onClick={() => window.print()}
@@ -426,6 +536,64 @@ export default function HistorialVentasPage() {
                   Reactivar venta
                 </button>
               )}
+              {selectedVenta.requiere_boleta && selectedVenta.estado_boleta === 'emitida' && (
+                <div className="grid grid-cols-2 gap-3 mt-3">
+                  <button
+                    onClick={() => loadBoletaDocument(selectedVenta)}
+                    className="py-4 bg-blue-50 text-blue-700 font-black rounded-2xl text-[10px] uppercase tracking-[0.2em] hover:bg-blue-600 hover:text-white transition-all"
+                  >
+                    Ver boleta
+                  </button>
+                  <button
+                    onClick={() => loadBoletaDocument(selectedVenta, true)}
+                    className="py-4 bg-gray-100 text-gray-700 font-black rounded-2xl text-[10px] uppercase tracking-[0.2em] hover:bg-gray-900 hover:text-white transition-all"
+                  >
+                    Reimprimir
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {boletaPreview && (
+        <div className="fixed inset-0 z-[130] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white dark:bg-gray-800 w-full max-w-md rounded-[2.5rem] p-8 shadow-2xl animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-auto">
+            <div className="text-center border-b border-gray-100 dark:border-gray-700 pb-5 mb-5">
+              <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Boleta electronica</p>
+              <h2 className="text-2xl font-black text-gray-900 dark:text-white mt-1">Folio {boletaPreview.venta.folio_boleta}</h2>
+              {boletaPreview.venta.track_id_sii && (
+                <p className="text-[10px] font-bold text-gray-400 uppercase mt-1">Track ID {boletaPreview.venta.track_id_sii}</p>
+              )}
+            </div>
+            <div className="space-y-2">
+              {boletaPreview.detalles.map((d, index) => (
+                <div key={`${d.id_detalle_venta || d.id_producto || index}`} className="flex justify-between gap-3 text-sm py-2 border-b border-gray-50 dark:border-gray-700">
+                  <span className="font-bold text-gray-700 dark:text-gray-200">{d.producto?.nombre || d.nombre || 'Producto'}</span>
+                  <span className="font-black text-gray-900 dark:text-white whitespace-nowrap">${(d.subtotal || 0).toLocaleString()}</span>
+                </div>
+              ))}
+            </div>
+            <div className="flex justify-between items-center pt-5 mt-5 border-t border-gray-100 dark:border-gray-700">
+              <span className="text-xs font-black text-gray-400 uppercase tracking-widest">Total</span>
+              <span className="text-3xl font-black text-blue-600">${boletaPreview.venta.total_venta.toLocaleString()}</span>
+            </div>
+            <div className="grid grid-cols-2 gap-3 mt-6">
+              <button
+                type="button"
+                onClick={() => setBoletaPreview(null)}
+                className="py-4 text-gray-400 font-black text-[10px] uppercase tracking-widest"
+              >
+                Cerrar
+              </button>
+              <button
+                type="button"
+                onClick={() => printBoleta(boletaPreview)}
+                className="py-4 bg-gray-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest"
+              >
+                Imprimir
+              </button>
             </div>
           </div>
         </div>

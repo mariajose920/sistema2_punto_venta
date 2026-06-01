@@ -141,6 +141,14 @@ export interface Database {
           motivo_reactivacion: string | null
           reactivada_por: string | null
           reactivada_en: string | null
+          requiere_boleta: boolean
+          estado_boleta: 'pendiente' | 'emitida' | 'rechazada'
+          folio_boleta: string | null
+          track_id_sii: string | null
+          respuesta_sii: Json | null
+          fecha_emision_boleta: string | null
+          url_pdf_boleta: string | null
+          xml_boleta: string | null
         }
         Insert: {
           id_venta?: string
@@ -165,6 +173,14 @@ export interface Database {
           motivo_reactivacion?: string | null
           reactivada_por?: string | null
           reactivada_en?: string | null
+          requiere_boleta?: boolean
+          estado_boleta?: 'pendiente' | 'emitida' | 'rechazada'
+          folio_boleta?: string | null
+          track_id_sii?: string | null
+          respuesta_sii?: Json | null
+          fecha_emision_boleta?: string | null
+          url_pdf_boleta?: string | null
+          xml_boleta?: string | null
         }
         Update: {
           id_venta?: string
@@ -189,6 +205,14 @@ export interface Database {
           motivo_reactivacion?: string | null
           reactivada_por?: string | null
           reactivada_en?: string | null
+          requiere_boleta?: boolean
+          estado_boleta?: 'pendiente' | 'emitida' | 'rechazada'
+          folio_boleta?: string | null
+          track_id_sii?: string | null
+          respuesta_sii?: Json | null
+          fecha_emision_boleta?: string | null
+          url_pdf_boleta?: string | null
+          xml_boleta?: string | null
         }
       }
       DetalleVenta: {
