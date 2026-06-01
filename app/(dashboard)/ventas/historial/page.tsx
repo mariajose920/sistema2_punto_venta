@@ -47,7 +47,7 @@ export default function HistorialVentasPage() {
         .select(`
           *,
           cliente:Cliente(nombre),
-          usuario:Usuario(nombre)
+          usuario:Usuario!Venta_id_usuario_cajera_fkey(nombre)
         `)
         .order('fecha_venta', { ascending: false });
 
